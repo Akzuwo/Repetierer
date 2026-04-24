@@ -1,4 +1,4 @@
-const { init, read, write_grade, write_joker, apply_entries } = require('./excelReader.js');
+const { init, read, write_grade, write_joker, apply_entries, getJokerMigrationStatus, migrate_jokers } = require('./excelReader.js');
 const { getAppSettings } = require('./storage.js');
 let cls;
 let persons;
@@ -33,7 +33,9 @@ function getProbabilities() {
 		id: e.person.id,
 		name: e.person.name,
 		grades: e.person.grades,
+		joker: Number(e.person.joker || 0),
 		weight: e.weight,
+		boostedNeverSelected: e.boostedNeverSelected,
 		probability: totalWeight > 0 ? e.weight / totalWeight : 0
 	}));
 }
@@ -72,31 +74,29 @@ function getWeightedPersons() {
 
 	return persons.map(e => {
 		let weight = Math.pow(decreaseFactor, 6 - e.grades);
-		if (settings.boostNeverSelected && e.grades === 0) {
+		const boostedNeverSelected = settings.boostNeverSelected && e.grades === 0;
+		if (boostedNeverSelected) {
 			weight *= settings.neverSelectedBoostFactor;
 		}
 
 		return {
 			person: e,
-			weight: weight
+			weight: weight,
+			boostedNeverSelected: boostedNeverSelected
 		};
 	});
 }
 
 function getPersonResult(selectedPerson) {
-	const settings = getAppSettings();
-	const jokerCount = Number(selectedPerson.joker || 0);
-	let jokerUsed = jokerCount >= 1;
-
-	if (settings.extraJokerAfterThreeGrades && selectedPerson.grades >= 3 && jokerCount < 2) {
-		jokerUsed = false;
-	}
-
-	return [selectedPerson.name, jokerUsed];
+	const remainingJokers = Number(selectedPerson.joker || 0);
+	const jokerUnavailable = remainingJokers <= 0;
+	return [selectedPerson.name, jokerUnavailable];
 }
 
 // save the new grade to the file
 function saveGrade(grade, callback) {
+	const settings = getAppSettings();
+	const awardExtraJoker = settings.extraJokerAfterThreeGrades && person.grades < 3 && person.grades + 1 >= 3;
 	const entry = {
 		type: 'grade',
 		className: cls,
@@ -104,6 +104,7 @@ function saveGrade(grade, callback) {
 		personId: person.id,
 		personName: person.name,
 		grade: grade,
+		awardExtraJoker: awardExtraJoker,
 		date: getFormattedDate()
 	};
 
@@ -115,13 +116,11 @@ function saveGrade(grade, callback) {
 			excelWriteError: result && result.error,
 			excelWriteReason: result && result.reason
 		})
-	});
+	}, awardExtraJoker);
 }
 
 // save the joker to the file
 function setJoker(callback) {
-	const settings = getAppSettings();
-	const allowExtraJoker = settings.extraJokerAfterThreeGrades && person.grades >= 3;
 	const entry = {
 		type: 'joker',
 		className: cls,
@@ -141,8 +140,17 @@ function setJoker(callback) {
 				excelWriteReason: result && result.reason
 			});
 		}
-    }, allowExtraJoker);
+    });
 
+}
+
+function migrateJokers(callback) {
+	migrate_jokers(result => {
+		if (result && result.success && cls) {
+			persons = read(cls);
+		}
+		callback(result);
+	});
 }
 
 function applyPendingExcelEntries(entries, callback) {
@@ -201,6 +209,8 @@ module.exports = {
 	applyPendingExcelEntries: applyPendingExcelEntries,
 	reloadExcel: reloadExcel,
 	getCurrentFilePath: getCurrentFilePath,
+	getJokerMigrationStatus: getJokerMigrationStatus,
+	migrateJokers: migrateJokers,
 	getPersons: getPersons,
 	getProbabilities: getProbabilities,
 	selectSpecificPerson: selectSpecificPerson,

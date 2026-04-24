@@ -51,6 +51,10 @@
 			<button class="btn-2 disabled" id="flush-excel-btn">Excel aktualisieren</button>
 			<button class="btn-2" id="reload-excel-btn">Excel neu laden</button>
 		</div>
+		<div class="drawer-actions debug-actions update-hidden" id="debug-actions">
+			<button class="btn-2" id="debug-test-alert-btn">Testalert</button>
+			<button class="btn-2" id="debug-fake-update-btn">Fake Update</button>
+		</div>
 		<p id="drawer-status">Noch keine Datei ausgewählt.</p>
 	</aside>
 
@@ -148,6 +152,38 @@
 		</div>
 	</div>
 
+	<div id="joker-migration-modal" class="modal">
+		<div class="modal-content conflict-content">
+			<div class="settings-header">
+				<button class="help-button" id="joker-migration-help-btn" title="Hilfe">?</button>
+				<h2>Joker anpassen</h2>
+			</div>
+			<p>Aus technischen Gründen müssen die Jokerwerte in dieser Excel-Datei einmalig angepasst werden.</p>
+			<p class="migration-summary" id="joker-migration-summary"></p>
+			<div class="modal-buttons">
+				<button class="btn-1" id="run-joker-migration-btn">Migration durchführen</button>
+				<button class="btn-2" id="cancel-joker-migration-btn">Abbrechen</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="joker-migration-help-modal" class="modal">
+		<div class="modal-content conflict-content">
+			<div class="settings-header">
+				<button class="help-button help-button-back" id="close-joker-migration-help-btn" title="Zurück">‹</button>
+				<h2>Warum?</h2>
+			</div>
+			<div class="settings-guide">
+				<p>Früher wurde der Joker wie ein Ja/Nein-Wert gespeichert: leer bedeutete noch nicht benutzt, 1 bedeutete benutzt.</p>
+				<p>Neu speichert Repetierer die Anzahl verbleibender Joker als Zahl. Dadurch sind auch Extra-Joker möglich, ohne dass Daten uneindeutig werden.</p>
+				<p>Bei der Migration werden leere Joker-Felder zu 1. Alte 1-Werte werden zu 0. So bleibt die Bedeutung erhalten: Wer noch einen Joker hatte, hat danach 1 verbleibenden Joker; wer ihn schon benutzt hatte, hat danach 0.</p>
+			</div>
+			<div class="modal-buttons">
+				<button class="btn-2" id="close-joker-migration-help-bottom-btn">Zurück</button>
+			</div>
+		</div>
+	</div>
+
 	<div id="probabilities-modal" class="modal">
 		<div class="modal-content probability-content">
 			<h2>Wahrscheinlichkeiten</h2>
@@ -160,28 +196,52 @@
 
 	<div id="settings-modal" class="modal">
 		<div class="modal-content settings-content">
-			<h2>Einstellungen</h2>
+			<div class="settings-header">
+				<button class="help-button" id="settings-help-btn" title="Hilfe">?</button>
+				<h2>Einstellungen</h2>
+			</div>
 			<p id="settings-location"></p>
 			<label class="setting-row">
 				<input type="checkbox" id="extra-joker-setting">
-				<span>Personen mit mindestens 3 Noten bekommen einen extra Joker</span>
+				<span>Extra Joker ab 3 Noten</span>
 			</label>
 			<label class="setting-field">
-				<span>Wahrscheinlichkeit sinkt pro Note um den Faktor</span>
+				<span>Wahrscheinlichkeits-Faktor</span>
 				<input id="probability-factor-setting" type="number" min="1.1" max="10" step="0.1">
 			</label>
 			<label class="setting-row">
 				<input type="checkbox" id="boost-never-selected-setting">
-				<span>Personen ohne Note deutlich wahrscheinlicher auswählen</span>
+				<span>Boost für nie ausgewählte Personen</span>
 			</label>
 			<label class="setting-field">
-				<span>Extra-Faktor für Personen ohne Note</span>
+				<span>Boost-Faktor</span>
 				<input id="never-selected-boost-factor-setting" type="number" min="1.1" max="10" step="0.1">
 			</label>
-			<p class="settings-help">Standard ist 3. Das bedeutet: Nach jeder Note hat eine Person nur noch ein Drittel ihres vorherigen Gewichts.</p>
 			<div class="modal-buttons">
 				<button class="btn-1" id="save-settings-btn">Speichern</button>
 				<button class="btn-2" id="close-settings-modal">Abbrechen</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="settings-help-modal" class="modal">
+		<div class="modal-content settings-content settings-guide-content">
+			<div class="settings-header">
+				<button class="help-button help-button-back" id="close-settings-help-btn" title="Zurück">‹</button>
+				<h2>Anleitung</h2>
+			</div>
+			<div class="settings-guide">
+				<h3>Extra Joker ab 3 Noten</h3>
+				<p>Wenn diese Option aktiv ist, dürfen Personen, die bereits mindestens 3 Noten haben, einen zusätzlichen Joker erhalten. Standardmäßig ist das deaktiviert.</p>
+				<h3>Wahrscheinlichkeits-Faktor</h3>
+				<p>Dieser Wert bestimmt, wie stark die Chance sinkt, wenn eine Person schon einmal dran war. Der Standard ist 3. Das bedeutet: Nach jeder Note hat die Person nur noch ein Drittel ihres vorherigen Gewichts.</p>
+				<h3>Boost für nie ausgewählte Personen</h3>
+				<p>Wenn diese Option aktiv ist, bekommen Personen ohne Noten ein zusätzliches Gewicht. Sie werden dadurch deutlich wahrscheinlicher ausgewählt, aber andere Personen können weiterhin drankommen.</p>
+				<h3>Boost-Faktor</h3>
+				<p>Dieser Wert wird nur verwendet, wenn der Boost aktiviert ist. Je höher der Faktor, desto stärker werden Personen bevorzugt, die noch nie ausgewählt wurden.</p>
+			</div>
+			<div class="modal-buttons">
+				<button class="btn-2" id="close-settings-help-bottom-btn">Zurück</button>
 			</div>
 		</div>
 	</div>

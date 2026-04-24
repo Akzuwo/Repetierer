@@ -13,6 +13,9 @@ const _filePath = document.getElementById('file-path');
 const _backupBtn = document.getElementById('backup-btn');
 const _logBtn = document.getElementById('log-btn');
 const _reloadExcelBtn = document.getElementById('reload-excel-btn');
+const _debugActions = document.getElementById('debug-actions');
+const _debugTestAlertBtn = document.getElementById('debug-test-alert-btn');
+const _debugFakeUpdateBtn = document.getElementById('debug-fake-update-btn');
 const _settingsBtn = document.getElementById('settings-btn');
 const _classes = document.getElementById('class-list').children.item(0);
 const _start = document.getElementById('start-btn');
@@ -44,10 +47,22 @@ const _reloadConflictModal = document.getElementById('reload-conflict-modal');
 const _conflictFlushBtn = document.getElementById('conflict-flush-btn');
 const _conflictForceReloadBtn = document.getElementById('conflict-force-reload-btn');
 const _conflictCancelBtn = document.getElementById('conflict-cancel-btn');
+const _jokerMigrationModal = document.getElementById('joker-migration-modal');
+const _jokerMigrationSummary = document.getElementById('joker-migration-summary');
+const _jokerMigrationHelpBtn = document.getElementById('joker-migration-help-btn');
+const _runJokerMigrationBtn = document.getElementById('run-joker-migration-btn');
+const _cancelJokerMigrationBtn = document.getElementById('cancel-joker-migration-btn');
+const _jokerMigrationHelpModal = document.getElementById('joker-migration-help-modal');
+const _closeJokerMigrationHelpBtn = document.getElementById('close-joker-migration-help-btn');
+const _closeJokerMigrationHelpBottomBtn = document.getElementById('close-joker-migration-help-bottom-btn');
 const _probabilitiesModal = document.getElementById('probabilities-modal');
 const _probabilityList = document.getElementById('probability-list');
 const _closeProbabilitiesModal = document.getElementById('close-probabilities-modal');
 const _settingsModal = document.getElementById('settings-modal');
+const _settingsHelpBtn = document.getElementById('settings-help-btn');
+const _settingsHelpModal = document.getElementById('settings-help-modal');
+const _closeSettingsHelpBtn = document.getElementById('close-settings-help-btn');
+const _closeSettingsHelpBottomBtn = document.getElementById('close-settings-help-bottom-btn');
 const _settingsLocation = document.getElementById('settings-location');
 const _extraJokerSetting = document.getElementById('extra-joker-setting');
 const _probabilityFactorSetting = document.getElementById('probability-factor-setting');
@@ -66,6 +81,7 @@ const _updateSecondaryBtn = document.getElementById('update-secondary-btn');
 let selectedPersonIds = [];
 let _currentClass;
 let _nameSize;
+let updatePrimaryAction = requestUpdateDownload;
 
 /*
  * events to main
@@ -161,6 +177,38 @@ _conflictCancelBtn.addEventListener('click', () => {
 	_reloadConflictModal.style.display = 'none';
 });
 
+_runJokerMigrationBtn.addEventListener('click', () => {
+	closeModal(_jokerMigrationModal);
+	ipcRenderer.send('run-joker-migration');
+});
+
+_cancelJokerMigrationBtn.addEventListener('click', () => {
+	closeModal(_jokerMigrationModal);
+	ipcRenderer.send('cancel-joker-migration');
+	state = 0;
+	_filePath.innerText = '';
+	_drawerStatus.innerText = 'Migration abgebrochen. Datei wurde nicht geladen.';
+	updateState();
+});
+
+_jokerMigrationHelpBtn.addEventListener('click', () => {
+	closeModal(_jokerMigrationModal, () => openModal(_jokerMigrationHelpModal));
+});
+
+_closeJokerMigrationHelpBtn.addEventListener('click', () => {
+	closeJokerMigrationHelp();
+});
+
+_closeJokerMigrationHelpBottomBtn.addEventListener('click', () => {
+	closeJokerMigrationHelp();
+});
+
+_jokerMigrationHelpModal.addEventListener('click', (e) => {
+	if (e.target === _jokerMigrationHelpModal) {
+		closeJokerMigrationHelp();
+	}
+});
+
 _closeProbabilitiesModal.addEventListener('click', () => {
 	_probabilitiesModal.style.display = 'none';
 });
@@ -191,32 +239,80 @@ _saveSettingsBtn.addEventListener('click', () => {
 		boostNeverSelected: _boostNeverSelectedSetting.checked,
 		neverSelectedBoostFactor: neverSelectedBoostFactor
 	});
-	_settingsModal.style.display = 'none';
+	closeModal(_settingsModal);
 });
 
 _closeSettingsModal.addEventListener('click', () => {
-	_settingsModal.style.display = 'none';
+	closeModal(_settingsModal);
 });
 
 _settingsModal.addEventListener('click', (e) => {
 	if (e.target === _settingsModal) {
-		_settingsModal.style.display = 'none';
+		closeModal(_settingsModal);
 	}
 });
 
+_settingsHelpBtn.addEventListener('click', () => {
+	closeModal(_settingsModal, () => openModal(_settingsHelpModal));
+});
+
+_closeSettingsHelpBtn.addEventListener('click', () => {
+	closeSettingsHelp();
+});
+
+_closeSettingsHelpBottomBtn.addEventListener('click', () => {
+	closeSettingsHelp();
+});
+
+_settingsHelpModal.addEventListener('click', (e) => {
+	if (e.target === _settingsHelpModal) {
+		closeSettingsHelp();
+	}
+});
+
+_boostNeverSelectedSetting.addEventListener('change', () => {
+	updateNeverSelectedBoostField();
+});
+
 _updatePrimaryBtn.addEventListener('click', () => {
-	ipcRenderer.send('update-download-approved');
-	showUpdatePanel({
-		title: 'Update wird heruntergeladen',
-		detail: 'Bitte warte kurz. Repetierer bereitet die neue Version vor.',
-		progress: 0,
-		primaryVisible: false,
-		secondaryVisible: false
-	});
+	updatePrimaryAction();
 });
 
 _updateSecondaryBtn.addEventListener('click', () => {
 	hideUpdatePanel();
+});
+
+_debugTestAlertBtn.addEventListener('click', () => {
+	showUpdatePanel({
+		title: 'Testalert',
+		detail: 'Debug läuft. Diese Nachricht ist absichtlich oben rechts.',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true,
+		placement: 'toast'
+	});
+});
+
+_debugFakeUpdateBtn.addEventListener('click', () => {
+	showUpdatePanel({
+		title: 'Version 99.9.9 ist verfügbar',
+		detail: 'Das ist ein Fake-Update aus dem Debug-Menü.',
+		primaryText: 'Aktualisieren auf Version 99.9.9',
+		secondaryText: 'Später',
+		primaryVisible: true,
+		secondaryVisible: true,
+		primaryAction: () => {
+			showUpdatePanel({
+				title: 'Fake Update',
+				detail: 'Debug-Test erfolgreich. Es wird nichts heruntergeladen.',
+				primaryVisible: false,
+				secondaryText: 'OK',
+				secondaryVisible: true,
+				placement: 'toast'
+			});
+		},
+		placement: 'center'
+	});
 });
 
 // class
@@ -325,8 +421,49 @@ ipcRenderer.on('saved-file-missing', (event, filePath) => {
 	_drawerStatus.innerText = 'Die zuletzt gespeicherte Datei wurde nicht gefunden.';
 });
 
+ipcRenderer.on('joker-migration-required', (event, status, filePath) => {
+	state = 0;
+	_classes.innerHTML = '';
+	_className.innerText = '';
+	if (filePath) _filePath.innerText = filePath;
+	const emptyText = `${status.emptyCells || 0} leere Joker-Felder`;
+	const usedText = `${status.usedJokerCells || 0} bisherige 1-Werte`;
+	_jokerMigrationSummary.innerText = `${emptyText} werden erkannt. Bei der Migration werden leere Felder zu 1 und bisherige 1-Werte zu 0.`;
+	_drawerStatus.innerText = 'Joker-Migration erforderlich.';
+	updateState();
+	openModal(_jokerMigrationModal);
+});
+
+ipcRenderer.on('joker-migration-done', (event, result) => {
+	showUpdatePanel({
+		title: 'Joker angepasst',
+		detail: `${result.migratedCells || 0} Joker-Felder wurden migriert.`,
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
+});
+
+ipcRenderer.on('joker-migration-failed', (event, result) => {
+	showUpdatePanel({
+		title: 'Migration nicht möglich',
+		detail: result && result.reason === 'excel-locked'
+			? 'Die Excel-Datei scheint geöffnet zu sein. Bitte schließe sie und versuche es erneut.'
+			: 'Die Jokerwerte konnten nicht angepasst werden.',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
+});
+
 ipcRenderer.on('version', (event, appVersion) => {
 	document.getElementById("version").innerText = "Repetierer v" + appVersion;
+});
+
+ipcRenderer.on('debug-mode', (event, isDebugMode) => {
+	if (isDebugMode) {
+		_debugActions.classList.remove('update-hidden');
+	}
 });
 
 ipcRenderer.on('settings-data', (event, settings, paths) => {
@@ -334,8 +471,9 @@ ipcRenderer.on('settings-data', (event, settings, paths) => {
 	_probabilityFactorSetting.value = settings.probabilityDecreaseFactor;
 	_boostNeverSelectedSetting.checked = !!settings.boostNeverSelected;
 	_neverSelectedBoostFactorSetting.value = settings.neverSelectedBoostFactor;
+	updateNeverSelectedBoostField();
 	_settingsLocation.innerText = paths ? paths.settingsPath : '';
-	_settingsModal.style.display = 'block';
+	openModal(_settingsModal);
 });
 
 ipcRenderer.on('update-status', (event, payload) => {
@@ -588,7 +726,9 @@ ipcRenderer.on('probability-data', (event, probabilities) => {
 				bar.appendChild(fill);
 
 				const meta = document.createElement('small');
-				meta.innerText = `${person.grades} Noten | Gewicht ${person.weight.toFixed(2)}`;
+				const jokerText = ` | ${person.joker} Joker übrig`;
+				const boostText = person.boostedNeverSelected ? ' | Boost aktiv' : '';
+				meta.innerText = `${person.grades} Noten${jokerText} | Gewicht ${person.weight.toFixed(2)}${boostText}`;
 
 				header.appendChild(name);
 				header.appendChild(value);
@@ -747,7 +887,9 @@ function handleUpdateStatus(payload) {
 				primaryText: `Aktualisieren auf Version ${payload.version}`,
 				secondaryText: 'Später',
 				primaryVisible: true,
-				secondaryVisible: true
+				secondaryVisible: true,
+				primaryAction: requestUpdateDownload,
+				placement: 'center'
 			});
 			break;
 		case 'downloading':
@@ -756,7 +898,8 @@ function handleUpdateStatus(payload) {
 				detail: `Version ${payload.version} wird heruntergeladen.`,
 				progress: payload.percent || 0,
 				primaryVisible: false,
-				secondaryVisible: false
+				secondaryVisible: false,
+				placement: 'center'
 			});
 			break;
 		case 'progress':
@@ -765,7 +908,8 @@ function handleUpdateStatus(payload) {
 				detail: `${Number(payload.percent || 0).toFixed(1)}% abgeschlossen.`,
 				progress: payload.percent || 0,
 				primaryVisible: false,
-				secondaryVisible: false
+				secondaryVisible: false,
+				placement: 'center'
 			});
 			break;
 		case 'downloaded':
@@ -774,7 +918,8 @@ function handleUpdateStatus(payload) {
 				detail: 'Repetierer wird gleich geschlossen und aktualisiert.',
 				progress: 100,
 				primaryVisible: false,
-				secondaryVisible: false
+				secondaryVisible: false,
+				placement: 'center'
 			});
 			break;
 		case 'installing':
@@ -783,7 +928,8 @@ function handleUpdateStatus(payload) {
 				detail: 'Die App startet nach der Installation automatisch neu.',
 				progress: 100,
 				primaryVisible: false,
-				secondaryVisible: false
+				secondaryVisible: false,
+				placement: 'center'
 			});
 			break;
 		case 'installed':
@@ -811,6 +957,7 @@ function handleUpdateStatus(payload) {
 }
 
 function showUpdatePanel(options) {
+	updatePrimaryAction = options.primaryAction || requestUpdateDownload;
 	_updateTitle.innerText = options.title || 'Update';
 	_updateDetail.innerText = options.detail || '';
 
@@ -835,11 +982,57 @@ function showUpdatePanel(options) {
 		_updateSecondaryBtn.classList.add('update-hidden');
 	}
 
+	_updatePanel.classList.toggle('update-panel-center', options.placement === 'center');
 	_updatePanel.classList.remove('update-hidden');
 }
 
 function hideUpdatePanel() {
-	_updatePanel.classList.add('update-hidden');
+	_updatePanel.classList.add('update-panel-closing');
+	setTimeout(() => {
+		_updatePanel.classList.add('update-hidden');
+		_updatePanel.classList.remove('update-panel-center', 'update-panel-closing');
+		updatePrimaryAction = requestUpdateDownload;
+	}, 180);
+}
+
+function requestUpdateDownload() {
+	ipcRenderer.send('update-download-approved');
+	showUpdatePanel({
+		title: 'Update wird heruntergeladen',
+		detail: 'Bitte warte kurz. Repetierer bereitet die neue Version vor.',
+		progress: 0,
+		primaryVisible: false,
+		secondaryVisible: false,
+		placement: 'center'
+	});
+}
+
+function openModal(modal) {
+	modal.classList.remove('modal-closing');
+	modal.style.display = 'block';
+}
+
+function closeModal(modal, afterClose) {
+	modal.classList.add('modal-closing');
+	setTimeout(() => {
+		modal.style.display = 'none';
+		modal.classList.remove('modal-closing');
+		if (afterClose) afterClose();
+	}, 180);
+}
+
+function closeSettingsHelp() {
+	closeModal(_settingsHelpModal, () => openModal(_settingsModal));
+}
+
+function closeJokerMigrationHelp() {
+	closeModal(_jokerMigrationHelpModal, () => openModal(_jokerMigrationModal));
+}
+
+function updateNeverSelectedBoostField() {
+	const isEnabled = _boostNeverSelectedSetting.checked;
+	_neverSelectedBoostFactorSetting.disabled = !isEnabled;
+	_neverSelectedBoostFactorSetting.closest('.setting-field').classList.toggle('setting-disabled', !isEnabled);
 }
 
 // scale the name to fit the screen
@@ -859,4 +1052,4 @@ Math.clamp = function(a, b, c) {
 }
 
 // automatically scale the name on load
-module.exports = [scaleName(), updateState(), version(), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status')];
+module.exports = [scaleName(), updateState(), version(), ipcRenderer.send('get-debug-mode'), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status')];

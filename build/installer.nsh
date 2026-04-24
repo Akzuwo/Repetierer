@@ -1,3 +1,11 @@
+!ifndef MUI_LICENSEPAGE_CHECKBOX
+  !define MUI_LICENSEPAGE_CHECKBOX
+!endif
+
+!ifndef MUI_LICENSEPAGE_CHECKBOX_TEXT
+  !define MUI_LICENSEPAGE_CHECKBOX_TEXT "Ich akzeptiere das Lizenzabkommen und den Haftungsausschluss."
+!endif
+
 !ifndef BUILD_UNINSTALLER
 !macro customPageAfterChangeDir
   Page custom ExistingInstallNoticePage

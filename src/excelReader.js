@@ -45,13 +45,13 @@ function read(clss) {
 		if (joker_date.value == formattedDate) continue;
 
 		let grades = countGrades(i)
-        let joker = ws.getCell('H' + (i + 6));
+        let joker = Number(ws.getCell('H' + (i + 6)).value || 0);
         if (grades < 6)
 			persons.push({
 				id: i,
 				name: name.value,
 				grades: grades,
-                joker: joker.value
+                joker: joker
 			})
 	}
 
@@ -190,8 +190,84 @@ function writeWorkbook(clss, callback, result) {
 		});
 }
 
+function getJokerMigrationStatus() {
+	const status = {
+		needsMigration: false,
+		emptyCells: 0,
+		usedJokerCells: 0,
+		sheets: []
+	};
+
+	if (!wb) return status;
+
+	wb.worksheets.forEach(worksheet => {
+		if (!worksheet || worksheet.getCell('A1').value !== 'repetierer') return;
+		const sheetStatus = {
+			name: worksheet.name,
+			emptyCells: 0,
+			usedJokerCells: 0
+		};
+
+		for (let row = 6; row <= 30; row++) {
+			if (!worksheet.getCell('A' + row).value) break;
+			const value = worksheet.getCell('H' + row).value;
+			if (value === null || value === undefined || value === '') {
+				sheetStatus.emptyCells++;
+			} else if (Number(value) === 1) {
+				sheetStatus.usedJokerCells++;
+			}
+		}
+
+		if (sheetStatus.emptyCells > 0 || sheetStatus.usedJokerCells > 0) {
+			status.sheets.push(sheetStatus);
+			status.emptyCells += sheetStatus.emptyCells;
+			status.usedJokerCells += sheetStatus.usedJokerCells;
+		}
+	});
+
+	status.needsMigration = status.emptyCells > 0;
+	return status;
+}
+
+function migrate_jokers(callback) {
+	const lockStatus = getFileLockStatus(f);
+	if (lockStatus.locked) {
+		callback({ success: false, reason: 'excel-locked', error: lockStatus.error });
+		return;
+	}
+
+	let migratedCells = 0;
+	wb.worksheets.forEach(worksheet => {
+		if (!worksheet || worksheet.getCell('A1').value !== 'repetierer') return;
+
+		for (let row = 6; row <= 30; row++) {
+			if (!worksheet.getCell('A' + row).value) break;
+			const jokerCell = worksheet.getCell('H' + row);
+			const value = jokerCell.value;
+
+			if (value === null || value === undefined || value === '') {
+				jokerCell.value = 1;
+				migratedCells++;
+			} else if (Number(value) === 1) {
+				jokerCell.value = 0;
+				migratedCells++;
+			}
+		}
+	});
+
+	wb.xlsx.writeFile(f)
+		.then(() => init(f, worksheets => callback({ success: !!worksheets, worksheets: worksheets, migratedCells: migratedCells })))
+		.catch(error => {
+			callback({
+				success: false,
+				reason: 'excel-write-failed',
+				error: error && error.message ? error.message : String(error)
+			});
+		});
+}
+
 // write grade to file
-function write_grade(clss, person, grade, callback) {
+function write_grade(clss, person, grade, callback, awardExtraJoker) {
 
 	// check file
 	if (ws.getCell('A1').value !== 'repetierer') {
@@ -207,9 +283,13 @@ function write_grade(clss, person, grade, callback) {
 
 	ws.getCell(person.id + 6, person.grades + 2).value = grade;
 	ws.getCell(person.id + 6, person.grades + 11).value = getFormattedDate();
+	if (awardExtraJoker) {
+		const jokerCell = ws.getCell('H' + (person.id + 6));
+		jokerCell.value = Number(jokerCell.value || 0) + 1;
+	}
 	writeWorkbook(clss, callback, { type: 'grade' });
 }
-function write_joker(clss, person, callback, allowExtraJoker) {
+function write_joker(clss, person, callback) {
 
 	// check file
 	if (ws.getCell('A1').value !== 'repetierer') {
@@ -224,16 +304,12 @@ function write_joker(clss, person, callback, allowExtraJoker) {
 	}
 
 	const jokerCell = ws.getCell('H' + (person.id + 6));
-	const currentJokerValue = Number(jokerCell.value || 0);
-	if (currentJokerValue >= 1 && !allowExtraJoker) {
+	const remainingJokers = Number(jokerCell.value || 0);
+	if (remainingJokers <= 0) {
 		callback(undefined, { success: false, reason: 'joker-already-used' });
 		return;
 	}
-	if (currentJokerValue >= 2) {
-		callback(undefined, { success: false, reason: 'joker-already-used' });
-		return;
-	}
-	jokerCell.value = currentJokerValue === 1 && allowExtraJoker ? 2 : 1;
+	jokerCell.value = remainingJokers - 1;
 
 	ws.getCell('Q' + (person.id + 6)).value = getFormattedDate();
 	writeWorkbook(clss, callback, { type: 'joker' });
@@ -269,14 +345,18 @@ function apply_entries(clss, entries, callback) {
 			if (gradeIndex >= 6) return;
 			entryWorksheet.getCell(row, gradeIndex + 2).value = entry.grade;
 			entryWorksheet.getCell(row, gradeIndex + 11).value = entry.date || getFormattedDate();
+			if (entry.awardExtraJoker && gradeIndex < 3 && gradeIndex + 1 >= 3) {
+				const jokerCell = entryWorksheet.getCell('H' + row);
+				jokerCell.value = Number(jokerCell.value || 0) + 1;
+			}
 			applied.push(entry.id);
 		}
 
 		if (entry.type === 'joker') {
 			const jokerCell = entryWorksheet.getCell('H' + row);
-			const currentJokerValue = Number(jokerCell.value || 0);
-			if (currentJokerValue >= 2) return;
-			jokerCell.value = currentJokerValue + 1;
+			const remainingJokers = Number(jokerCell.value || 0);
+			if (remainingJokers <= 0) return;
+			jokerCell.value = remainingJokers - 1;
 			entryWorksheet.getCell('Q' + row).value = entry.date || getFormattedDate();
 			applied.push(entry.id);
 		}
@@ -301,7 +381,9 @@ module.exports = {
 	init: init,
 	read: read,
 	write_grade: write_grade,
-	write_joker: write_joker,
+    write_joker: write_joker,
 	apply_entries: apply_entries,
+	getJokerMigrationStatus: getJokerMigrationStatus,
+	migrate_jokers: migrate_jokers,
 	getFileLockStatus: getFileLockStatus
 }

@@ -1,7 +1,8 @@
 const { ipcMain, app, BrowserWindow, dialog } = require('electron');
 const fs = require('fs');
-const { setFile, setClass, selectPerson, saveGrade, setJoker, selectSpecificPerson, getPersons, getProbabilities, applyPendingExcelEntries, reloadExcel} = require('./program.js');
+const { setFile, setClass, selectPerson, saveGrade, setJoker, selectSpecificPerson, getPersons, getProbabilities, applyPendingExcelEntries, reloadExcel, getJokerMigrationStatus, migrateJokers} = require('./program.js');
 const { getBackup, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, logEvent, getLogs, getPaths } = require('./storage.js');
+const isDebugMode = process.argv.includes('--dev-mode');
 
 logEvent('App gestartet', { version: app.getVersion() });
 
@@ -22,6 +23,10 @@ ipcMain.on('quit', (event, args) => {
 // app version
 ipcMain.on('get-version', (event, args) => {
 	event.sender.send('version', app.getVersion());
+});
+
+ipcMain.on('get-debug-mode', (event, args) => {
+	event.sender.send('debug-mode', isDebugMode);
 });
 
 // settings
@@ -46,7 +51,7 @@ ipcMain.on('file', (event, args) => {
 		logEvent('Datei ausgewählt', { filePath: file[0] });
 		setFile(file[0], result => {
 			logEvent(result ? 'Excel eingelesen' : 'Fehler beim Lesen', { filePath: file[0] });
-			event.sender.send('classes', result, file[0]);
+			sendClassesOrJokerMigration(event, result, file[0]);
 		});
 	}
 });
@@ -61,7 +66,7 @@ ipcMain.on('load-saved-file', (event, args) => {
 
 	setFile(filePath, result => {
 		logEvent(result ? 'Excel eingelesen' : 'Fehler beim Lesen', { filePath: filePath, automatic: true });
-		event.sender.send('classes', result, filePath);
+		sendClassesOrJokerMigration(event, result, filePath);
 		event.sender.send('pending-excel-status', getPendingExcelEntries().length);
 	});
 });
@@ -177,6 +182,24 @@ ipcMain.on('discard-pending-excel-entry', (event, pendingEntryId) => {
 	event.sender.send('pending-excel-status', getPendingExcelEntries().length);
 });
 
+ipcMain.on('run-joker-migration', (event, args) => {
+	logEvent('Joker-Migration gestartet');
+	migrateJokers(result => {
+		if (result && result.success) {
+			logEvent('Joker-Migration abgeschlossen', { migratedCells: result.migratedCells });
+			event.sender.send('joker-migration-done', result);
+			event.sender.send('classes', result.worksheets, getExcelFilePath());
+		} else {
+			logEvent('Joker-Migration fehlgeschlagen', result || {});
+			event.sender.send('joker-migration-failed', result || { success: false, reason: 'unknown' });
+		}
+	});
+});
+
+ipcMain.on('cancel-joker-migration', (event, args) => {
+	logEvent('Joker-Migration abgebrochen');
+});
+
 function handleExcelBackupEntry(event, backupEntry) {
 	if (!backupEntry) return;
 	addBackupEntry(backupEntry);
@@ -204,12 +227,30 @@ function reloadExcelFile(event) {
 	reloadExcel(result => {
 		if (result && result.success) {
 			logEvent('Excel neu geladen', { filePath: result.filePath, className: result.className });
-			event.sender.send('classes', result.worksheets, result.filePath);
-			event.sender.send('excel-reloaded', result);
+			sendClassesOrJokerMigration(event, result.worksheets, result.filePath);
+			if (!getJokerMigrationStatus().needsMigration) {
+				event.sender.send('excel-reloaded', result);
+			}
 			event.sender.send('pending-excel-status', getPendingExcelEntries().length);
 		} else {
 			logEvent('Fehler beim Lesen', result || {});
 			event.sender.send('excel-reload-failed', result || { success: false, reason: 'unknown' });
 		}
 	});
+}
+
+function sendClassesOrJokerMigration(event, worksheets, filePath) {
+	if (!worksheets) {
+		event.sender.send('classes', worksheets, filePath);
+		return;
+	}
+
+	const migrationStatus = getJokerMigrationStatus();
+	if (migrationStatus && migrationStatus.needsMigration) {
+		logEvent('Joker-Migration erforderlich', migrationStatus);
+		event.sender.send('joker-migration-required', migrationStatus, filePath);
+		return;
+	}
+
+	event.sender.send('classes', worksheets, filePath);
 }
