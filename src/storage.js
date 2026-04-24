@@ -14,7 +14,8 @@ function getPaths() {
 	return {
 		storageDir: storageDir,
 		settingsPath: path.join(storageDir, 'settings.json'),
-		backupPath: path.join(storageDir, 'backup.json')
+		backupPath: path.join(storageDir, 'backup.json'),
+		logPath: path.join(storageDir, 'repetierer.log')
 	};
 }
 
@@ -118,6 +119,28 @@ function removePendingExcelEntries(ids) {
 	writeJson(getPaths().backupPath, backup);
 }
 
+function logEvent(message, details) {
+	try {
+		ensureStorageDir();
+		const payload = details ? ` ${JSON.stringify(details)}` : '';
+		const line = `[${new Date().toISOString()}] ${message}${payload}\n`;
+		fs.appendFileSync(getPaths().logPath, line, 'utf8');
+	} catch (error) {
+		console.error('Logging fehlgeschlagen:', error);
+	}
+}
+
+function getLogs() {
+	try {
+		ensureStorageDir();
+		const logPath = getPaths().logPath;
+		if (!fs.existsSync(logPath)) return '';
+		return fs.readFileSync(logPath, 'utf8');
+	} catch (error) {
+		return `Logs konnten nicht gelesen werden: ${error && error.message ? error.message : String(error)}`;
+	}
+}
+
 module.exports = {
 	getBackup,
 	getAppSettings,
@@ -128,5 +151,7 @@ module.exports = {
 	addBackupEntry,
 	addPendingExcelEntry,
 	removePendingExcelEntries,
+	logEvent,
+	getLogs,
 	getPaths
 };

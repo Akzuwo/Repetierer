@@ -1,7 +1,9 @@
 const { ipcMain, app, BrowserWindow, dialog } = require('electron');
 const fs = require('fs');
-const { setFile, setClass, selectPerson, saveGrade, setJoker, selectSpecificPerson, getPersons, getProbabilities, applyPendingExcelEntries} = require('./program.js');
-const { getBackup, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, getPaths } = require('./storage.js');
+const { setFile, setClass, selectPerson, saveGrade, setJoker, selectSpecificPerson, getPersons, getProbabilities, applyPendingExcelEntries, reloadExcel} = require('./program.js');
+const { getBackup, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, logEvent, getLogs, getPaths } = require('./storage.js');
+
+logEvent('App gestartet', { version: app.getVersion() });
 
 /*
  * events
@@ -29,6 +31,7 @@ ipcMain.on('get-settings', (event, args) => {
 
 ipcMain.on('save-settings', (event, settings) => {
 	saveAppSettings(settings || {});
+	logEvent('Einstellungen gespeichert');
 	event.sender.send('settings-saved', getAppSettings());
 });
 
@@ -40,7 +43,9 @@ ipcMain.on('file', (event, args) => {
 	});
 	if (file) {
 		saveExcelFilePath(file[0]);
+		logEvent('Datei ausgewählt', { filePath: file[0] });
 		setFile(file[0], result => {
+			logEvent(result ? 'Excel eingelesen' : 'Fehler beim Lesen', { filePath: file[0] });
 			event.sender.send('classes', result, file[0]);
 		});
 	}
@@ -55,6 +60,7 @@ ipcMain.on('load-saved-file', (event, args) => {
 	}
 
 	setFile(filePath, result => {
+		logEvent(result ? 'Excel eingelesen' : 'Fehler beim Lesen', { filePath: filePath, automatic: true });
 		event.sender.send('classes', result, filePath);
 		event.sender.send('pending-excel-status', getPendingExcelEntries().length);
 	});
@@ -115,7 +121,13 @@ ipcMain.on('joker', (event, args) => {
 
 // backup
 ipcMain.on('get-backup', (event, args) => {
+	logEvent('Backup geöffnet');
 	event.sender.send('backup-data', getBackup(), getPaths());
+});
+
+ipcMain.on('get-logs', (event, args) => {
+	logEvent('Log geöffnet');
+	event.sender.send('log-data', getLogs(), getPaths());
 });
 
 // pending excel entries
@@ -133,12 +145,31 @@ ipcMain.on('flush-pending-excel', (event, args) => {
 	applyPendingExcelEntries(pendingEntries, result => {
 		if (result && result.success) {
 			removePendingExcelEntries(result.applied || []);
+			logEvent('Excel aktualisiert', { applied: result.applied || [] });
+		} else {
+			logEvent(result && result.reason === 'excel-locked' ? 'Konflikt erkannt' : 'Fehler beim Schreiben', result || {});
 		}
 
 		const remaining = getPendingExcelEntries().length;
 		event.sender.send('pending-excel-status', remaining);
 		event.sender.send('pending-excel-flushed', Object.assign({}, result, { remaining: remaining }));
 	});
+});
+
+ipcMain.on('reload-excel', (event, args) => {
+	const pendingEntries = getPendingExcelEntries();
+	if (pendingEntries.length > 0) {
+		logEvent('Konflikt erkannt', { action: 'reload-excel', pendingEntries: pendingEntries.length });
+		event.sender.send('reload-excel-conflict', pendingEntries.length);
+		return;
+	}
+
+	reloadExcelFile(event);
+});
+
+ipcMain.on('reload-excel-force', (event, args) => {
+	logEvent('Excel neu laden trotz lokaler Änderungen bestätigt');
+	reloadExcelFile(event);
 });
 
 ipcMain.on('discard-pending-excel-entry', (event, pendingEntryId) => {
@@ -149,11 +180,36 @@ ipcMain.on('discard-pending-excel-entry', (event, pendingEntryId) => {
 function handleExcelBackupEntry(event, backupEntry) {
 	if (!backupEntry) return;
 	addBackupEntry(backupEntry);
+	logEvent('Backup erstellt', {
+		type: backupEntry.type,
+		personName: backupEntry.personName,
+		excelWriteSucceeded: backupEntry.excelWriteSucceeded,
+		reason: backupEntry.excelWriteReason
+	});
 
-	if (!backupEntry.excelWriteSucceeded && backupEntry.excelWriteReason === 'excel-write-failed') {
+	if (!backupEntry.excelWriteSucceeded && ['excel-write-failed', 'excel-locked'].includes(backupEntry.excelWriteReason)) {
 		const pendingEntry = addPendingExcelEntry(backupEntry);
+		logEvent(backupEntry.excelWriteReason === 'excel-locked' ? 'Konflikt erkannt' : 'Fehler beim Schreiben', {
+			type: backupEntry.type,
+			personName: backupEntry.personName,
+			reason: backupEntry.excelWriteReason
+		});
 		event.sender.send('excel-write-pending', pendingEntry);
 	}
 
 	event.sender.send('pending-excel-status', getPendingExcelEntries().length);
+}
+
+function reloadExcelFile(event) {
+	reloadExcel(result => {
+		if (result && result.success) {
+			logEvent('Excel neu geladen', { filePath: result.filePath, className: result.className });
+			event.sender.send('classes', result.worksheets, result.filePath);
+			event.sender.send('excel-reloaded', result);
+			event.sender.send('pending-excel-status', getPendingExcelEntries().length);
+		} else {
+			logEvent('Fehler beim Lesen', result || {});
+			event.sender.send('excel-reload-failed', result || { success: false, reason: 'unknown' });
+		}
+	});
 }

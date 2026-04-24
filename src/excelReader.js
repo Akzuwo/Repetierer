@@ -1,4 +1,6 @@
 const ExcelJS = require('exceljs');
+const fs = require('fs');
+const path = require('path');
 let f;
 let wb;
 let ws;
@@ -80,7 +82,41 @@ function reloadAfterWrite(clss, callback, result) {
 	});
 }
 
+function getFileLockStatus(filePath) {
+	const targetPath = filePath || f;
+	const ownerLockPath = path.join(path.dirname(targetPath), `~$${path.basename(targetPath)}`);
+	if (fs.existsSync(ownerLockPath)) {
+		return {
+			locked: true,
+			error: 'Excel lock file exists',
+			code: 'EXCEL_OWNER_LOCK'
+		};
+	}
+
+	try {
+		const handle = fs.openSync(targetPath, 'r+');
+		fs.closeSync(handle);
+		return { locked: false };
+	} catch (error) {
+		return {
+			locked: true,
+			error: error && error.message ? error.message : String(error),
+			code: error && error.code
+		};
+	}
+}
+
 function writeWorkbook(clss, callback, result) {
+	const lockStatus = getFileLockStatus(f);
+	if (lockStatus.locked) {
+		callback(undefined, Object.assign({}, result, {
+			success: false,
+			reason: 'excel-locked',
+			error: lockStatus.error
+		}));
+		return;
+	}
+
 	wb.xlsx.writeFile(f)
 		.then(() => reloadAfterWrite(clss, callback, Object.assign({}, result, { success: true })))
 		.catch(error => {
@@ -103,6 +139,12 @@ function write_grade(clss, person, grade, callback) {
 		return;
 	}
 
+	const lockStatus = getFileLockStatus(f);
+	if (lockStatus.locked) {
+		callback(undefined, { success: false, reason: 'excel-locked', error: lockStatus.error });
+		return;
+	}
+
 	ws.getCell(person.id + 6, person.grades + 2).value = grade;
 	ws.getCell(person.id + 6, person.grades + 11).value = getFormattedDate();
 	writeWorkbook(clss, callback, { type: 'grade' });
@@ -112,6 +154,12 @@ function write_joker(clss, person, callback, allowExtraJoker) {
 	// check file
 	if (ws.getCell('A1').value !== 'repetierer') {
 		callback(undefined, { success: false, reason: 'invalid-file' });
+		return;
+	}
+
+	const lockStatus = getFileLockStatus(f);
+	if (lockStatus.locked) {
+		callback(undefined, { success: false, reason: 'excel-locked', error: lockStatus.error });
 		return;
 	}
 
@@ -134,6 +182,17 @@ function write_joker(clss, person, callback, allowExtraJoker) {
 function apply_entries(clss, entries, callback) {
 	if (!entries || entries.length === 0) {
 		callback(read(clss), { success: true, applied: [] });
+		return;
+	}
+
+	const lockStatus = getFileLockStatus(f);
+	if (lockStatus.locked) {
+		callback(undefined, {
+			success: false,
+			reason: 'excel-locked',
+			error: lockStatus.error,
+			applied: []
+		});
 		return;
 	}
 
@@ -182,6 +241,7 @@ module.exports = {
 	init: init,
 	read: read,
 	write_grade: write_grade,
-    write_joker: write_joker,
-	apply_entries: apply_entries
+	write_joker: write_joker,
+	apply_entries: apply_entries,
+	getFileLockStatus: getFileLockStatus
 }

@@ -14,22 +14,45 @@
 <div id="container">
 
 	<div id="title-bar">
-		<div class="ico" id="settings-btn" title="Einstellungen">
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-				<path d="M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.37-.31-.6-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98L14.5 2.42C14.47 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42L9.12 5.07c-.61.25-1.18.59-1.69.98l-2.49-1c-.23-.08-.48 0-.6.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.08.65-.08.98s.03.66.08.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.37.31.6.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.25.42.5.42h4c.25 0 .47-.18.5-.42l.38-2.65c.61-.25 1.18-.59 1.69-.98l2.49 1c.23.08.48 0 .6-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/>
-			</svg>
+		<div class="title-actions">
+			<div class="ico" id="drawer-toggle" title="Menü">
+				<span></span>
+				<span></span>
+				<span></span>
+			</div>
 		</div>
-		<div class="ico" id="minimize">
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 6">
-				<rect width="56" height="6" rx="3"/>
-			</svg>
-		</div>
-		<div class="ico" id="quit">
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 58.72 57.8">
-				<path d="M57.86.9h0a3,3,0,0,0-4.24,0L29.36,24.69,5.1.86A3,3,0,0,0,.86.9h0a3,3,0,0,0,0,4.24L25.08,28.9.9,52.66a3,3,0,0,0,0,4.24h0a3,3,0,0,0,4.24,0L29.36,33.1,53.62,56.94a3,3,0,0,0,4.24,0h0a3,3,0,0,0,0-4.24L33.64,28.9,57.82,5.14A3,3,0,0,0,57.86.9Z"/>
-			</svg>
+		<div class="title-actions">
+			<div class="ico" id="settings-btn" title="Einstellungen">
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+					<path d="M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.37-.31-.6-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98L14.5 2.42C14.47 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42L9.12 5.07c-.61.25-1.18.59-1.69.98l-2.49-1c-.23-.08-.48 0-.6.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.08.65-.08.98s.03.66.08.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.37.31.6.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.25.42.5.42h4c.25 0 .47-.18.5-.42l.38-2.65c.61-.25 1.18-.59 1.69-.98l2.49 1c.23.08.48 0 .6-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/>
+				</svg>
+			</div>
+			<div class="ico" id="minimize">
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 6">
+					<rect width="56" height="6" rx="3"/>
+				</svg>
+			</div>
+			<div class="ico" id="quit">
+				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 58.72 57.8">
+					<path d="M57.86.9h0a3,3,0,0,0-4.24,0L29.36,24.69,5.1.86A3,3,0,0,0,.86.9h0a3,3,0,0,0,0,4.24L25.08,28.9.9,52.66a3,3,0,0,0,0,4.24h0a3,3,0,0,0,4.24,0L29.36,33.1,53.62,56.94a3,3,0,0,0,4.24,0h0a3,3,0,0,0,0-4.24L33.64,28.9,57.82,5.14A3,3,0,0,0,57.86.9Z"/>
+				</svg>
+			</div>
 		</div>
 	</div>
+
+	<div id="drawer-scrim"></div>
+	<aside id="drawer">
+		<h2>Dateien</h2>
+		<button class="btn-1" id="drawer-file-btn">Datei auswählen</button>
+		<p id="file-path"></p>
+		<div class="drawer-actions">
+			<button class="btn-2" id="backup-btn">Backup anzeigen</button>
+			<button class="btn-2" id="log-btn">Log anzeigen</button>
+			<button class="btn-2 disabled" id="flush-excel-btn">Excel aktualisieren</button>
+			<button class="btn-2" id="reload-excel-btn">Excel neu laden</button>
+		</div>
+		<p id="drawer-status">Noch keine Datei ausgewählt.</p>
+	</aside>
 
 	<div id="info">
 		<p id="version"></p>
@@ -39,12 +62,6 @@
 	<h1 id="title">Repetierer</h1>
 
 	<div id="content">
-		<div class="neum" id='file'>
-			<h2>Datei</h2>
-			<button class="btn-1">Datei Auswählen</button>
-			<p id="file-path"></p>
-			<button class="btn-2" id="backup-btn">Backup anzeigen</button>
-		</div>
 		<div class="neum" id="class">
 			<h2>Klasse</h2>
 			<div id="class-list">
@@ -57,7 +74,6 @@
 				<button class="btn-1 disabled" id="start-btn">Start</button>
 				<button class="btn-1 disabled" id="manual-select-btn">Freiwillig</button>
 				<button class="btn-2 disabled" id="probabilities-btn">Chancen</button>
-				<button class="btn-2 disabled" id="flush-excel-btn">Excel aktualisieren</button>
 			</div>
 			<h1 class="disabled" id="name">Name</h1>
 			<div id="res">
@@ -69,6 +85,20 @@
 				<button class="btn-1 disabled">OK</button>
 				<button class="btn-1 disabled">Joker</button>
 			</div>
+		</div>
+	</div>
+
+	<div id="update-panel" class="update-panel update-hidden">
+		<div class="update-copy">
+			<strong id="update-title">Update</strong>
+			<span id="update-detail"></span>
+			<div id="update-progress" class="update-progress update-hidden">
+				<div id="update-progress-bar"></div>
+			</div>
+		</div>
+		<div class="update-actions">
+			<button class="btn-1" id="update-primary-btn">Aktualisieren</button>
+			<button class="btn-2" id="update-secondary-btn">Später</button>
 		</div>
 	</div>
 
@@ -90,6 +120,30 @@
 			<div id="backup-list"></div>
 			<div class="modal-buttons">
 				<button class="btn-2" id="close-backup-modal">Schließen</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="log-modal" class="modal">
+		<div class="modal-content log-content">
+			<h2>Log</h2>
+			<p id="log-location"></p>
+			<pre id="log-list"></pre>
+			<div class="modal-buttons">
+				<button class="btn-1" id="copy-log-btn">Logs kopieren</button>
+				<button class="btn-2" id="close-log-modal">Schließen</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="reload-conflict-modal" class="modal">
+		<div class="modal-content conflict-content">
+			<h2>Lokale Änderungen</h2>
+			<p>Es gibt lokale Änderungen, die noch nicht ins Excel geschrieben wurden.</p>
+			<div class="modal-buttons">
+				<button class="btn-1" id="conflict-flush-btn">Zuerst Excel aktualisieren</button>
+				<button class="btn-2" id="conflict-force-reload-btn">Trotzdem neu laden</button>
+				<button class="btn-2" id="conflict-cancel-btn">Abbrechen</button>
 			</div>
 		</div>
 	</div>

@@ -1,12 +1,18 @@
-const {ipcRenderer} = require('electron');
+const {ipcRenderer, clipboard} = require('electron');
 let state = 0; // 0: select file, 1: select class, 2: click start, 3: set grade
 
 // elements
 const _minimize = document.getElementById('minimize');
 const _quit = document.getElementById('quit');
-const _file = document.getElementById('file').children.item(1);
+const _drawerToggle = document.getElementById('drawer-toggle');
+const _drawer = document.getElementById('drawer');
+const _drawerScrim = document.getElementById('drawer-scrim');
+const _drawerStatus = document.getElementById('drawer-status');
+const _file = document.getElementById('drawer-file-btn');
 const _filePath = document.getElementById('file-path');
 const _backupBtn = document.getElementById('backup-btn');
+const _logBtn = document.getElementById('log-btn');
+const _reloadExcelBtn = document.getElementById('reload-excel-btn');
 const _settingsBtn = document.getElementById('settings-btn');
 const _classes = document.getElementById('class-list').children.item(0);
 const _start = document.getElementById('start-btn');
@@ -29,6 +35,15 @@ const _backupModal = document.getElementById('backup-modal');
 const _backupList = document.getElementById('backup-list');
 const _backupLocation = document.getElementById('backup-location');
 const _closeBackupModal = document.getElementById('close-backup-modal');
+const _logModal = document.getElementById('log-modal');
+const _logList = document.getElementById('log-list');
+const _logLocation = document.getElementById('log-location');
+const _copyLogBtn = document.getElementById('copy-log-btn');
+const _closeLogModal = document.getElementById('close-log-modal');
+const _reloadConflictModal = document.getElementById('reload-conflict-modal');
+const _conflictFlushBtn = document.getElementById('conflict-flush-btn');
+const _conflictForceReloadBtn = document.getElementById('conflict-force-reload-btn');
+const _conflictCancelBtn = document.getElementById('conflict-cancel-btn');
 const _probabilitiesModal = document.getElementById('probabilities-modal');
 const _probabilityList = document.getElementById('probability-list');
 const _closeProbabilitiesModal = document.getElementById('close-probabilities-modal');
@@ -40,6 +55,13 @@ const _boostNeverSelectedSetting = document.getElementById('boost-never-selected
 const _neverSelectedBoostFactorSetting = document.getElementById('never-selected-boost-factor-setting');
 const _saveSettingsBtn = document.getElementById('save-settings-btn');
 const _closeSettingsModal = document.getElementById('close-settings-modal');
+const _updatePanel = document.getElementById('update-panel');
+const _updateTitle = document.getElementById('update-title');
+const _updateDetail = document.getElementById('update-detail');
+const _updateProgress = document.getElementById('update-progress');
+const _updateProgressBar = document.getElementById('update-progress-bar');
+const _updatePrimaryBtn = document.getElementById('update-primary-btn');
+const _updateSecondaryBtn = document.getElementById('update-secondary-btn');
 
 let selectedPersonIds = [];
 let _currentClass;
@@ -64,9 +86,21 @@ _file.addEventListener('click', () => {
 	ipcRenderer.send('file');
 });
 
+_drawerToggle.addEventListener('click', () => {
+	toggleDrawer();
+});
+
+_drawerScrim.addEventListener('click', () => {
+	closeDrawer();
+});
+
 // backup
 _backupBtn.addEventListener('click', () => {
 	ipcRenderer.send('get-backup');
+});
+
+_logBtn.addEventListener('click', () => {
+	ipcRenderer.send('get-logs');
 });
 
 _closeBackupModal.addEventListener('click', () => {
@@ -79,6 +113,27 @@ _backupModal.addEventListener('click', (e) => {
 	}
 });
 
+_closeLogModal.addEventListener('click', () => {
+	_logModal.style.display = 'none';
+});
+
+_copyLogBtn.addEventListener('click', () => {
+	clipboard.writeText(_logList.innerText || '');
+	showUpdatePanel({
+		title: 'Logs kopiert',
+		detail: 'Die Log-Datei liegt jetzt in der Zwischenablage.',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
+});
+
+_logModal.addEventListener('click', (e) => {
+	if (e.target === _logModal) {
+		_logModal.style.display = 'none';
+	}
+});
+
 // probabilities
 _probabilitiesBtn.addEventListener('click', () => {
 	ipcRenderer.send('get-probabilities');
@@ -86,6 +141,24 @@ _probabilitiesBtn.addEventListener('click', () => {
 
 _flushExcelBtn.addEventListener('click', () => {
 	ipcRenderer.send('flush-pending-excel');
+});
+
+_reloadExcelBtn.addEventListener('click', () => {
+	ipcRenderer.send('reload-excel');
+});
+
+_conflictFlushBtn.addEventListener('click', () => {
+	_reloadConflictModal.style.display = 'none';
+	ipcRenderer.send('flush-pending-excel');
+});
+
+_conflictForceReloadBtn.addEventListener('click', () => {
+	_reloadConflictModal.style.display = 'none';
+	ipcRenderer.send('reload-excel-force');
+});
+
+_conflictCancelBtn.addEventListener('click', () => {
+	_reloadConflictModal.style.display = 'none';
 });
 
 _closeProbabilitiesModal.addEventListener('click', () => {
@@ -129,6 +202,21 @@ _settingsModal.addEventListener('click', (e) => {
 	if (e.target === _settingsModal) {
 		_settingsModal.style.display = 'none';
 	}
+});
+
+_updatePrimaryBtn.addEventListener('click', () => {
+	ipcRenderer.send('update-download-approved');
+	showUpdatePanel({
+		title: 'Update wird heruntergeladen',
+		detail: 'Bitte warte kurz. Repetierer bereitet die neue Version vor.',
+		progress: 0,
+		primaryVisible: false,
+		secondaryVisible: false
+	});
+});
+
+_updateSecondaryBtn.addEventListener('click', () => {
+	hideUpdatePanel();
 });
 
 // class
@@ -211,6 +299,7 @@ ipcRenderer.on('classes', (event, args, filePath) => {
 	if (args) {
 		state = 1;
 		if (filePath) _filePath.innerText = filePath;
+		_drawerStatus.innerText = 'Datei geladen. Wähle jetzt eine Klasse.';
 		updateState();
 
 		_classes.innerHTML = '';
@@ -224,6 +313,7 @@ ipcRenderer.on('classes', (event, args, filePath) => {
 	} else {
 		state = 0;
 		_filePath.innerText = '';
+		_drawerStatus.innerText = 'Die Datei konnte nicht gelesen werden.';
 		updateState();
 		error(_file);
 	}
@@ -231,6 +321,7 @@ ipcRenderer.on('classes', (event, args, filePath) => {
 
 ipcRenderer.on('saved-file-missing', (event, filePath) => {
 	if (filePath) _filePath.innerText = `Gespeicherte Datei nicht gefunden: ${filePath}`;
+	_drawerStatus.innerText = 'Die zuletzt gespeicherte Datei wurde nicht gefunden.';
 });
 
 ipcRenderer.on('version', (event, appVersion) => {
@@ -246,13 +337,19 @@ ipcRenderer.on('settings-data', (event, settings, paths) => {
 	_settingsModal.style.display = 'block';
 });
 
+ipcRenderer.on('update-status', (event, payload) => {
+	handleUpdateStatus(payload || {});
+});
+
 ipcRenderer.on('pending-excel-status', (event, count) => {
-	if (count > 0 && state === 2) {
+	if (count > 0) {
 		enableElement(_flushExcelBtn);
 		_flushExcelBtn.innerText = `Excel aktualisieren (${count})`;
+		_drawerStatus.innerText = `${count} Eintrag${count === 1 ? '' : 'e'} warten auf Excel.`;
 	} else {
 		disableElement(_flushExcelBtn);
 		_flushExcelBtn.innerText = 'Excel aktualisieren';
+		if (_filePath.innerText) _drawerStatus.innerText = 'Excel und Backup sind synchron.';
 	}
 });
 
@@ -281,20 +378,73 @@ ipcRenderer.on('finished', (event, args) => {
 })
 
 ipcRenderer.on('excel-write-pending', (event, entry) => {
-	const keepPending = confirm('Die Excel-Datei konnte gerade nicht beschrieben werden. Sie ist vermutlich in Excel geöffnet.\n\nSoll der Eintrag vorübergehend im Programm gespeichert werden?\n\nWenn ja: Schließe die Excel-Datei und klicke danach auf "Excel aktualisieren".');
-	if (!keepPending) {
-		ipcRenderer.send('discard-pending-excel-entry', entry.id);
-	}
+	showUpdatePanel({
+		title: 'Excel-Datei ist geöffnet',
+		detail: 'Der Eintrag wurde sicher im Programm gespeichert. Schließe Excel und klicke danach im Menü auf "Excel aktualisieren".',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
 });
 
 ipcRenderer.on('pending-excel-flushed', (event, result) => {
 	if (result && result.success && result.remaining === 0) {
-		alert('Alle zwischengespeicherten Einträge wurden erfolgreich in die Excel-Datei geschrieben.');
+		showUpdatePanel({
+			title: 'Excel aktualisiert',
+			detail: 'Alle zwischengespeicherten Einträge wurden erfolgreich in die Excel-Datei geschrieben.',
+			primaryVisible: false,
+			secondaryText: 'OK',
+			secondaryVisible: true
+		});
 	} else if (result && result.success) {
-		alert(`Ein Teil der Einträge wurde geschrieben. Noch offen: ${result.remaining}`);
+		showUpdatePanel({
+			title: 'Excel teilweise aktualisiert',
+			detail: `Ein Teil der Einträge wurde geschrieben. Noch offen: ${result.remaining}`,
+			primaryVisible: false,
+			secondaryText: 'OK',
+			secondaryVisible: true
+		});
 	} else {
-		alert('Die Excel-Datei konnte noch nicht aktualisiert werden. Bitte schließe Excel und versuche es erneut.');
+		showUpdatePanel({
+			title: 'Excel-Datei ist geöffnet',
+			detail: 'Die Excel-Datei scheint aktuell geöffnet zu sein. Bitte schließe sie zuerst und versuche es erneut.',
+			primaryVisible: false,
+			secondaryText: 'OK',
+			secondaryVisible: true
+		});
 	}
+});
+
+ipcRenderer.on('reload-excel-conflict', (event, pendingCount) => {
+	_drawerStatus.innerText = `${pendingCount} lokale Änderung${pendingCount === 1 ? '' : 'en'} blockieren das Neuladen.`;
+	_reloadConflictModal.style.display = 'block';
+});
+
+ipcRenderer.on('excel-reloaded', (event, result) => {
+	if (result && result.hasClass && result.className) {
+		state = 2;
+		_className.innerText = result.className;
+		updateState();
+	}
+	_drawerStatus.innerText = 'Excel wurde neu geladen.';
+	showUpdatePanel({
+		title: 'Excel neu geladen',
+		detail: 'Die aktuell ausgewählte Excel-Datei wurde erneut eingelesen.',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
+});
+
+ipcRenderer.on('excel-reload-failed', (event, result) => {
+	_drawerStatus.innerText = 'Excel konnte nicht neu geladen werden.';
+	showUpdatePanel({
+		title: 'Excel konnte nicht geladen werden',
+		detail: 'Bitte prüfe, ob die Datei existiert und eine gültige Repetierer-Datei ist.',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
 });
 
 // name
@@ -396,6 +546,12 @@ ipcRenderer.on('backup-data', (event, backup, paths) => {
 	_backupModal.style.display = 'block';
 });
 
+ipcRenderer.on('log-data', (event, logs, paths) => {
+	_logLocation.innerText = paths ? paths.logPath : '';
+	_logList.innerText = logs && logs.trim() ? logs : 'Noch keine Logs vorhanden.';
+	_logModal.style.display = 'block';
+});
+
 ipcRenderer.on('probability-data', (event, probabilities) => {
 	_probabilityList.innerHTML = '';
 
@@ -463,7 +619,6 @@ function updateState() {
             disable(_joker);
 			disable(_manualSelectBtn);
 			disable(_probabilitiesBtn);
-			disable(_flushExcelBtn);
 			text();
 			break;
 		case 2:
@@ -489,7 +644,6 @@ function updateState() {
             disable(_joker);
 			disable(_manualSelectBtn);
 			disable(_probabilitiesBtn);
-			disable(_flushExcelBtn);
 			break;
         case 4:
 			disable(_start);
@@ -501,7 +655,6 @@ function updateState() {
             enable(_joker);
 			disable(_manualSelectBtn);
 			disable(_probabilitiesBtn);
-			disable(_flushExcelBtn);
 			break;
 
 	}
@@ -542,6 +695,129 @@ function disableElement(e) {
 
 function enableElement(e) {
 	if (e.classList.contains('disabled')) e.classList.remove('disabled');
+}
+
+function toggleDrawer() {
+	if (_drawer.classList.contains('drawer-open')) {
+		closeDrawer();
+	} else {
+		_drawer.classList.add('drawer-open');
+		_drawerScrim.classList.add('scrim-visible');
+		_drawerToggle.classList.add('drawer-toggle-open');
+	}
+}
+
+function closeDrawer() {
+	_drawer.classList.remove('drawer-open');
+	_drawerScrim.classList.remove('scrim-visible');
+	_drawerToggle.classList.remove('drawer-toggle-open');
+}
+
+function handleUpdateStatus(payload) {
+	switch (payload.status) {
+		case 'checking':
+		case 'not-available':
+			break;
+		case 'available':
+			showUpdatePanel({
+				title: `Version ${payload.version} ist verfügbar`,
+				detail: 'Eine neue Version von Repetierer kann installiert werden.',
+				primaryText: `Aktualisieren auf Version ${payload.version}`,
+				secondaryText: 'Später',
+				primaryVisible: true,
+				secondaryVisible: true
+			});
+			break;
+		case 'downloading':
+			showUpdatePanel({
+				title: 'Update wird heruntergeladen',
+				detail: `Version ${payload.version} wird heruntergeladen.`,
+				progress: payload.percent || 0,
+				primaryVisible: false,
+				secondaryVisible: false
+			});
+			break;
+		case 'progress':
+			showUpdatePanel({
+				title: 'Update wird heruntergeladen',
+				detail: `${Number(payload.percent || 0).toFixed(1)}% abgeschlossen.`,
+				progress: payload.percent || 0,
+				primaryVisible: false,
+				secondaryVisible: false
+			});
+			break;
+		case 'downloaded':
+			showUpdatePanel({
+				title: 'Update bereit',
+				detail: 'Repetierer wird gleich geschlossen und aktualisiert.',
+				progress: 100,
+				primaryVisible: false,
+				secondaryVisible: false
+			});
+			break;
+		case 'installing':
+			showUpdatePanel({
+				title: 'Update wird installiert',
+				detail: 'Die App startet nach der Installation automatisch neu.',
+				progress: 100,
+				primaryVisible: false,
+				secondaryVisible: false
+			});
+			break;
+		case 'installed':
+			showUpdatePanel({
+				title: 'Update erfolgreich installiert',
+				detail: `Repetierer läuft jetzt mit Version ${payload.version}.`,
+				primaryText: 'OK',
+				primaryVisible: false,
+				secondaryText: 'Schließen',
+				secondaryVisible: true
+			});
+			break;
+		case 'error':
+			showUpdatePanel({
+				title: 'Update nicht möglich',
+				detail: payload.error ? `${payload.message} ${payload.error}` : payload.message,
+				primaryVisible: false,
+				secondaryText: 'Schließen',
+				secondaryVisible: true
+			});
+			break;
+		default:
+			break;
+	}
+}
+
+function showUpdatePanel(options) {
+	_updateTitle.innerText = options.title || 'Update';
+	_updateDetail.innerText = options.detail || '';
+
+	if (typeof options.progress === 'number') {
+		_updateProgress.classList.remove('update-hidden');
+		_updateProgressBar.style.width = `${Math.max(0, Math.min(100, options.progress))}%`;
+	} else {
+		_updateProgress.classList.add('update-hidden');
+	}
+
+	if (options.primaryVisible) {
+		_updatePrimaryBtn.classList.remove('update-hidden');
+		_updatePrimaryBtn.innerText = options.primaryText || 'Aktualisieren';
+	} else {
+		_updatePrimaryBtn.classList.add('update-hidden');
+	}
+
+	if (options.secondaryVisible) {
+		_updateSecondaryBtn.classList.remove('update-hidden');
+		_updateSecondaryBtn.innerText = options.secondaryText || 'Später';
+	} else {
+		_updateSecondaryBtn.classList.add('update-hidden');
+	}
+
+	_updatePanel.classList.remove('update-hidden');
+}
+
+function hideUpdatePanel() {
+	_updatePanel.classList.add('update-hidden');
 }
 
 // scale the name to fit the screen

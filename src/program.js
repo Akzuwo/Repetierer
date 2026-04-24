@@ -157,6 +157,36 @@ function applyPendingExcelEntries(entries, callback) {
 	});
 }
 
+function reloadExcel(callback) {
+	if (!filePath) {
+		callback({ success: false, reason: 'no-file-selected' });
+		return;
+	}
+
+	init(filePath, worksheets => {
+		if (!worksheets) {
+			callback({ success: false, reason: 'excel-read-failed' });
+			return;
+		}
+
+		if (cls) {
+			persons = read(cls);
+		}
+
+		callback({
+			success: true,
+			worksheets: worksheets,
+			filePath: filePath,
+			className: cls,
+			hasClass: !!cls
+		});
+	});
+}
+
+function getCurrentFilePath() {
+	return filePath;
+}
+
 function getFormattedDate() {
 	const currentDate = new Date();
 	return `${String(currentDate.getDate()).padStart(2, '0')}.${String(currentDate.getMonth() + 1).padStart(2, '0')}.${currentDate.getFullYear()}`;
@@ -169,6 +199,8 @@ module.exports = {
 	saveGrade: saveGrade,
 	setJoker: setJoker,
 	applyPendingExcelEntries: applyPendingExcelEntries,
+	reloadExcel: reloadExcel,
+	getCurrentFilePath: getCurrentFilePath,
 	getPersons: getPersons,
 	getProbabilities: getProbabilities,
 	selectSpecificPerson: selectSpecificPerson,
