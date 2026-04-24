@@ -84,6 +84,7 @@ function saveExcelFilePath(filePath) {
 function getBackup() {
 	const backup = readJson(getPaths().backupPath, { entries: [] });
 	if (!backup.entries) backup.entries = [];
+	if (!backup.pendingExcelEntries) backup.pendingExcelEntries = [];
 	return backup;
 }
 
@@ -95,12 +96,37 @@ function addBackupEntry(entry) {
 	writeJson(getPaths().backupPath, backup);
 }
 
+function addPendingExcelEntry(entry) {
+	const backup = getBackup();
+	const pendingEntry = Object.assign({
+		id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+		createdAt: new Date().toISOString()
+	}, entry);
+	backup.pendingExcelEntries.push(pendingEntry);
+	writeJson(getPaths().backupPath, backup);
+	return pendingEntry;
+}
+
+function getPendingExcelEntries() {
+	return getBackup().pendingExcelEntries;
+}
+
+function removePendingExcelEntries(ids) {
+	const idSet = new Set(ids || []);
+	const backup = getBackup();
+	backup.pendingExcelEntries = backup.pendingExcelEntries.filter(entry => !idSet.has(entry.id));
+	writeJson(getPaths().backupPath, backup);
+}
+
 module.exports = {
 	getBackup,
 	getAppSettings,
+	getPendingExcelEntries,
 	getExcelFilePath,
 	saveExcelFilePath,
 	saveAppSettings,
 	addBackupEntry,
+	addPendingExcelEntry,
+	removePendingExcelEntries,
 	getPaths
 };

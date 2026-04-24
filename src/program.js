@@ -1,4 +1,4 @@
-const { init, read, write_grade, write_joker } = require('./excelReader.js');
+const { init, read, write_grade, write_joker, apply_entries } = require('./excelReader.js');
 const { getAppSettings } = require('./storage.js');
 let cls;
 let persons;
@@ -97,16 +97,23 @@ function getPersonResult(selectedPerson) {
 
 // save the new grade to the file
 function saveGrade(grade, callback) {
-	write_grade(cls, person, grade, (p) => {
-		persons = p;
+	const entry = {
+		type: 'grade',
+		className: cls,
+		filePath: filePath,
+		personId: person.id,
+		personName: person.name,
+		grade: grade,
+		date: getFormattedDate()
+	};
+
+	write_grade(cls, person, grade, (p, result) => {
+		if (p) persons = p;
 		callback(undefined, {
-			type: 'grade',
-			className: cls,
-			filePath: filePath,
-			personId: person.id,
-			personName: person.name,
-			grade: grade,
-			excelWriteSucceeded: !!p
+			...entry,
+			excelWriteSucceeded: !!(result && result.success),
+			excelWriteError: result && result.error,
+			excelWriteReason: result && result.reason
 		})
 	});
 }
@@ -115,21 +122,44 @@ function saveGrade(grade, callback) {
 function setJoker(callback) {
 	const settings = getAppSettings();
 	const allowExtraJoker = settings.extraJokerAfterThreeGrades && person.grades >= 3;
+	const entry = {
+		type: 'joker',
+		className: cls,
+		filePath: filePath,
+		personId: person.id,
+		personName: person.name,
+		date: getFormattedDate()
+	};
 
-    write_joker(cls, person, (p) => {
-        persons  = p;
+    write_joker(cls, person, (p, result) => {
+        if (p) persons = p;
 		if (callback) {
 			callback(undefined, {
-				type: 'joker',
-				className: cls,
-				filePath: filePath,
-				personId: person.id,
-				personName: person.name,
-				excelWriteSucceeded: !!p
+				...entry,
+				excelWriteSucceeded: !!(result && result.success),
+				excelWriteError: result && result.error,
+				excelWriteReason: result && result.reason
 			});
 		}
     }, allowExtraJoker);
 
+}
+
+function applyPendingExcelEntries(entries, callback) {
+	if (!cls) {
+		callback({ success: false, reason: 'no-class-selected', applied: [] });
+		return;
+	}
+
+	apply_entries(cls, entries, (p, result) => {
+		if (p) persons = p;
+		callback(result || { success: false, reason: 'unknown', applied: [] });
+	});
+}
+
+function getFormattedDate() {
+	const currentDate = new Date();
+	return `${String(currentDate.getDate()).padStart(2, '0')}.${String(currentDate.getMonth() + 1).padStart(2, '0')}.${currentDate.getFullYear()}`;
 }
 
 module.exports = {
@@ -138,6 +168,7 @@ module.exports = {
 	selectPerson: selectPerson,
 	saveGrade: saveGrade,
 	setJoker: setJoker,
+	applyPendingExcelEntries: applyPendingExcelEntries,
 	getPersons: getPersons,
 	getProbabilities: getProbabilities,
 	selectSpecificPerson: selectSpecificPerson,

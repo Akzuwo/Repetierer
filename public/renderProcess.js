@@ -11,6 +11,7 @@ const _settingsBtn = document.getElementById('settings-btn');
 const _classes = document.getElementById('class-list').children.item(0);
 const _start = document.getElementById('start-btn');
 const _probabilitiesBtn = document.getElementById('probabilities-btn');
+const _flushExcelBtn = document.getElementById('flush-excel-btn');
 const _repetition = document.getElementById('repetition');
 const _name = document.getElementById('name');
 const _label = document.getElementById('grade').children.item(0);
@@ -81,6 +82,10 @@ _backupModal.addEventListener('click', (e) => {
 // probabilities
 _probabilitiesBtn.addEventListener('click', () => {
 	ipcRenderer.send('get-probabilities');
+});
+
+_flushExcelBtn.addEventListener('click', () => {
+	ipcRenderer.send('flush-pending-excel');
 });
 
 _closeProbabilitiesModal.addEventListener('click', () => {
@@ -241,6 +246,16 @@ ipcRenderer.on('settings-data', (event, settings, paths) => {
 	_settingsModal.style.display = 'block';
 });
 
+ipcRenderer.on('pending-excel-status', (event, count) => {
+	if (count > 0 && state === 2) {
+		enableElement(_flushExcelBtn);
+		_flushExcelBtn.innerText = `Excel aktualisieren (${count})`;
+	} else {
+		disableElement(_flushExcelBtn);
+		_flushExcelBtn.innerText = 'Excel aktualisieren';
+	}
+});
+
 // ready
 ipcRenderer.on('ready', (event, args) => {
 	if (!args) {
@@ -264,6 +279,23 @@ ipcRenderer.on('finished', (event, args) => {
 		error(_ok);
 
 })
+
+ipcRenderer.on('excel-write-pending', (event, entry) => {
+	const keepPending = confirm('Die Excel-Datei konnte gerade nicht beschrieben werden. Sie ist vermutlich in Excel geöffnet.\n\nSoll der Eintrag vorübergehend im Programm gespeichert werden?\n\nWenn ja: Schließe die Excel-Datei und klicke danach auf "Excel aktualisieren".');
+	if (!keepPending) {
+		ipcRenderer.send('discard-pending-excel-entry', entry.id);
+	}
+});
+
+ipcRenderer.on('pending-excel-flushed', (event, result) => {
+	if (result && result.success && result.remaining === 0) {
+		alert('Alle zwischengespeicherten Einträge wurden erfolgreich in die Excel-Datei geschrieben.');
+	} else if (result && result.success) {
+		alert(`Ein Teil der Einträge wurde geschrieben. Noch offen: ${result.remaining}`);
+	} else {
+		alert('Die Excel-Datei konnte noch nicht aktualisiert werden. Bitte schließe Excel und versuche es erneut.');
+	}
+});
 
 // name
 ipcRenderer.on('name', (event, args) => {
@@ -431,6 +463,7 @@ function updateState() {
             disable(_joker);
 			disable(_manualSelectBtn);
 			disable(_probabilitiesBtn);
+			disable(_flushExcelBtn);
 			text();
 			break;
 		case 2:
@@ -443,6 +476,7 @@ function updateState() {
             disable(_joker);
 			enable(_manualSelectBtn);
 			enable(_probabilitiesBtn);
+			ipcRenderer.send('get-pending-excel-status');
 			text();
 			break;
 		case 3:
@@ -455,6 +489,7 @@ function updateState() {
             disable(_joker);
 			disable(_manualSelectBtn);
 			disable(_probabilitiesBtn);
+			disable(_flushExcelBtn);
 			break;
         case 4:
 			disable(_start);
@@ -466,16 +501,17 @@ function updateState() {
             enable(_joker);
 			disable(_manualSelectBtn);
 			disable(_probabilitiesBtn);
+			disable(_flushExcelBtn);
 			break;
 
 	}
 
 	function disable(e) {
-		if (!e.classList.contains('disabled')) e.classList.add('disabled');
+		disableElement(e);
 	}
 
 	function enable(e) {
-		if (e.classList.contains('disabled')) e.classList.remove('disabled');
+		enableElement(e);
 	}
 
 	function text() {
@@ -500,6 +536,14 @@ function version() {
 	ipcRenderer.send('get-version');
 }
 
+function disableElement(e) {
+	if (!e.classList.contains('disabled')) e.classList.add('disabled');
+}
+
+function enableElement(e) {
+	if (e.classList.contains('disabled')) e.classList.remove('disabled');
+}
+
 // scale the name to fit the screen
 function scaleName() {
 	_name.style.fontSize = _nameSize + 'rem';
@@ -517,4 +561,4 @@ Math.clamp = function(a, b, c) {
 }
 
 // automatically scale the name on load
-module.exports = [scaleName(), updateState(), version(), ipcRenderer.send('load-saved-file')];
+module.exports = [scaleName(), updateState(), version(), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status')];

@@ -1,7 +1,7 @@
 const { ipcMain, app, BrowserWindow, dialog } = require('electron');
 const fs = require('fs');
-const { setFile, setClass, selectPerson, saveGrade, setJoker, selectSpecificPerson, getPersons, getProbabilities} = require('./program.js');
-const { getBackup, getAppSettings, getExcelFilePath, saveExcelFilePath, saveAppSettings, addBackupEntry, getPaths } = require('./storage.js');
+const { setFile, setClass, selectPerson, saveGrade, setJoker, selectSpecificPerson, getPersons, getProbabilities, applyPendingExcelEntries} = require('./program.js');
+const { getBackup, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, getPaths } = require('./storage.js');
 
 /*
  * events
@@ -56,6 +56,7 @@ ipcMain.on('load-saved-file', (event, args) => {
 
 	setFile(filePath, result => {
 		event.sender.send('classes', result, filePath);
+		event.sender.send('pending-excel-status', getPendingExcelEntries().length);
 	});
 });
 
@@ -99,7 +100,7 @@ ipcMain.on('select-person', (event, personId) => {
 // ok
 ipcMain.on('ok', (event, args) => {
 	saveGrade(args, (result, backupEntry) => {
-		if (backupEntry) addBackupEntry(backupEntry);
+		handleExcelBackupEntry(event, backupEntry);
 		event.sender.send('finished', result);
 	});
 });
@@ -107,7 +108,7 @@ ipcMain.on('ok', (event, args) => {
 // joker
 ipcMain.on('joker', (event, args) => {
     setJoker((result, backupEntry) => {
-		if (backupEntry) addBackupEntry(backupEntry);
+		handleExcelBackupEntry(event, backupEntry);
 		event.sender.send('finished', result);
 	});
 });
@@ -116,3 +117,43 @@ ipcMain.on('joker', (event, args) => {
 ipcMain.on('get-backup', (event, args) => {
 	event.sender.send('backup-data', getBackup(), getPaths());
 });
+
+// pending excel entries
+ipcMain.on('get-pending-excel-status', (event, args) => {
+	event.sender.send('pending-excel-status', getPendingExcelEntries().length);
+});
+
+ipcMain.on('flush-pending-excel', (event, args) => {
+	const pendingEntries = getPendingExcelEntries();
+	if (pendingEntries.length === 0) {
+		event.sender.send('pending-excel-status', 0);
+		return;
+	}
+
+	applyPendingExcelEntries(pendingEntries, result => {
+		if (result && result.success) {
+			removePendingExcelEntries(result.applied || []);
+		}
+
+		const remaining = getPendingExcelEntries().length;
+		event.sender.send('pending-excel-status', remaining);
+		event.sender.send('pending-excel-flushed', Object.assign({}, result, { remaining: remaining }));
+	});
+});
+
+ipcMain.on('discard-pending-excel-entry', (event, pendingEntryId) => {
+	removePendingExcelEntries([pendingEntryId]);
+	event.sender.send('pending-excel-status', getPendingExcelEntries().length);
+});
+
+function handleExcelBackupEntry(event, backupEntry) {
+	if (!backupEntry) return;
+	addBackupEntry(backupEntry);
+
+	if (!backupEntry.excelWriteSucceeded && backupEntry.excelWriteReason === 'excel-write-failed') {
+		const pendingEntry = addPendingExcelEntry(backupEntry);
+		event.sender.send('excel-write-pending', pendingEntry);
+	}
+
+	event.sender.send('pending-excel-status', getPendingExcelEntries().length);
+}
