@@ -222,7 +222,7 @@ _updateSecondaryBtn.addEventListener('click', () => {
 // class
 function classEvent(e) {
 	e.addEventListener('click', () => {
-		_currentClass = e;
+		setActiveClassButton(e);
 		ipcRenderer.send('class', e.innerText);
 	});
 }
@@ -303,6 +303,7 @@ ipcRenderer.on('classes', (event, args, filePath) => {
 		updateState();
 
 		_classes.innerHTML = '';
+		_currentClass = null;
 		for (let i = 0; i < args.length; i++) {
 			let x = document.createElement('button')
 			x.className = 'btn-2';
@@ -358,10 +359,12 @@ ipcRenderer.on('ready', (event, args) => {
 	if (!args) {
 		state = 2;
 		_className.innerText = `${_currentClass.innerText}`;
+		setActiveClassButton(_currentClass);
 		updateState();
 	} else {
 		state = 1;
 		_className.innerText = '';
+		clearActiveClassButton();
 		updateState();
 		error(_currentClass);
 	}
@@ -424,6 +427,7 @@ ipcRenderer.on('excel-reloaded', (event, result) => {
 	if (result && result.hasClass && result.className) {
 		state = 2;
 		_className.innerText = result.className;
+		setActiveClassByName(result.className);
 		updateState();
 	}
 	_drawerStatus.innerText = 'Excel wurde neu geladen.';
@@ -711,6 +715,24 @@ function closeDrawer() {
 	_drawer.classList.remove('drawer-open');
 	_drawerScrim.classList.remove('scrim-visible');
 	_drawerToggle.classList.remove('drawer-toggle-open');
+}
+
+function setActiveClassButton(button) {
+	clearActiveClassButton();
+	_currentClass = button;
+	if (_currentClass) _currentClass.classList.add('class-selected');
+}
+
+function setActiveClassByName(className) {
+	const buttons = Array.from(_classes.querySelectorAll('button'));
+	const matchingButton = buttons.find(button => button.innerText === className);
+	if (matchingButton) setActiveClassButton(matchingButton);
+}
+
+function clearActiveClassButton() {
+	Array.from(_classes.querySelectorAll('.class-selected')).forEach(button => {
+		button.classList.remove('class-selected');
+	});
 }
 
 function handleUpdateStatus(payload) {

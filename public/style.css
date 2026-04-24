@@ -448,6 +448,14 @@
 		background-color: #18a890;
 	}
 
+	#class-list button.class-selected {
+		background-color: #18a890;
+		box-shadow: 0 0 0 0.15rem rgba(24, 168, 144, 0.28), 0 0.5rem 1rem rgba(0, 0, 0, 0.22);
+		color: #ffffff;
+		font-weight: 500;
+		transform: translateY(-0.08rem);
+	}
+
 	#name {
 		line-height: 0.75;
 		text-transform: uppercase;
