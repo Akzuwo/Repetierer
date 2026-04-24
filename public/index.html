@@ -37,6 +37,8 @@
 		<div class="neum" id='file'>
 			<h2>Datei</h2>
 			<button class="btn-1">Datei Auswählen</button>
+			<p id="file-path"></p>
+			<button class="btn-2" id="backup-btn">Backup anzeigen</button>
 		</div>
 		<div class="neum" id="class">
 			<h2>Klasse</h2>
@@ -70,6 +72,17 @@
 			<div class="modal-buttons">
 				<button class="btn-1" id="random-select-btn">Auswählen</button>
 				<button class="btn-2" id="close-modal">Abbrechen</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="backup-modal" class="modal">
+		<div class="modal-content backup-content">
+			<h2>Backup</h2>
+			<p id="backup-location"></p>
+			<div id="backup-list"></div>
+			<div class="modal-buttons">
+				<button class="btn-2" id="close-backup-modal">Schließen</button>
 			</div>
 		</div>
 	</div>

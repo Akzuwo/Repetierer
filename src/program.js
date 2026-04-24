@@ -2,9 +2,11 @@ const { init, read, write_grade, write_joker } = require('./excelReader.js');
 let cls;
 let persons;
 let person;
+let filePath;
 
 // set the file
 function setFile(file, callback) {
+	filePath = file;
 	init(file, (r) => {
 		callback(r);
 	});
@@ -49,14 +51,32 @@ function selectPerson() {
 function saveGrade(grade, callback) {
 	write_grade(cls, person, grade, (p) => {
 		persons = p;
-		callback()
+		callback(undefined, {
+			type: 'grade',
+			className: cls,
+			filePath: filePath,
+			personId: person.id,
+			personName: person.name,
+			grade: grade,
+			excelWriteSucceeded: !!p
+		})
 	});
 }
 
 // save the joker to the file
-function setJoker() {
+function setJoker(callback) {
     write_joker(cls, person, (p) => {
         persons  = p;
+		if (callback) {
+			callback(undefined, {
+				type: 'joker',
+				className: cls,
+				filePath: filePath,
+				personId: person.id,
+				personName: person.name,
+				excelWriteSucceeded: !!p
+			});
+		}
     });
 
 }

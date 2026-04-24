@@ -6,6 +6,8 @@ let state = 0; // 0: select file, 1: select class, 2: click start, 3: set grade
 const _minimize = document.getElementById('minimize');
 const _quit = document.getElementById('quit');
 const _file = document.getElementById('file').children.item(1);
+const _filePath = document.getElementById('file-path');
+const _backupBtn = document.getElementById('backup-btn');
 const _classes = document.getElementById('class-list').children.item(0);
 const _start = document.getElementById('start-btn');
 const _repetition = document.getElementById('repetition');
@@ -21,6 +23,10 @@ const _personList = document.getElementById('person-list');
 const _closeModal = document.getElementById('close-modal');
 const _randomSelectBtn = document.getElementById('random-select-btn');
 const _className = document.getElementById('class-name');
+const _backupModal = document.getElementById('backup-modal');
+const _backupList = document.getElementById('backup-list');
+const _backupLocation = document.getElementById('backup-location');
+const _closeBackupModal = document.getElementById('close-backup-modal');
 
 let selectedPersonIds = [];
 let _currentClass;
@@ -43,6 +49,21 @@ _quit.addEventListener('click', () => {
 // file
 _file.addEventListener('click', () => {
 	ipcRenderer.send('file');
+});
+
+// backup
+_backupBtn.addEventListener('click', () => {
+	ipcRenderer.send('get-backup');
+});
+
+_closeBackupModal.addEventListener('click', () => {
+	_backupModal.style.display = 'none';
+});
+
+_backupModal.addEventListener('click', (e) => {
+	if (e.target === _backupModal) {
+		_backupModal.style.display = 'none';
+	}
 });
 
 // class
@@ -121,9 +142,10 @@ _randomSelectBtn.addEventListener('click', () => {
 })*/
 
 // classes
-ipcRenderer.on('classes', (event, args) => {
+ipcRenderer.on('classes', (event, args, filePath) => {
 	if (args) {
 		state = 1;
+		if (filePath) _filePath.innerText = filePath;
 		updateState();
 
 		_classes.innerHTML = '';
@@ -136,10 +158,15 @@ ipcRenderer.on('classes', (event, args) => {
 		}
 	} else {
 		state = 0;
+		_filePath.innerText = '';
 		updateState();
 		error(_file);
 	}
 })
+
+ipcRenderer.on('saved-file-missing', (event, filePath) => {
+	if (filePath) _filePath.innerText = `Gespeicherte Datei nicht gefunden: ${filePath}`;
+});
 
 // ready
 ipcRenderer.on('ready', (event, args) => {
@@ -226,6 +253,42 @@ ipcRenderer.on('persons-list', (event, persons) => {
 	} else {
 		error(_manualSelectBtn);
 	}
+});
+
+ipcRenderer.on('backup-data', (event, backup, paths) => {
+	const entries = backup && backup.entries ? backup.entries.slice().reverse() : [];
+	_backupList.innerHTML = '';
+	_backupLocation.innerText = paths ? paths.backupPath : '';
+
+	if (entries.length === 0) {
+		const empty = document.createElement('p');
+		empty.className = 'backup-empty';
+		empty.innerText = 'Noch keine Backup-Einträge vorhanden.';
+		_backupList.appendChild(empty);
+	} else {
+		entries.forEach(entry => {
+			const item = document.createElement('div');
+			item.className = 'backup-item';
+
+			const title = document.createElement('strong');
+			title.innerText = entry.type === 'joker' ? 'Joker' : `Note ${entry.grade}`;
+
+			const details = document.createElement('p');
+			const createdAt = entry.createdAt ? new Date(entry.createdAt).toLocaleString('de-CH') : 'Unbekanntes Datum';
+			const status = entry.excelWriteSucceeded ? 'Excel gespeichert' : 'Excel nicht bestätigt';
+			details.innerText = `${createdAt} | ${entry.className || 'Keine Klasse'} | ${entry.personName || 'Unbekannt'} | ${status}`;
+
+			const file = document.createElement('small');
+			file.innerText = entry.filePath || '';
+
+			item.appendChild(title);
+			item.appendChild(details);
+			item.appendChild(file);
+			_backupList.appendChild(item);
+		});
+	}
+
+	_backupModal.style.display = 'block';
 });
 
     
@@ -331,4 +394,4 @@ Math.clamp = function(a, b, c) {
 }
 
 // automatically scale the name on load
-module.exports = [scaleName(), updateState(), version()];
+module.exports = [scaleName(), updateState(), version(), ipcRenderer.send('load-saved-file')];

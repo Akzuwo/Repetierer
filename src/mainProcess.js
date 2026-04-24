@@ -1,5 +1,7 @@
 const { ipcMain, app, BrowserWindow, dialog } = require('electron');
+const fs = require('fs');
 const { setFile, setClass, selectPerson, saveGrade, setJoker, selectSpecificPerson, getPersons} = require('./program.js');
+const { getBackup, getExcelFilePath, saveExcelFilePath, addBackupEntry, getPaths } = require('./storage.js');
 
 /*
  * events
@@ -22,10 +24,24 @@ ipcMain.on('file', (event, args) => {
 		filters: [{ name: 'Excel Dateien (*.xlsx)', extensions: ['xlsx'] }]
 	});
 	if (file) {
+		saveExcelFilePath(file[0]);
 		setFile(file[0], result => {
-			event.sender.send('classes', result);
+			event.sender.send('classes', result, file[0]);
 		});
 	}
+});
+
+// load the last selected file automatically
+ipcMain.on('load-saved-file', (event, args) => {
+	const filePath = getExcelFilePath();
+	if (!filePath || !fs.existsSync(filePath)) {
+		event.sender.send('saved-file-missing', filePath);
+		return;
+	}
+
+	setFile(filePath, result => {
+		event.sender.send('classes', result, filePath);
+	});
 });
 
 // class
@@ -62,12 +78,21 @@ ipcMain.on('select-person', (event, personId) => {
 
 // ok
 ipcMain.on('ok', (event, args) => {
-	saveGrade(args, (result) => {
+	saveGrade(args, (result, backupEntry) => {
+		if (backupEntry) addBackupEntry(backupEntry);
 		event.sender.send('finished', result);
 	});
 });
 
 // joker
 ipcMain.on('joker', (event, args) => {
-    event.sender.send('finished', setJoker())
+    setJoker((result, backupEntry) => {
+		if (backupEntry) addBackupEntry(backupEntry);
+		event.sender.send('finished', result);
+	});
+});
+
+// backup
+ipcMain.on('get-backup', (event, args) => {
+	event.sender.send('backup-data', getBackup(), getPaths());
 });
