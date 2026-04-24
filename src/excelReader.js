@@ -1,6 +1,7 @@
 const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 let f;
 let wb;
 let ws;
@@ -84,13 +85,18 @@ function reloadAfterWrite(clss, callback, result) {
 
 function getFileLockStatus(filePath) {
 	const targetPath = filePath || f;
-	const ownerLockPath = path.join(path.dirname(targetPath), `~$${path.basename(targetPath)}`);
-	if (fs.existsSync(ownerLockPath)) {
+	const ownerLockPath = getExistingOwnerLockPath(targetPath);
+	if (ownerLockPath) {
 		return {
 			locked: true,
-			error: 'Excel lock file exists',
+			error: `Excel lock file exists: ${path.basename(ownerLockPath)}`,
 			code: 'EXCEL_OWNER_LOCK'
 		};
+	}
+
+	if (process.platform === 'win32') {
+		const windowsLockStatus = getWindowsFileLockStatus(targetPath);
+		if (windowsLockStatus) return windowsLockStatus;
 	}
 
 	try {
@@ -104,6 +110,60 @@ function getFileLockStatus(filePath) {
 			code: error && error.code
 		};
 	}
+}
+
+function getExistingOwnerLockPath(targetPath) {
+	const directory = path.dirname(targetPath);
+	const basename = path.basename(targetPath);
+	const candidates = [
+		path.join(directory, `~$${basename}`),
+		path.join(directory, `~$${basename.slice(2)}`)
+	];
+
+	return candidates.find(candidate => fs.existsSync(candidate));
+}
+
+function getWindowsFileLockStatus(targetPath) {
+	const script = [
+		'$targetPath = $env:REPETIERER_LOCK_CHECK_PATH',
+		'$ErrorActionPreference = "Stop"',
+		'$stream = $null',
+		'try {',
+		'  $stream = [System.IO.File]::Open($targetPath, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)',
+		'  exit 0',
+		'} catch [System.IO.IOException] {',
+		'  [Console]::Error.WriteLine($_.Exception.Message)',
+		'  exit 2',
+		'} catch {',
+		'  [Console]::Error.WriteLine($_.Exception.Message)',
+		'  exit 3',
+		'} finally {',
+		'  if ($stream) { $stream.Close() }',
+		'}'
+	].join('; ');
+	const encodedScript = Buffer.from(script, 'utf16le').toString('base64');
+
+	const result = spawnSync('powershell.exe', [
+		'-NoProfile',
+		'-NonInteractive',
+		'-ExecutionPolicy',
+		'Bypass',
+		'-EncodedCommand',
+		encodedScript
+	], {
+		encoding: 'utf8',
+		env: Object.assign({}, process.env, { REPETIERER_LOCK_CHECK_PATH: targetPath }),
+		windowsHide: true
+	});
+
+	if (result.error) return null;
+	if (result.status === 0) return { locked: false };
+
+	return {
+		locked: true,
+		error: (result.stderr || result.stdout || 'File is locked').trim(),
+		code: result.status === 2 ? 'EXCEL_EXCLUSIVE_LOCK' : 'EXCEL_LOCK_CHECK_FAILED'
+	};
 }
 
 function writeWorkbook(clss, callback, result) {
