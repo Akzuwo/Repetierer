@@ -1,5 +1,4 @@
-//const ipcRenderer = require('electron').ipcRenderer;
-const {ipcRenderer, remote} = require('electron');
+const {ipcRenderer} = require('electron');
 let state = 0; // 0: select file, 1: select class, 2: click start, 3: set grade
 
 // elements
@@ -8,8 +7,10 @@ const _quit = document.getElementById('quit');
 const _file = document.getElementById('file').children.item(1);
 const _filePath = document.getElementById('file-path');
 const _backupBtn = document.getElementById('backup-btn');
+const _settingsBtn = document.getElementById('settings-btn');
 const _classes = document.getElementById('class-list').children.item(0);
 const _start = document.getElementById('start-btn');
+const _probabilitiesBtn = document.getElementById('probabilities-btn');
 const _repetition = document.getElementById('repetition');
 const _name = document.getElementById('name');
 const _label = document.getElementById('grade').children.item(0);
@@ -27,6 +28,17 @@ const _backupModal = document.getElementById('backup-modal');
 const _backupList = document.getElementById('backup-list');
 const _backupLocation = document.getElementById('backup-location');
 const _closeBackupModal = document.getElementById('close-backup-modal');
+const _probabilitiesModal = document.getElementById('probabilities-modal');
+const _probabilityList = document.getElementById('probability-list');
+const _closeProbabilitiesModal = document.getElementById('close-probabilities-modal');
+const _settingsModal = document.getElementById('settings-modal');
+const _settingsLocation = document.getElementById('settings-location');
+const _extraJokerSetting = document.getElementById('extra-joker-setting');
+const _probabilityFactorSetting = document.getElementById('probability-factor-setting');
+const _boostNeverSelectedSetting = document.getElementById('boost-never-selected-setting');
+const _neverSelectedBoostFactorSetting = document.getElementById('never-selected-boost-factor-setting');
+const _saveSettingsBtn = document.getElementById('save-settings-btn');
+const _closeSettingsModal = document.getElementById('close-settings-modal');
 
 let selectedPersonIds = [];
 let _currentClass;
@@ -63,6 +75,54 @@ _closeBackupModal.addEventListener('click', () => {
 _backupModal.addEventListener('click', (e) => {
 	if (e.target === _backupModal) {
 		_backupModal.style.display = 'none';
+	}
+});
+
+// probabilities
+_probabilitiesBtn.addEventListener('click', () => {
+	ipcRenderer.send('get-probabilities');
+});
+
+_closeProbabilitiesModal.addEventListener('click', () => {
+	_probabilitiesModal.style.display = 'none';
+});
+
+_probabilitiesModal.addEventListener('click', (e) => {
+	if (e.target === _probabilitiesModal) {
+		_probabilitiesModal.style.display = 'none';
+	}
+});
+
+// settings
+_settingsBtn.addEventListener('click', () => {
+	ipcRenderer.send('get-settings');
+});
+
+_saveSettingsBtn.addEventListener('click', () => {
+	const probabilityDecreaseFactor = parseFloat(_probabilityFactorSetting.value.replace(',', '.'));
+	const neverSelectedBoostFactor = parseFloat(_neverSelectedBoostFactorSetting.value.replace(',', '.'));
+	if (!probabilityDecreaseFactor || probabilityDecreaseFactor < 1.1 || probabilityDecreaseFactor > 10 ||
+		!neverSelectedBoostFactor || neverSelectedBoostFactor < 1.1 || neverSelectedBoostFactor > 10) {
+		error(_saveSettingsBtn);
+		return;
+	}
+
+	ipcRenderer.send('save-settings', {
+		extraJokerAfterThreeGrades: _extraJokerSetting.checked,
+		probabilityDecreaseFactor: probabilityDecreaseFactor,
+		boostNeverSelected: _boostNeverSelectedSetting.checked,
+		neverSelectedBoostFactor: neverSelectedBoostFactor
+	});
+	_settingsModal.style.display = 'none';
+});
+
+_closeSettingsModal.addEventListener('click', () => {
+	_settingsModal.style.display = 'none';
+});
+
+_settingsModal.addEventListener('click', (e) => {
+	if (e.target === _settingsModal) {
+		_settingsModal.style.display = 'none';
 	}
 });
 
@@ -166,6 +226,19 @@ ipcRenderer.on('classes', (event, args, filePath) => {
 
 ipcRenderer.on('saved-file-missing', (event, filePath) => {
 	if (filePath) _filePath.innerText = `Gespeicherte Datei nicht gefunden: ${filePath}`;
+});
+
+ipcRenderer.on('version', (event, appVersion) => {
+	document.getElementById("version").innerText = "Repetierer v" + appVersion;
+});
+
+ipcRenderer.on('settings-data', (event, settings, paths) => {
+	_extraJokerSetting.checked = !!settings.extraJokerAfterThreeGrades;
+	_probabilityFactorSetting.value = settings.probabilityDecreaseFactor;
+	_boostNeverSelectedSetting.checked = !!settings.boostNeverSelected;
+	_neverSelectedBoostFactorSetting.value = settings.neverSelectedBoostFactor;
+	_settingsLocation.innerText = paths ? paths.settingsPath : '';
+	_settingsModal.style.display = 'block';
 });
 
 // ready
@@ -291,6 +364,52 @@ ipcRenderer.on('backup-data', (event, backup, paths) => {
 	_backupModal.style.display = 'block';
 });
 
+ipcRenderer.on('probability-data', (event, probabilities) => {
+	_probabilityList.innerHTML = '';
+
+	if (!probabilities || probabilities.length === 0) {
+		const empty = document.createElement('p');
+		empty.className = 'backup-empty';
+		empty.innerText = 'Keine Personen verfügbar.';
+		_probabilityList.appendChild(empty);
+	} else {
+		probabilities
+			.slice()
+			.sort((a, b) => b.probability - a.probability)
+			.forEach(person => {
+				const item = document.createElement('div');
+				item.className = 'probability-item';
+
+				const header = document.createElement('div');
+				header.className = 'probability-header';
+
+				const name = document.createElement('strong');
+				name.innerText = person.name;
+
+				const value = document.createElement('span');
+				value.innerText = `${(person.probability * 100).toFixed(1)}%`;
+
+				const bar = document.createElement('div');
+				bar.className = 'probability-bar';
+				const fill = document.createElement('div');
+				fill.style.width = `${Math.max(1, person.probability * 100)}%`;
+				bar.appendChild(fill);
+
+				const meta = document.createElement('small');
+				meta.innerText = `${person.grades} Noten | Gewicht ${person.weight.toFixed(2)}`;
+
+				header.appendChild(name);
+				header.appendChild(value);
+				item.appendChild(header);
+				item.appendChild(bar);
+				item.appendChild(meta);
+				_probabilityList.appendChild(item);
+			});
+	}
+
+	_probabilitiesModal.style.display = 'block';
+});
+
     
 /*
  * other
@@ -311,6 +430,7 @@ function updateState() {
 			disable(_ok);
             disable(_joker);
 			disable(_manualSelectBtn);
+			disable(_probabilitiesBtn);
 			text();
 			break;
 		case 2:
@@ -322,6 +442,7 @@ function updateState() {
 			disable(_ok);
             disable(_joker);
 			enable(_manualSelectBtn);
+			enable(_probabilitiesBtn);
 			text();
 			break;
 		case 3:
@@ -333,6 +454,7 @@ function updateState() {
 			enable(_ok);
             disable(_joker);
 			disable(_manualSelectBtn);
+			disable(_probabilitiesBtn);
 			break;
         case 4:
 			disable(_start);
@@ -343,6 +465,7 @@ function updateState() {
 			enable(_ok);
             enable(_joker);
 			disable(_manualSelectBtn);
+			disable(_probabilitiesBtn);
 			break;
 
 	}
@@ -374,7 +497,7 @@ function error(x) {
 
 // display the version
 function version() {
-	document.getElementById("version").innerText = "Repetierer v" + remote.app.getVersion();
+	ipcRenderer.send('get-version');
 }
 
 // scale the name to fit the screen

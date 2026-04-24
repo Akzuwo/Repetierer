@@ -39,7 +39,7 @@ function read(clss) {
 		if (!name.value) break;
 
 		// check if a person used the joker on the current date
-		if (joker_date == formattedDate) continue;
+		if (joker_date.value == formattedDate) continue;
 
 		let grades = countGrades(i)
         let joker = ws.getCell('H' + (i + 6));
@@ -86,13 +86,16 @@ function write_grade(clss, person, grade, callback) {
 		}))
 		.catch(() => callback()); // can't write
 }
-function write_joker(clss, person, callback) {
+function write_joker(clss, person, callback, allowExtraJoker) {
 
 	// check file
 	if (ws.getCell('A1').value !== 'repetierer') { callback(); return; }
-    
-    if (ws.getCell('H' + (person.id + 6)).value === 1) {callback; return;}
-	ws.getCell('H' + (person.id + 6)).value = 1;
+
+	const jokerCell = ws.getCell('H' + (person.id + 6));
+	const currentJokerValue = Number(jokerCell.value || 0);
+	if (currentJokerValue >= 1 && !allowExtraJoker) { callback(); return; }
+	if (currentJokerValue >= 2) { callback(); return; }
+	jokerCell.value = currentJokerValue === 1 && allowExtraJoker ? 2 : 1;
 
 	const currentDate = new Date();
 	const formattedDate = `${String(currentDate.getDate()).padStart(2, '0')}.${String(currentDate.getMonth() + 1).padStart(2, '0')}.${currentDate.getFullYear()}`;

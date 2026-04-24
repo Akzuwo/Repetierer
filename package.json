@@ -1,6 +1,6 @@
 {
   "name": "repetierer",
-  "version": "6.0.0",
+  "version": "6.0.3",
   "description": "(:",
   "license": "GPL-3.0",
   "repository": {
@@ -19,41 +19,47 @@
     "directories": {
       "output": "./builds"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Akzuwo",
+        "repo": "Repetierer",
+        "releaseType": "release"
+      }
+    ],
     "win": {
       "target": [
         "nsis"
       ],
-      "icon": "./public/icons/icon.ico",
-      "publish": [
-        "github"
-      ]
+      "icon": "./public/icons/icon.ico"
     },
     "nsis": {
       "installerIcon": "./public/icons/icon.ico",
       "uninstallerIcon": "./public/icons/icon.ico",
       "installerSidebar": "./public/images/sidebar.bmp",
       "oneClick": false,
-      "perMachine": true,
+      "perMachine": false,
       "allowElevation": true,
-      "allowToChangeInstallationDirectory": false,
+      "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Repetierer",
       "runAfterFinish": true,
+      "license": "installer-license.txt",
       "deleteAppDataOnUninstall": false,
-      "artifactName": "Repetierer ${version}.${ext}"
+      "artifactName": "Repetierer-${version}.${ext}"
     }
   },
-  "author": "srpnt3, Jonas-Luetolf",
+  "author": "srpnt3, Jonas-Luetolf, Akzuwo",
   "dependencies": {
-    "electron-updater": "^4.3.8",
+    "electron-updater": "^6.8.3",
     "exceljs": "^4.2.1",
     "npm": "^6.14.13",
     "user": "^0.0.0"
   },
   "devDependencies": {
-    "electron": "^9.4.4",
-    "electron-builder": "^22.14.13",
+    "electron": "^41.3.0",
+    "electron-builder": "^26.5.0",
     "electron-packager": "^15.2.0"
   }
 }

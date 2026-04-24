@@ -1,7 +1,7 @@
 const { ipcMain, app, BrowserWindow, dialog } = require('electron');
 const fs = require('fs');
-const { setFile, setClass, selectPerson, saveGrade, setJoker, selectSpecificPerson, getPersons} = require('./program.js');
-const { getBackup, getExcelFilePath, saveExcelFilePath, addBackupEntry, getPaths } = require('./storage.js');
+const { setFile, setClass, selectPerson, saveGrade, setJoker, selectSpecificPerson, getPersons, getProbabilities} = require('./program.js');
+const { getBackup, getAppSettings, getExcelFilePath, saveExcelFilePath, saveAppSettings, addBackupEntry, getPaths } = require('./storage.js');
 
 /*
  * events
@@ -15,6 +15,21 @@ ipcMain.on('minimize', (event, args) => {
 // quit
 ipcMain.on('quit', (event, args) => {
 	app.quit();
+});
+
+// app version
+ipcMain.on('get-version', (event, args) => {
+	event.sender.send('version', app.getVersion());
+});
+
+// settings
+ipcMain.on('get-settings', (event, args) => {
+	event.sender.send('settings-data', getAppSettings(), getPaths());
+});
+
+ipcMain.on('save-settings', (event, settings) => {
+	saveAppSettings(settings || {});
+	event.sender.send('settings-saved', getAppSettings());
 });
 
 // file
@@ -66,6 +81,11 @@ ipcMain.on('start', (event, args) => {
 ipcMain.on('get-persons', (event, args) => {
 	const persons = getPersons();
 	event.sender.send('persons-list', persons);
+});
+
+// get probability list
+ipcMain.on('get-probabilities', (event, args) => {
+	event.sender.send('probability-data', getProbabilities());
 });
 
 // select specific person

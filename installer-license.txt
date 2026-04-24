@@ -1,0 +1,10 @@
+Nutzungsbedingungen und Haftungsausschluss
+
+Mit der Installation und Nutzung von Repetierer akzeptierst du diese Bedingungen.
+
+Die Software wird ohne Gewaehrleistung bereitgestellt.
+Ich, Timo Wigger, uebernehme keine Haftung fuer etwaige Schaeden, Datenverluste,
+Fehleintraege oder sonstige Probleme, die durch den Gebrauch der Software
+entstehen koennten, so unwahrscheinlich diese auch sind.
+
+Bitte erstelle regelmaessig eigene Backups deiner Excel-Dateien.
