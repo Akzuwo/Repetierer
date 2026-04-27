@@ -5,26 +5,41 @@ const path = require('path');
 require('./src/mainProcess.js');
 
 let win;
+const mainWindowSize = { width: 1100, height: 800 };
+const startupWindowSize = { width: 560, height: 260 };
 let updateDownloadApproved = false;
 let updateCheckStarted = false;
 let updateListenersRegistered = false;
 let availableUpdateInfo;
+const updateFeed = {
+	provider: 'github',
+	owner: 'Akzuwo',
+	repo: 'Repetierer',
+	releaseType: 'release'
+};
 
 // initialize the window
 function initWindow() {
 	win = new BrowserWindow({
-		width: 1100,
-		height: 800,
+		width: startupWindowSize.width,
+		height: startupWindowSize.height,
 		resizable: false,
 		transparent: true,
 		frame: false,
 		center: true,
+		icon: path.join(__dirname, 'public', 'icons', 'icon.ico'),
 		webPreferences: {
 			nodeIntegration: true,
 			contextIsolation: false
 		},
 	});
 }
+
+ipcMain.on('startup-splash-finished', () => {
+	if (!win || win.isDestroyed()) return;
+	win.setSize(mainWindowSize.width, mainWindowSize.height, true);
+	win.center();
+});
 
 // load the index.html file and display it
 function loadHTML() {
@@ -43,9 +58,18 @@ function createApp() {
 		notifyInstalledUpdateIfNeeded();
 		checkForUpdatesWithConsent();
 	});
+	win.on('restore', () => {
+		sendWindowRestored();
+	});
 	win.on('close', () => {
 		closeWindow();
 	})
+}
+
+function sendWindowRestored() {
+	if (win && !win.isDestroyed() && win.webContents) {
+		win.webContents.send('window-restored');
+	}
 }
 
 function checkForUpdatesWithConsent() {
@@ -59,6 +83,7 @@ function checkForUpdatesWithConsent() {
 
 	autoUpdater.autoDownload = false;
 	autoUpdater.autoInstallOnAppQuit = false;
+	autoUpdater.setFeedURL(updateFeed);
 	registerUpdaterListeners();
 
 	sendUpdateStatus('checking');

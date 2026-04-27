@@ -1,4 +1,4 @@
-const { init, read, write_grade, write_joker, apply_entries, getJokerMigrationStatus, migrate_jokers } = require('./excelReader.js');
+const { init, read, read_editor_persons, write_grade, write_joker, edit_persons, apply_entries, getJokerMigrationStatus, migrate_jokers } = require('./excelReader.js');
 const { getAppSettings } = require('./storage.js');
 let cls;
 let persons;
@@ -23,6 +23,11 @@ function setClass(clss, callback) {
 // get all persons for manual selection
 function getPersons() {
 	return persons;
+}
+
+function getEditorPersons() {
+	if (!cls) return [];
+	return read_editor_persons(cls) || [];
 }
 
 function getProbabilities() {
@@ -144,6 +149,18 @@ function setJoker(callback) {
 
 }
 
+function saveEditorPersons(editorPersons, callback) {
+	if (!cls) {
+		callback({ success: false, reason: 'no-class-selected' });
+		return;
+	}
+
+	edit_persons(cls, editorPersons, (p, result) => {
+		if (result && result.success) persons = p || [];
+		callback(result || { success: false, reason: 'unknown' });
+	});
+}
+
 function migrateJokers(callback) {
 	migrate_jokers(result => {
 		if (result && result.success && cls) {
@@ -206,12 +223,14 @@ module.exports = {
 	selectPerson: selectPerson,
 	saveGrade: saveGrade,
 	setJoker: setJoker,
+	saveEditorPersons: saveEditorPersons,
 	applyPendingExcelEntries: applyPendingExcelEntries,
 	reloadExcel: reloadExcel,
 	getCurrentFilePath: getCurrentFilePath,
 	getJokerMigrationStatus: getJokerMigrationStatus,
 	migrateJokers: migrateJokers,
 	getPersons: getPersons,
+	getEditorPersons: getEditorPersons,
 	getProbabilities: getProbabilities,
 	selectSpecificPerson: selectSpecificPerson,
 }

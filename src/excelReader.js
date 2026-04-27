@@ -68,6 +68,26 @@ function read(clss) {
 	}
 }
 
+function read_editor_persons(clss) {
+	const worksheet = wb.getWorksheet(clss);
+	if (!worksheet || worksheet.getCell('A1').value !== 'repetierer') return;
+
+	const persons = [];
+	for (let row = 6; row <= 30; row++) {
+		const name = worksheet.getCell('A' + row).value;
+		if (!name) break;
+
+		persons.push({
+			id: row - 6,
+			name: String(name),
+			grades: countGradesForRow(worksheet, row),
+			joker: Number(worksheet.getCell('H' + row).value || 0)
+		});
+	}
+
+	return persons;
+}
+
 function getFormattedDate() {
 	const currentDate = new Date();
 	return `${String(currentDate.getDate()).padStart(2, '0')}.${String(currentDate.getMonth() + 1).padStart(2, '0')}.${currentDate.getFullYear()}`;
@@ -315,6 +335,62 @@ function write_joker(clss, person, callback) {
 	writeWorkbook(clss, callback, { type: 'joker' });
 }
 
+function edit_persons(clss, editorPersons, callback) {
+	const worksheet = wb.getWorksheet(clss);
+	if (!worksheet || worksheet.getCell('A1').value !== 'repetierer') {
+		callback(undefined, { success: false, reason: 'invalid-file' });
+		return;
+	}
+
+	const lockStatus = getFileLockStatus(f);
+	if (lockStatus.locked) {
+		callback(undefined, { success: false, reason: 'excel-locked', error: lockStatus.error });
+		return;
+	}
+
+	const existingRows = new Map();
+	for (let row = 6; row <= 30; row++) {
+		if (!worksheet.getCell('A' + row).value) break;
+		existingRows.set(row - 6, copyRowValues(worksheet, row));
+	}
+
+	const normalizedPersons = (editorPersons || [])
+		.map(person => ({
+			id: person.id === null || person.id === undefined ? null : Number(person.id),
+			name: String(person.name || '').trim(),
+			joker: Number(person.joker)
+		}));
+
+	const hasInvalidPerson = normalizedPersons.some(person =>
+		!person.name ||
+		!Number.isInteger(person.joker) ||
+		person.joker < 0
+	);
+	if (hasInvalidPerson) {
+		callback(undefined, { success: false, reason: 'invalid-editor-data' });
+		return;
+	}
+
+	if (normalizedPersons.length > 25) {
+		callback(undefined, { success: false, reason: 'too-many-persons' });
+		return;
+	}
+
+	for (let row = 6; row <= 30; row++) {
+		clearRosterRow(worksheet, row);
+	}
+
+	normalizedPersons.forEach((person, index) => {
+		const targetRow = index + 6;
+		const sourceValues = Number.isFinite(person.id) && existingRows.has(person.id) ? existingRows.get(person.id) : {};
+		writeRowValues(worksheet, targetRow, sourceValues);
+		worksheet.getCell('A' + targetRow).value = person.name;
+		worksheet.getCell('H' + targetRow).value = person.joker;
+	});
+
+	writeWorkbook(clss, callback, { type: 'edit-persons' });
+}
+
 function apply_entries(clss, entries, callback) {
 	if (!entries || entries.length === 0) {
 		callback(read(clss), { success: true, applied: [] });
@@ -377,11 +453,41 @@ function apply_entries(clss, entries, callback) {
 		return n;
 	}
 }
+
+function countGradesForRow(worksheet, row) {
+	let n = 0;
+	[1,2,3,4,5,6].map(x => {
+		if (worksheet.getCell(row, x + 1).value) n++;
+	});
+	return n;
+}
+
+function copyRowValues(worksheet, row) {
+	const values = {};
+	for (let column = 1; column <= 17; column++) {
+		values[column] = worksheet.getCell(row, column).value;
+	}
+	return values;
+}
+
+function writeRowValues(worksheet, row, values) {
+	for (let column = 1; column <= 17; column++) {
+		worksheet.getCell(row, column).value = Object.prototype.hasOwnProperty.call(values, column) ? values[column] : null;
+	}
+}
+
+function clearRosterRow(worksheet, row) {
+	for (let column = 1; column <= 17; column++) {
+		worksheet.getCell(row, column).value = null;
+	}
+}
 module.exports = {
 	init: init,
 	read: read,
+	read_editor_persons: read_editor_persons,
 	write_grade: write_grade,
     write_joker: write_joker,
+	edit_persons: edit_persons,
 	apply_entries: apply_entries,
 	getJokerMigrationStatus: getJokerMigrationStatus,
 	migrate_jokers: migrate_jokers,

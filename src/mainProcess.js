@@ -1,6 +1,6 @@
 const { ipcMain, app, BrowserWindow, dialog } = require('electron');
 const fs = require('fs');
-const { setFile, setClass, selectPerson, saveGrade, setJoker, selectSpecificPerson, getPersons, getProbabilities, applyPendingExcelEntries, reloadExcel, getJokerMigrationStatus, migrateJokers} = require('./program.js');
+const { setFile, setClass, selectPerson, saveGrade, setJoker, selectSpecificPerson, getPersons, getEditorPersons, saveEditorPersons, getProbabilities, applyPendingExcelEntries, reloadExcel, getJokerMigrationStatus, migrateJokers} = require('./program.js');
 const { getBackup, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, logEvent, getLogs, getPaths } = require('./storage.js');
 const isDebugMode = process.argv.includes('--dev-mode');
 
@@ -93,6 +93,23 @@ ipcMain.on('start', (event, args) => {
 ipcMain.on('get-persons', (event, args) => {
 	const persons = getPersons();
 	event.sender.send('persons-list', persons);
+});
+
+ipcMain.on('get-editor-persons', (event, args) => {
+	const persons = getEditorPersons();
+	event.sender.send('editor-persons-data', persons);
+});
+
+ipcMain.on('save-editor-persons', (event, editorPersons) => {
+	saveEditorPersons(editorPersons, result => {
+		if (result && result.success) {
+			logEvent('Excel Personen bearbeitet', { count: editorPersons ? editorPersons.length : 0 });
+			event.sender.send('editor-persons-saved', result);
+		} else {
+			logEvent('Excel Personen bearbeiten fehlgeschlagen', result || {});
+			event.sender.send('editor-persons-save-failed', result || { success: false, reason: 'unknown' });
+		}
+	});
 });
 
 // get probability list

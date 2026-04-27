@@ -76,6 +76,64 @@
 		animation: app-enter 420ms ease-out;
 	}
 
+	#container.window-minimizing {
+		opacity: 0;
+		transform: translateY(0.7rem) scale(0.985);
+		transition: opacity .18s ease, transform .18s ease;
+	}
+
+	#container.window-restoring {
+		animation: window-restore 260ms ease-out both;
+	}
+
+	#title-bar,
+	#info,
+	#title,
+	#content {
+		transition: opacity .22s ease;
+	}
+
+	#container.startup-active > :not(#startup-splash) {
+		opacity: 0;
+	}
+
+	#startup-splash {
+		-webkit-app-region: drag;
+		align-items: center;
+		background: #1e1f22;
+		display: flex;
+		inset: 0;
+		justify-content: center;
+		position: absolute;
+		z-index: 2000;
+		transition: opacity .45s ease, visibility .45s ease;
+	}
+
+	#startup-splash.startup-splash-hidden {
+		opacity: 0;
+		pointer-events: none;
+		visibility: hidden;
+	}
+
+	.startup-loader {
+		height: auto;
+		max-width: min(72vw, 46rem);
+		overflow: visible;
+		width: 46rem;
+	}
+
+	.startup-loader-text {
+		animation: startup-dash-array 4.2s ease-in-out infinite, startup-dash-offset 4.2s linear infinite, startup-fill 4.2s ease-in-out infinite;
+		fill: rgba(24, 168, 144, 0.08);
+		font-size: 5.5rem;
+		font-weight: 900;
+		letter-spacing: 0;
+		stroke: url(#startup-gradient);
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-width: 0.12rem;
+	}
+
 	/*==================================
 	Title bar
 	==================================*/
@@ -226,7 +284,6 @@
 	Main
 	==================================*/
 	#title {
-		-webkit-app-region: no-drag;
 		font-size: 4.5rem;
 		padding: 0 3rem;
 		line-height: 100%;
@@ -234,7 +291,6 @@
 	}
 
 	#content {
-		-webkit-app-region: no-drag;
 		padding: 3rem;
 		height: calc(100% - 15rem);
 		display: grid;
@@ -313,6 +369,7 @@
 	}
 
 	.btn-1, .btn-2 {
+		-webkit-app-region: no-drag;
 		-webkit-appearance: none;
 		font-size: 1rem;
 		line-height: 100%;
@@ -321,6 +378,13 @@
 		outline: none;
 		cursor: pointer;
 		transition: background-color .3s, color .3s, border-color .3s, transform .2s, box-shadow .2s;
+	}
+
+	input,
+	label,
+	select,
+	textarea {
+		-webkit-app-region: no-drag;
 	}
 
 	.btn-1 {
@@ -559,12 +623,9 @@
 
 .modal {
 	display: none;
-	position: fixed;
+	position: absolute;
 	z-index: 1000;
-	left: 0;
-	top: 0;
-	width: 100%;
-	height: 100%;
+	inset: 0;
 	background-color: rgba(0,0,0,0.5);
 	animation: modal-backdrop .18s ease-out;
 }
@@ -576,12 +637,12 @@
 .modal-content {
 	-webkit-app-region: no-drag;
 	background-color: #1e1e1e;
-	margin: 10% auto;
+	margin: 6vh auto;
 	padding: 20px;
 	border-radius: 10px;
 	width: 80%;
 	max-width: 500px;
-	max-height: 70vh;
+	max-height: 82vh;
 	overflow-y: auto;
 	animation: modal-content-enter .22s ease-out;
 }
@@ -602,7 +663,6 @@
 	margin: 20px 0;
 	max-height: 50vh;
 	overflow-y: auto;
-	overflow: scroll;
 	height: calc(100% - 4rem);
 }
 
@@ -690,8 +750,16 @@
 }
 
 .settings-content,
-.probability-content {
+.probability-content,
+.excel-editor-content {
 	max-width: 620px;
+}
+
+.excel-editor-content {
+	display: flex;
+	flex-direction: column;
+	max-height: calc(100vh - 5rem);
+	overflow: hidden;
 }
 
 .settings-content {
@@ -772,6 +840,38 @@
 	margin-bottom: 1rem;
 }
 
+#excel-editor-list {
+	display: flex;
+	flex: 1 1 auto;
+	flex-direction: column;
+	gap: 0.55rem;
+	max-height: none;
+	overflow-y: auto;
+	margin-bottom: 0.8rem;
+	min-height: 0;
+	padding-right: 0.35rem;
+	scrollbar-color: #18a890 #202125;
+	scrollbar-width: thin;
+}
+
+#excel-editor-list::-webkit-scrollbar {
+	width: 0.45rem;
+}
+
+#excel-editor-list::-webkit-scrollbar-track {
+	background: #202125;
+	border-radius: 999px;
+}
+
+#excel-editor-list::-webkit-scrollbar-thumb {
+	background: #18a890;
+	border-radius: 999px;
+}
+
+#excel-editor-list::-webkit-scrollbar-thumb:hover {
+	background: #20c0a5;
+}
+
 #log-list {
 	background: #151619;
 	border: 0.1rem solid #414246;
@@ -803,6 +903,94 @@
 .probability-item:hover {
 	transform: translateX(0.2rem);
 	background-color: #303236;
+}
+
+.excel-editor-item {
+	align-items: center;
+	background: #2a2a2a;
+	border-radius: 5px;
+	display: grid;
+	gap: 0.65rem;
+	grid-template-columns: minmax(0, 1fr) 5rem 4.5rem 6rem;
+	padding: 0.7rem;
+	transition: opacity .2s ease, background-color .2s ease;
+}
+
+.excel-editor-help {
+	color: #bfc0c4;
+	font-size: 0.9rem;
+	line-height: 1.4;
+	margin: 0.25rem 0 1rem;
+}
+
+.excel-editor-header {
+	color: #777880;
+	display: grid;
+	font-size: 0.78rem;
+	font-weight: 700;
+	gap: 0.65rem;
+	grid-template-columns: minmax(0, 1fr) 5rem 4.5rem 6rem;
+	margin-bottom: 0.45rem;
+	padding: 0 1.05rem 0 0.7rem;
+	text-transform: uppercase;
+}
+
+.excel-editor-item-deleted {
+	opacity: 0.52;
+}
+
+.excel-editor-item input,
+.excel-editor-add input {
+	-webkit-app-region: no-drag;
+	background-color: #27282c;
+	border: 0.1rem solid #18a890;
+	border-radius: 0.25rem;
+	color: #f5f5f5;
+	font-size: 0.95rem;
+	min-width: 0;
+	padding: 0.55rem 0.65rem;
+}
+
+.excel-editor-item input:disabled {
+	border-color: #414246;
+	color: #777880;
+}
+
+.excel-editor-item small {
+	color: #bfc0c4;
+	white-space: nowrap;
+}
+
+.excel-editor-item button {
+	margin-left: 0;
+	padding: 0.65rem 0.75rem;
+}
+
+.excel-editor-add {
+	align-items: end;
+	border-top: 0.1rem solid #414246;
+	display: grid;
+	gap: 0.75rem;
+	grid-template-columns: minmax(0, 1fr) 5rem 8rem;
+	margin: 0.2rem 0 0.8rem;
+	padding-top: 0.8rem;
+}
+
+.excel-editor-add label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.excel-editor-add label span {
+	color: #bfc0c4;
+	font-size: 0.78rem;
+	font-weight: 700;
+}
+
+.excel-editor-add button {
+	margin-left: 0;
+	padding: 0.65rem 0.85rem;
 }
 
 .probability-header {
@@ -950,6 +1138,49 @@
 	to {
 		opacity: 1;
 		transform: scale(1);
+	}
+}
+
+@keyframes window-restore {
+	from {
+		opacity: 0;
+		transform: translateY(0.7rem) scale(0.985);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+@keyframes startup-dash-array {
+	0% {
+		stroke-dasharray: 0 1 1099 0;
+	}
+	50% {
+		stroke-dasharray: 0 1099 1 0;
+	}
+	100% {
+		stroke-dasharray: 1099 1 0 0;
+	}
+}
+
+@keyframes startup-dash-offset {
+	0% {
+		stroke-dashoffset: 1105;
+	}
+	100% {
+		stroke-dashoffset: 5;
+	}
+}
+
+@keyframes startup-fill {
+	0%,
+	42% {
+		fill: rgba(24, 168, 144, 0.03);
+	}
+	70%,
+	100% {
+		fill: rgba(24, 168, 144, 0.14);
 	}
 }
 

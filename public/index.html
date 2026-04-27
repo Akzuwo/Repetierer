@@ -11,7 +11,20 @@
 </head>
 
 <body>
-<div id="container">
+<div id="container" class="startup-active">
+	<div id="startup-splash">
+		<svg class="startup-loader" viewBox="0 0 760 150" role="img" aria-label="Repetierer">
+			<defs>
+				<linearGradient gradientUnits="userSpaceOnUse" y2="0" x2="760" y1="150" x1="0" id="startup-gradient">
+					<stop stop-color="#0f1113" />
+					<stop stop-color="#18a890" />
+					<stop stop-color="#0f1113" offset="1" />
+					<animateTransform repeatCount="indefinite" dur="14s" values="0 380 75;-270 380 75;-270 380 75;-540 380 75;-540 380 75;-810 380 75;-810 380 75;-1080 380 75;-1080 380 75" type="rotate" attributeName="gradientTransform" />
+				</linearGradient>
+			</defs>
+			<text class="startup-loader-text" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle">Repetierer</text>
+		</svg>
+	</div>
 
 	<div id="title-bar">
 		<div class="title-actions">
@@ -50,6 +63,7 @@
 			<button class="btn-2" id="log-btn">Log anzeigen</button>
 			<button class="btn-2 disabled" id="flush-excel-btn">Excel aktualisieren</button>
 			<button class="btn-2" id="reload-excel-btn">Excel neu laden</button>
+			<button class="btn-2 disabled" id="excel-editor-btn">Excel bearbeiten</button>
 		</div>
 		<div class="drawer-actions debug-actions update-hidden" id="debug-actions">
 			<button class="btn-2" id="debug-test-alert-btn">Testalert</button>
@@ -190,6 +204,35 @@
 			<div id="probability-list"></div>
 			<div class="modal-buttons">
 				<button class="btn-2" id="close-probabilities-modal">Schließen</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="excel-editor-modal" class="modal">
+		<div class="modal-content excel-editor-content">
+			<h2>Excel bearbeiten</h2>
+			<p class="excel-editor-help">Bearbeitet die aktuell ausgewählte Klasse. Name ist die Person in Spalte A. Joker ist die Anzahl verbleibender Joker. Noten zeigt nur, wie viele Noten schon eingetragen sind.</p>
+			<div class="excel-editor-header">
+				<span>Name</span>
+				<span>Joker</span>
+				<span>Noten</span>
+				<span>Aktion</span>
+			</div>
+			<div id="excel-editor-list"></div>
+			<div class="excel-editor-add">
+				<label>
+					<span>Neue Person</span>
+					<input id="excel-editor-name" type="text" placeholder="Name">
+				</label>
+				<label>
+					<span>Joker</span>
+					<input id="excel-editor-joker" type="number" min="0" step="1" value="1">
+				</label>
+				<button class="btn-1" id="excel-editor-add-btn">Hinzufügen</button>
+			</div>
+			<div class="modal-buttons">
+				<button class="btn-1" id="excel-editor-save-btn">Speichern</button>
+				<button class="btn-2" id="excel-editor-close-btn">Abbrechen</button>
 			</div>
 		</div>
 	</div>

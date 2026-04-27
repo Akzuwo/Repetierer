@@ -2,8 +2,10 @@ const {ipcRenderer, clipboard} = require('electron');
 let state = 0; // 0: select file, 1: select class, 2: click start, 3: set grade
 
 // elements
+const _container = document.getElementById('container');
 const _minimize = document.getElementById('minimize');
 const _quit = document.getElementById('quit');
+const _startupSplash = document.getElementById('startup-splash');
 const _drawerToggle = document.getElementById('drawer-toggle');
 const _drawer = document.getElementById('drawer');
 const _drawerScrim = document.getElementById('drawer-scrim');
@@ -13,6 +15,7 @@ const _filePath = document.getElementById('file-path');
 const _backupBtn = document.getElementById('backup-btn');
 const _logBtn = document.getElementById('log-btn');
 const _reloadExcelBtn = document.getElementById('reload-excel-btn');
+const _excelEditorBtn = document.getElementById('excel-editor-btn');
 const _debugActions = document.getElementById('debug-actions');
 const _debugTestAlertBtn = document.getElementById('debug-test-alert-btn');
 const _debugFakeUpdateBtn = document.getElementById('debug-fake-update-btn');
@@ -58,6 +61,13 @@ const _closeJokerMigrationHelpBottomBtn = document.getElementById('close-joker-m
 const _probabilitiesModal = document.getElementById('probabilities-modal');
 const _probabilityList = document.getElementById('probability-list');
 const _closeProbabilitiesModal = document.getElementById('close-probabilities-modal');
+const _excelEditorModal = document.getElementById('excel-editor-modal');
+const _excelEditorList = document.getElementById('excel-editor-list');
+const _excelEditorName = document.getElementById('excel-editor-name');
+const _excelEditorJoker = document.getElementById('excel-editor-joker');
+const _excelEditorAddBtn = document.getElementById('excel-editor-add-btn');
+const _excelEditorSaveBtn = document.getElementById('excel-editor-save-btn');
+const _excelEditorCloseBtn = document.getElementById('excel-editor-close-btn');
 const _settingsModal = document.getElementById('settings-modal');
 const _settingsHelpBtn = document.getElementById('settings-help-btn');
 const _settingsHelpModal = document.getElementById('settings-help-modal');
@@ -79,9 +89,11 @@ const _updatePrimaryBtn = document.getElementById('update-primary-btn');
 const _updateSecondaryBtn = document.getElementById('update-secondary-btn');
 
 let selectedPersonIds = [];
+let excelEditorPersons = [];
 let _currentClass;
 let _nameSize;
 let updatePrimaryAction = requestUpdateDownload;
+let restoreAnimationActive = false;
 
 /*
  * events to main
@@ -89,7 +101,7 @@ let updatePrimaryAction = requestUpdateDownload;
 
 // minimize
 _minimize.addEventListener('click', () => {
-	ipcRenderer.send('minimize');
+	animateMinimize();
 });
 
 // quit
@@ -163,6 +175,10 @@ _reloadExcelBtn.addEventListener('click', () => {
 	ipcRenderer.send('reload-excel');
 });
 
+_excelEditorBtn.addEventListener('click', () => {
+	ipcRenderer.send('get-editor-persons');
+});
+
 _conflictFlushBtn.addEventListener('click', () => {
 	_reloadConflictModal.style.display = 'none';
 	ipcRenderer.send('flush-pending-excel');
@@ -216,6 +232,24 @@ _closeProbabilitiesModal.addEventListener('click', () => {
 _probabilitiesModal.addEventListener('click', (e) => {
 	if (e.target === _probabilitiesModal) {
 		_probabilitiesModal.style.display = 'none';
+	}
+});
+
+_excelEditorAddBtn.addEventListener('click', () => {
+	addExcelEditorPerson();
+});
+
+_excelEditorSaveBtn.addEventListener('click', () => {
+	saveExcelEditorPersons();
+});
+
+_excelEditorCloseBtn.addEventListener('click', () => {
+	closeModal(_excelEditorModal);
+});
+
+_excelEditorModal.addEventListener('click', (e) => {
+	if (e.target === _excelEditorModal) {
+		closeModal(_excelEditorModal);
 	}
 });
 
@@ -336,11 +370,13 @@ _cancel.addEventListener('click', () => {
 
 // ok
 _ok.addEventListener('click', () => {
-	let v = parseFloat(_grade.value.replace(',', '.'));
-	if (v && v >= 1 && v <= 6)
+	let v = parseGradeInput(_grade.value);
+	if (isValidGrade(v)) {
 		ipcRenderer.send('ok', v);
-	else
+	} else {
 		error(_ok);
+		showInvalidGradeAlert();
+	}
 
 });
 _joker.addEventListener('click', () => {
@@ -478,6 +514,10 @@ ipcRenderer.on('settings-data', (event, settings, paths) => {
 
 ipcRenderer.on('update-status', (event, payload) => {
 	handleUpdateStatus(payload || {});
+});
+
+ipcRenderer.on('window-restored', () => {
+	animateRestore();
 });
 
 ipcRenderer.on('pending-excel-status', (event, count) => {
@@ -742,6 +782,60 @@ ipcRenderer.on('probability-data', (event, probabilities) => {
 	_probabilitiesModal.style.display = 'block';
 });
 
+ipcRenderer.on('editor-persons-data', (event, persons) => {
+	if (!_className.innerText) {
+		error(_excelEditorBtn);
+		showUpdatePanel({
+			title: 'Keine Klasse ausgewählt',
+			detail: 'Wähle zuerst eine Klasse aus, bevor du die Excel-Datei bearbeitest.',
+			primaryVisible: false,
+			secondaryText: 'OK',
+			secondaryVisible: true,
+			placement: 'toast'
+		});
+		return;
+	}
+
+	excelEditorPersons = (persons || []).map(person => ({
+		id: person.id,
+		name: person.name,
+		grades: person.grades,
+		joker: Number(person.joker || 0),
+		isNew: false,
+		deleted: false
+	}));
+	_excelEditorName.value = '';
+	_excelEditorJoker.value = '1';
+	renderExcelEditor();
+	openModal(_excelEditorModal);
+});
+
+ipcRenderer.on('editor-persons-saved', (event, result) => {
+	closeModal(_excelEditorModal);
+	state = 2;
+	updateState();
+	showUpdatePanel({
+		title: 'Excel gespeichert',
+		detail: 'Personen und Joker wurden in der Excel-Datei aktualisiert.',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
+});
+
+ipcRenderer.on('editor-persons-save-failed', (event, result) => {
+	const reason = result && result.reason;
+	showUpdatePanel({
+		title: 'Excel nicht gespeichert',
+		detail: reason === 'excel-locked'
+			? 'Die Excel-Datei scheint geöffnet zu sein. Bitte schließe sie und versuche es erneut.'
+			: 'Die Personen konnten nicht in die Excel-Datei geschrieben werden.',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
+});
+
     
 /*
  * other
@@ -760,9 +854,10 @@ function updateState() {
 			disable(_grade);
 			disable(_cancel);
 			disable(_ok);
-            disable(_joker);
+			disable(_joker);
 			disable(_manualSelectBtn);
 			disable(_probabilitiesBtn);
+			disable(_excelEditorBtn);
 			text();
 			break;
 		case 2:
@@ -775,6 +870,7 @@ function updateState() {
             disable(_joker);
 			enable(_manualSelectBtn);
 			enable(_probabilitiesBtn);
+			enable(_excelEditorBtn);
 			ipcRenderer.send('get-pending-excel-status');
 			text();
 			break;
@@ -788,6 +884,7 @@ function updateState() {
             disable(_joker);
 			disable(_manualSelectBtn);
 			disable(_probabilitiesBtn);
+			disable(_excelEditorBtn);
 			break;
         case 4:
 			disable(_start);
@@ -799,6 +896,7 @@ function updateState() {
             enable(_joker);
 			disable(_manualSelectBtn);
 			disable(_probabilitiesBtn);
+			disable(_excelEditorBtn);
 			break;
 
 	}
@@ -826,6 +924,137 @@ function error(x) {
 	new Promise(r => setTimeout(r, 600)).then(() => {
 		x.classList.remove('error');
 	});
+}
+
+function showInvalidGradeAlert() {
+	showUpdatePanel({
+		title: 'Ungültige Note',
+		detail: 'Bitte gib eine Note zwischen 1 und 6 ein.',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true,
+		placement: 'toast'
+	});
+}
+
+function parseGradeInput(value) {
+	return Number(String(value).trim().replace(',', '.'));
+}
+
+function isValidGrade(value) {
+	return Number.isFinite(value) && value >= 1 && value <= 6;
+}
+
+function renderExcelEditor() {
+	_excelEditorList.innerHTML = '';
+
+	const activePersons = excelEditorPersons.filter(person => !person.deleted);
+	if (excelEditorPersons.length === 0) {
+		const empty = document.createElement('p');
+		empty.className = 'backup-empty';
+		empty.innerText = 'Noch keine Personen in dieser Klasse.';
+		_excelEditorList.appendChild(empty);
+	}
+
+	excelEditorPersons.forEach((person, index) => {
+		const item = document.createElement('div');
+		item.className = person.deleted ? 'excel-editor-item excel-editor-item-deleted' : 'excel-editor-item';
+
+		const nameInput = document.createElement('input');
+		nameInput.type = 'text';
+		nameInput.value = person.name;
+		nameInput.disabled = person.deleted;
+		nameInput.addEventListener('input', () => {
+			person.name = nameInput.value;
+		});
+
+		const jokerInput = document.createElement('input');
+		jokerInput.type = 'number';
+		jokerInput.min = '0';
+		jokerInput.step = '1';
+		jokerInput.value = person.joker;
+		jokerInput.disabled = person.deleted;
+		jokerInput.addEventListener('input', () => {
+			person.joker = parseJokerInput(jokerInput.value);
+		});
+
+		const meta = document.createElement('small');
+		meta.innerText = person.isNew ? 'Neu' : `${person.grades} Noten`;
+
+		const removeButton = document.createElement('button');
+		removeButton.className = person.deleted ? 'btn-1' : 'btn-2';
+		removeButton.innerText = person.deleted ? 'Zurück' : 'Löschen';
+		removeButton.addEventListener('click', () => {
+			person.deleted = !person.deleted;
+			renderExcelEditor();
+		});
+
+		item.appendChild(nameInput);
+		item.appendChild(jokerInput);
+		item.appendChild(meta);
+		item.appendChild(removeButton);
+		_excelEditorList.appendChild(item);
+	});
+
+	_excelEditorSaveBtn.innerText = `Speichern (${activePersons.length}/25)`;
+}
+
+function addExcelEditorPerson() {
+	const name = _excelEditorName.value.trim();
+	const joker = parseJokerInput(_excelEditorJoker.value);
+	const activeCount = excelEditorPersons.filter(person => !person.deleted).length;
+
+	if (!name || !Number.isInteger(joker) || joker < 0 || activeCount >= 25) {
+		error(_excelEditorAddBtn);
+		return;
+	}
+
+	excelEditorPersons.push({
+		id: null,
+		name: name,
+		grades: 0,
+		joker: joker,
+		isNew: true,
+		deleted: false
+	});
+	_excelEditorName.value = '';
+	_excelEditorJoker.value = '1';
+	renderExcelEditor();
+}
+
+function saveExcelEditorPersons() {
+	const persons = excelEditorPersons
+		.filter(person => !person.deleted)
+		.map(person => ({
+			id: person.id,
+			name: String(person.name || '').trim(),
+			joker: parseJokerInput(person.joker)
+		}));
+
+	const hasInvalidPerson = persons.some(person =>
+		!person.name ||
+		!Number.isInteger(person.joker) ||
+		person.joker < 0
+	);
+
+	if (hasInvalidPerson || persons.length > 25) {
+		error(_excelEditorSaveBtn);
+		showUpdatePanel({
+			title: 'Excel nicht gespeichert',
+			detail: 'Bitte prüfe Namen und Joker. Joker müssen ganze Zahlen ab 0 sein.',
+			primaryVisible: false,
+			secondaryText: 'OK',
+			secondaryVisible: true,
+			placement: 'toast'
+		});
+		return;
+	}
+
+	ipcRenderer.send('save-editor-persons', persons);
+}
+
+function parseJokerInput(value) {
+	return Number(String(value).trim().replace(',', '.'));
 }
 
 // display the version
@@ -1035,6 +1264,47 @@ function updateNeverSelectedBoostField() {
 	_neverSelectedBoostFactorSetting.closest('.setting-field').classList.toggle('setting-disabled', !isEnabled);
 }
 
+function hideStartupSplash() {
+	if (!_startupSplash) return;
+	setTimeout(() => {
+		_startupSplash.classList.add('startup-splash-hidden');
+		setTimeout(() => {
+			ipcRenderer.send('startup-splash-finished');
+			if (_container) {
+				_container.classList.remove('startup-active');
+				requestAnimationFrame(() => animateRestore());
+			}
+		}, 650);
+	}, 2600);
+}
+
+function animateMinimize() {
+	if (!_container) {
+		ipcRenderer.send('minimize');
+		return;
+	}
+
+	_container.classList.remove('window-restoring');
+	_container.classList.add('window-minimizing');
+	setTimeout(() => {
+		ipcRenderer.send('minimize');
+	}, 180);
+}
+
+function animateRestore() {
+	if (!_container) return;
+	if (restoreAnimationActive) return;
+	restoreAnimationActive = true;
+	_container.classList.remove('window-minimizing');
+	_container.classList.remove('window-restoring');
+	void _container.offsetWidth;
+	_container.classList.add('window-restoring');
+	setTimeout(() => {
+		_container.classList.remove('window-restoring');
+		restoreAnimationActive = false;
+	}, 260);
+}
+
 // scale the name to fit the screen
 function scaleName() {
 	_name.style.fontSize = _nameSize + 'rem';
@@ -1052,4 +1322,4 @@ Math.clamp = function(a, b, c) {
 }
 
 // automatically scale the name on load
-module.exports = [scaleName(), updateState(), version(), ipcRenderer.send('get-debug-mode'), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status')];
+module.exports = [scaleName(), updateState(), version(), hideStartupSplash(), ipcRenderer.send('get-debug-mode'), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status')];
