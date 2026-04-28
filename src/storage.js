@@ -12,6 +12,8 @@ const defaultAppSettings = {
 	wiggersRulePenaltyFactor: 0.05,
 	wiggersRuleDurationMinutes: 120
 };
+const MAX_BACKUP_PREVIEW_ENTRIES = 100;
+const MAX_LOG_READ_BYTES = 200 * 1024;
 
 function getPaths() {
 	const storageDir = app.getPath('userData');
@@ -129,6 +131,16 @@ function getBackup() {
 	return backup;
 }
 
+function getBackupPreview(limit) {
+	const backup = getBackup();
+	const entryLimit = Number.isInteger(limit) && limit > 0 ? limit : MAX_BACKUP_PREVIEW_ENTRIES;
+	return {
+		entries: backup.entries.slice(-entryLimit),
+		pendingExcelEntries: backup.pendingExcelEntries,
+		totalEntries: backup.entries.length
+	};
+}
+
 function addBackupEntry(entry) {
 	const backup = getBackup();
 	const backupEntry = Object.assign({}, entry, {
@@ -186,7 +198,20 @@ function getLogs() {
 		ensureStorageDir();
 		const logPath = getPaths().logPath;
 		if (!fs.existsSync(logPath)) return '';
-		return fs.readFileSync(logPath, 'utf8');
+		const stats = fs.statSync(logPath);
+		if (stats.size <= MAX_LOG_READ_BYTES) return fs.readFileSync(logPath, 'utf8');
+
+		const fd = fs.openSync(logPath, 'r');
+		try {
+			const buffer = Buffer.alloc(MAX_LOG_READ_BYTES);
+			fs.readSync(fd, buffer, 0, MAX_LOG_READ_BYTES, stats.size - MAX_LOG_READ_BYTES);
+			const text = buffer.toString('utf8');
+			const firstNewline = text.indexOf('\n');
+			const trimmedText = firstNewline >= 0 ? text.slice(firstNewline + 1) : text;
+			return `[Log gekuerzt: zeige die letzten ${Math.round(MAX_LOG_READ_BYTES / 1024)} KB]\n${trimmedText}`;
+		} finally {
+			fs.closeSync(fd);
+		}
 	} catch (error) {
 		return `Logs konnten nicht gelesen werden: ${error && error.message ? error.message : String(error)}`;
 	}
@@ -194,6 +219,7 @@ function getLogs() {
 
 module.exports = {
 	getBackup,
+	getBackupPreview,
 	getAppSettings,
 	getWiggersRulePenalties,
 	getPendingExcelEntries,

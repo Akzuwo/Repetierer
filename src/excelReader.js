@@ -9,6 +9,7 @@ let ws;
 // initialize the workbook
 function init(file, callback) {
 	f = file;
+	ws = undefined;
 	wb = new ExcelJS.Workbook();
 	wb.xlsx.readFile(f)
 		.then(() => {
@@ -19,6 +20,8 @@ function init(file, callback) {
 			callback(worksheets);
 		})
 		.catch(() => {
+			wb = undefined;
+			ws = undefined;
 			callback();
 		})
 }

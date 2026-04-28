@@ -111,6 +111,7 @@ function selectPerson() {
 
 function getWeightedPersons() {
 	const settings = getAppSettings();
+	const storedPenalties = getWiggersRulePenalties();
 	const decreaseFactor = settings.probabilityDecreaseFactor;
 
 	if (!persons || persons.length === 0) return [];
@@ -121,7 +122,7 @@ function getWeightedPersons() {
 		if (boostedNeverSelected) {
 			weight *= settings.neverSelectedBoostFactor;
 		}
-		const wiggersRule = getWiggersRuleState(e.id, settings);
+		const wiggersRule = getWiggersRuleState(e.id, settings, storedPenalties);
 		if (wiggersRule.active) {
 			weight *= settings.wiggersRulePenaltyFactor;
 		}
@@ -339,14 +340,13 @@ function deactivateWiggersRuleForEntry(entry) {
 	}
 }
 
-function getWiggersRuleState(personId, settings) {
+function getWiggersRuleState(personId, settings, storedPenalties) {
 	if (!settings.wiggersRuleEnabled) {
 		return { active: false, remainingMinutes: 0 };
 	}
 
 	const key = getWiggersRuleKey(personId);
-	const storedPenalties = getWiggersRulePenalties();
-	const expiresAt = wiggersRulePenalties.get(key) || storedPenalties[key];
+	const expiresAt = wiggersRulePenalties.get(key) || (storedPenalties && storedPenalties[key]);
 	if (!expiresAt) return { active: false, remainingMinutes: 0 };
 
 	const remainingMs = expiresAt - Date.now();

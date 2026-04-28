@@ -1,7 +1,7 @@
 const { ipcMain, app, BrowserWindow, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { getBackup, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, removeBackupEntries, logEvent, getLogs, getPaths } = require('./storage.js');
+const { getBackupPreview, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, removeBackupEntries, logEvent, getLogs, getPaths } = require('./storage.js');
 const isDebugMode = process.argv.includes('--dev-mode');
 const sessionEntries = [];
 let lastUndoEntry;
@@ -203,7 +203,7 @@ ipcMain.on('joker', (event, args) => {
 // backup
 ipcMain.on('get-backup', (event, args) => {
 	logEvent('Backup geöffnet');
-	event.sender.send('backup-data', getBackup(), getPaths());
+	event.sender.send('backup-data', getBackupPreview(), getPaths());
 });
 
 ipcMain.on('get-logs', (event, args) => {

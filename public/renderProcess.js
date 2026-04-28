@@ -1053,6 +1053,7 @@ ipcRenderer.on('absences-save-failed', (event, result) => {
 
 ipcRenderer.on('backup-data', (event, backup, paths) => {
 	const entries = backup && backup.entries ? backup.entries.slice().reverse() : [];
+	const totalEntries = backup && Number.isFinite(backup.totalEntries) ? backup.totalEntries : entries.length;
 	_backupList.innerHTML = '';
 	_backupLocation.innerText = paths ? paths.backupPath : '';
 
@@ -1062,6 +1063,13 @@ ipcRenderer.on('backup-data', (event, backup, paths) => {
 		empty.innerText = 'Noch keine Backup-Einträge vorhanden.';
 		_backupList.appendChild(empty);
 	} else {
+		if (totalEntries > entries.length) {
+			const previewInfo = document.createElement('p');
+			previewInfo.className = 'backup-empty';
+			previewInfo.innerText = `Zeige die letzten ${entries.length} von ${totalEntries} Backup-Eintraegen.`;
+			_backupList.appendChild(previewInfo);
+		}
+
 		entries.forEach(entry => {
 			const item = document.createElement('div');
 			item.className = 'backup-item';
