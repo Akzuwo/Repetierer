@@ -1,10 +1,11 @@
 const {BrowserWindow, app, ipcMain} = require('electron');
-const {autoUpdater} = require("electron-updater");
 const fs = require('fs');
 const path = require('path');
 require('./src/mainProcess.js');
 
 let win;
+let autoUpdater;
+const isDebugMode = process.argv.includes('--dev-mode');
 const mainWindowSize = { width: 1100, height: 800 };
 const startupWindowSize = { width: 560, height: 260 };
 let updateDownloadApproved = false;
@@ -25,12 +26,16 @@ function initWindow() {
 		height: startupWindowSize.height,
 		resizable: false,
 		transparent: true,
+		backgroundColor: '#00000000',
 		frame: false,
 		center: true,
 		icon: path.join(__dirname, 'public', 'icons', 'icon.ico'),
 		webPreferences: {
 			nodeIntegration: true,
-			contextIsolation: false
+			contextIsolation: false,
+			spellcheck: false,
+			devTools: isDebugMode,
+			backgroundThrottling: true
 		},
 	});
 }
@@ -81,6 +86,7 @@ function checkForUpdatesWithConsent() {
 		return;
 	}
 
+	autoUpdater = getAutoUpdater();
 	autoUpdater.autoDownload = false;
 	autoUpdater.autoInstallOnAppQuit = false;
 	autoUpdater.setFeedURL(updateFeed);
@@ -94,6 +100,13 @@ function checkForUpdatesWithConsent() {
 			error: getErrorMessage(error)
 		});
 	});
+}
+
+function getAutoUpdater() {
+	if (!autoUpdater) {
+		autoUpdater = require('electron-updater').autoUpdater;
+	}
+	return autoUpdater;
 }
 
 function registerUpdaterListeners() {

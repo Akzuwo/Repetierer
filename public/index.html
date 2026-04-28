@@ -8,6 +8,7 @@
 	<meta name="description" content="(:">
 	<meta name="author" content="srpnt3, Jonas-Luetolf, Akzuwo">
 	<link rel="stylesheet" href="style.css">
+	<link rel="stylesheet" href="tailwind.css">
 </head>
 
 <body>
@@ -56,14 +57,16 @@
 	<div id="drawer-scrim"></div>
 	<aside id="drawer">
 		<h2>Dateien</h2>
-		<button class="btn-1" id="drawer-file-btn">Datei auswählen</button>
+		<button class="btn-1" id="drawer-file-btn" title="Excel-Datei auswählen, aus der Klassen, Namen, Noten und Joker gelesen werden.">Datei auswählen</button>
 		<p id="file-path"></p>
 		<div class="drawer-actions">
-			<button class="btn-2" id="backup-btn">Backup anzeigen</button>
-			<button class="btn-2" id="log-btn">Log anzeigen</button>
-			<button class="btn-2 disabled" id="flush-excel-btn">Excel aktualisieren</button>
-			<button class="btn-2" id="reload-excel-btn">Excel neu laden</button>
-			<button class="btn-2 disabled" id="excel-editor-btn">Excel bearbeiten</button>
+			<button class="btn-2" id="backup-btn" title="Zeigt gespeicherte Backup-Einträge dieser Sitzung und Datei.">Backup anzeigen</button>
+			<button class="btn-2" id="log-btn" title="Öffnet technische Meldungen, falls etwas geprüft werden muss.">Log anzeigen</button>
+			<button class="btn-2" id="export-protocol-btn" title="Exportiert das Sitzungsprotokoll gleichzeitig als PDF und CSV.">Protokoll exportieren</button>
+			<button class="btn-2" id="import-class-list-btn" title="Importiert eine Namensliste und erstellt daraus eine Repetierer-Klasse.">Klassenliste importieren</button>
+			<button class="btn-2 disabled" id="flush-excel-btn" title="Schreibt wartende lokale Änderungen in die Excel-Datei.">Excel aktualisieren</button>
+			<button class="btn-2" id="reload-excel-btn" title="Liest die ausgewählte Excel-Datei erneut ein.">Excel neu laden</button>
+			<button class="btn-2 disabled" id="excel-editor-btn" title="Bearbeitet Personen und Joker der ausgewählten Klasse direkt in der Excel-Datei.">Excel bearbeiten</button>
 		</div>
 		<div class="drawer-actions debug-actions update-hidden" id="debug-actions">
 			<button class="btn-2" id="debug-test-alert-btn">Testalert</button>
@@ -81,17 +84,30 @@
 
 	<div id="content">
 		<div class="neum" id="class">
-			<h2>Klasse</h2>
+			<div class="panel-heading">
+				<h2>Klasse</h2>
+				<button class="help-button mini-help-button" id="class-help-btn" title="Erklärung">?</button>
+			</div>
 			<div id="class-list">
 				<div></div>
 			</div>
 		</div>
 		<div class="neum" id="repetition">
-			<h2>Repetition <span id="class-name"></span></h2>
+			<div class="repetition-header">
+				<h2>Repetition <span id="class-name"></span></h2>
+				<div class="repetition-tools">
+					<button class="help-button mini-help-button" id="repetition-help-btn" title="Erklärung">?</button>
+					<div class="history-actions">
+						<button class="btn-2 history-btn disabled" id="undo-last-btn" title="Letzte Aktion rückgängig" aria-label="Letzte Aktion rückgängig">↶</button>
+						<button class="btn-2 history-btn disabled" id="redo-last-btn" title="Wiederholen" aria-label="Wiederholen">↷</button>
+					</div>
+				</div>
+			</div>
 			<div class="button-row">
 				<button class="btn-1 disabled" id="start-btn">Start</button>
 				<button class="btn-1 disabled" id="manual-select-btn">Freiwillig</button>
 				<button class="btn-2 disabled" id="probabilities-btn">Chancen</button>
+				<button class="btn-2 disabled" id="absences-btn">Abwesend</button>
 			</div>
 			<h1 class="disabled" id="name">Name</h1>
 			<div id="res">
@@ -131,6 +147,18 @@
 		</div>
 	</div>
 
+	<div id="absence-modal" class="modal">
+		<div class="modal-content absence-content">
+			<h2>Abwesenheiten heute</h2>
+			<p class="excel-editor-help">Markierte Personen werden heute nicht zufällig ausgewählt. Die Excel-Datei wird dadurch nicht verändert.</p>
+			<div id="absence-list"></div>
+			<div class="modal-buttons">
+				<button class="btn-1" id="save-absences-btn">Speichern</button>
+				<button class="btn-2" id="close-absence-modal">Abbrechen</button>
+			</div>
+		</div>
+	</div>
+
 	<div id="backup-modal" class="modal">
 		<div class="modal-content backup-content">
 			<h2>Backup</h2>
@@ -166,6 +194,35 @@
 		</div>
 	</div>
 
+	<div id="class-import-modal" class="modal">
+		<div class="modal-content conflict-content">
+			<h2>Klasse importieren</h2>
+			<p class="excel-editor-help" id="class-import-detail"></p>
+			<label class="setting-field">
+				<span>Klassenname</span>
+				<input id="class-import-name" type="text" maxlength="31" placeholder="z.B. L23a">
+			</label>
+			<div id="class-import-preview"></div>
+			<div class="modal-buttons">
+				<button class="btn-1" id="confirm-class-import-btn">Hinzufügen</button>
+				<button class="btn-2" id="cancel-class-import-btn">Abbrechen</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="teacher-help-modal" class="modal">
+		<div class="modal-content teacher-help-content">
+			<div class="settings-header">
+				<button class="help-button help-button-back" id="close-teacher-help-btn" title="Zurück">‹</button>
+				<h2 id="teacher-help-title">Erklärung</h2>
+			</div>
+			<div class="settings-guide" id="teacher-help-body"></div>
+			<div class="modal-buttons info-modal-buttons">
+				<button class="btn-2" id="close-teacher-help-bottom-btn">Zurück</button>
+			</div>
+		</div>
+	</div>
+
 	<div id="joker-migration-modal" class="modal">
 		<div class="modal-content conflict-content">
 			<div class="settings-header">
@@ -192,7 +249,7 @@
 				<p>Neu speichert Repetierer die Anzahl verbleibender Joker als Zahl. Dadurch sind auch Extra-Joker möglich, ohne dass Daten uneindeutig werden.</p>
 				<p>Bei der Migration werden leere Joker-Felder zu 1. Alte 1-Werte werden zu 0. So bleibt die Bedeutung erhalten: Wer noch einen Joker hatte, hat danach 1 verbleibenden Joker; wer ihn schon benutzt hatte, hat danach 0.</p>
 			</div>
-			<div class="modal-buttons">
+			<div class="modal-buttons info-modal-buttons">
 				<button class="btn-2" id="close-joker-migration-help-bottom-btn">Zurück</button>
 			</div>
 		</div>
@@ -243,23 +300,44 @@
 				<button class="help-button" id="settings-help-btn" title="Hilfe">?</button>
 				<h2>Einstellungen</h2>
 			</div>
-			<p id="settings-location"></p>
-			<label class="setting-row">
-				<input type="checkbox" id="extra-joker-setting">
-				<span>Extra Joker ab 3 Noten</span>
-			</label>
-			<label class="setting-field">
-				<span>Wahrscheinlichkeits-Faktor</span>
-				<input id="probability-factor-setting" type="number" min="1.1" max="10" step="0.1">
-			</label>
-			<label class="setting-row">
-				<input type="checkbox" id="boost-never-selected-setting">
-				<span>Boost für nie ausgewählte Personen</span>
-			</label>
-			<label class="setting-field">
-				<span>Boost-Faktor</span>
-				<input id="never-selected-boost-factor-setting" type="number" min="1.1" max="10" step="0.1">
-			</label>
+			<div class="settings-scroll-area">
+				<p id="settings-location"></p>
+				<label class="setting-row">
+					<input type="checkbox" id="extra-joker-setting">
+					<span>Extra Joker ab 3 Noten</span>
+				</label>
+				<label class="setting-field">
+					<span>Wahrscheinlichkeits-Faktor</span>
+					<input id="probability-factor-setting" type="number" min="1.1" max="10" step="0.1">
+				</label>
+				<label class="setting-row">
+					<input type="checkbox" id="boost-never-selected-setting">
+					<span>Boost für nie ausgewählte Personen</span>
+				</label>
+				<label class="setting-field">
+					<span>Boost-Faktor</span>
+					<input id="never-selected-boost-factor-setting" type="number" min="1.1" max="10" step="0.1">
+				</label>
+				<label class="setting-row">
+					<input type="checkbox" id="logo-animation-setting">
+					<span>Titelanimation aktivieren</span>
+				</label>
+				<label class="setting-row">
+					<input type="checkbox" id="wiggers-rule-setting">
+					<span>
+						Wiggersche Regel aktivieren
+						<small>Wenn jemand den Joker setzt, wird diese Person für eine begrenzte Zeit deutlich unwahrscheinlicher erneut ausgewählt.</small>
+					</span>
+				</label>
+				<label class="setting-field">
+					<span>Wiggers-Malus</span>
+					<input id="wiggers-rule-penalty-setting" type="number" min="0.01" max="1" step="0.01">
+				</label>
+				<label class="setting-field">
+					<span>Wiggers-Dauer in Minuten</span>
+					<input id="wiggers-rule-duration-setting" type="number" min="1" max="480" step="1">
+				</label>
+			</div>
 			<div class="modal-buttons">
 				<button class="btn-1" id="save-settings-btn">Speichern</button>
 				<button class="btn-2" id="close-settings-modal">Abbrechen</button>
@@ -273,7 +351,7 @@
 				<button class="help-button help-button-back" id="close-settings-help-btn" title="Zurück">‹</button>
 				<h2>Anleitung</h2>
 			</div>
-			<div class="settings-guide">
+			<div class="settings-guide settings-scroll-area">
 				<h3>Extra Joker ab 3 Noten</h3>
 				<p>Wenn diese Option aktiv ist, dürfen Personen, die bereits mindestens 3 Noten haben, einen zusätzlichen Joker erhalten. Standardmäßig ist das deaktiviert.</p>
 				<h3>Wahrscheinlichkeits-Faktor</h3>
@@ -282,8 +360,14 @@
 				<p>Wenn diese Option aktiv ist, bekommen Personen ohne Noten ein zusätzliches Gewicht. Sie werden dadurch deutlich wahrscheinlicher ausgewählt, aber andere Personen können weiterhin drankommen.</p>
 				<h3>Boost-Faktor</h3>
 				<p>Dieser Wert wird nur verwendet, wenn der Boost aktiviert ist. Je höher der Faktor, desto stärker werden Personen bevorzugt, die noch nie ausgewählt wurden.</p>
+				<h3>Wiggersche Regel</h3>
+				<p>Wenn eine Person ihren Joker setzt, sinkt ihre Auswahlwahrscheinlichkeit für eine begrenzte Zeit stark. Standardmäßig gilt der Malus 2 Stunden. Die Regel verhindert nicht vollständig, dass jemand erneut drankommt, macht es aber sehr unwahrscheinlich.</p>
+				<h3>Wiggers-Malus</h3>
+				<p>Dieser Faktor wird während der Wiggerschen Regel auf das normale Gewicht angewendet. 0.05 bedeutet, dass die Person nur noch 5% ihres eigentlichen Gewichts hat.</p>
+				<h3>Wiggers-Dauer</h3>
+				<p>Diese Dauer bestimmt, wie lange der Joker-Malus nach einer Joker-Nutzung aktiv bleibt.</p>
 			</div>
-			<div class="modal-buttons">
+			<div class="modal-buttons info-modal-buttons">
 				<button class="btn-2" id="close-settings-help-bottom-btn">Zurück</button>
 			</div>
 		</div>

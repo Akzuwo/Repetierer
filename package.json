@@ -9,8 +9,10 @@
   },
   "main": "app.js",
   "scripts": {
-    "start": "electron . ",
+    "build:css": "tailwindcss -c tailwind.config.js -i ./public/tailwind.input.css -o ./public/tailwind.css --minify",
+    "start": "npm run build:css && electron . ",
     "build": "electron-builder",
+    "build:local": "powershell -ExecutionPolicy Bypass -File ./build-local.ps1",
     "release": "electron-builder -p=always",
     "release:ci": "node scripts/release-with-icon.js"
   },
@@ -20,6 +22,28 @@
     "directories": {
       "output": "./builds"
     },
+    "files": [
+      "app.js",
+      "src/**/*",
+      "public/index.html",
+      "public/renderProcess.js",
+      "public/style.css",
+      "public/tailwind.css",
+      "public/icons/icon.ico",
+      "public/icons/icon.png",
+      "public/icons/*.svg",
+      "public/fonts/**/*",
+      "installer-license.txt",
+      "LICENSE",
+      "package.json",
+      "!public/tailwind.input.css",
+      "!public/icons/icon.ai",
+      "!public/images/**",
+      "!importer-samples/**",
+      "!builds/**",
+      "!scripts/**",
+      "!*.xlsx"
+    ],
     "publish": [
       {
         "provider": "github",
@@ -57,14 +81,15 @@
   "author": "srpnt3, Jonas-Luetolf, Akzuwo",
   "dependencies": {
     "electron-updater": "^6.8.3",
-    "exceljs": "^4.2.1",
-    "npm": "^6.14.13",
-    "user": "^0.0.0"
+    "exceljs": "^4.2.1"
   },
   "devDependencies": {
+    "autoprefixer": "^10.4.20",
     "electron": "^41.3.0",
     "electron-builder": "^26.5.0",
     "electron-packager": "^15.2.0",
-    "rcedit": "^2.3.0"
+    "postcss": "^8.4.49",
+    "rcedit": "^2.3.0",
+    "tailwindcss": "^3.4.17"
   }
 }

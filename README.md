@@ -42,6 +42,14 @@ Zusätzlich zum Programm gibt es im Repository und/oder in den Releases eine Exc
 Diese Datei kann als Vorlage verwendet und an die eigenen Bedürfnisse angepasst werden.
 Aktuell werden bis zu 25 Personen, maximal 6 Noten pro Person und beliebig viele Klassen/Fächer unterstützt.
 
+### Neue Funktionen
+- **Sitzungsprotokoll exportieren:** Im Menü kann die aktuelle Sitzung als CSV oder PDF exportiert werden. Das Protokoll enthält Zeitpunkt, Datum, Klasse, Person, Aktion, Note und Excel-Status.
+- **Klassenliste importieren:** Eine bestehende Excel- oder CSV-Datei kann importiert und als neue Repetierer-Datei gespeichert werden. Das Programm übernimmt bis zu 25 eindeutige Namen und legt die nötige Excel-Struktur automatisch an.
+- **Letzte Aktion rückgängig machen:** Die letzte Note oder Joker-Nutzung der aktuellen Sitzung kann rückgängig gemacht werden, solange der passende Excel-Eintrag noch unverändert ist. Falls Excel beim Speichern gesperrt war, wird der offene lokale Eintrag entfernt.
+- **Wiederholen:** Eine versehentlich rückgängig gemachte Aktion kann direkt wiederhergestellt werden.
+- **Abwesenheiten:** Personen können für den aktuellen Tag als abwesend markiert werden. Diese Personen werden bei der zufälligen Auswahl und bei der freiwilligen Auswahl übersprungen, ohne dass die Excel-Datei verändert wird.
+- **Wiggersche Regel:** Wenn eine Person ihren Joker setzt, fällt ihre Auswahlwahrscheinlichkeit für eine begrenzte Zeit stark ab. Standardmäßig gilt dieser Malus 2 Stunden und reduziert das Gewicht auf 5%. Die Person kann weiterhin ausgewählt werden, aber es wird sehr unwahrscheinlich. Die Regel ist als Balancing-Maßnahme gedacht, damit ein Joker nicht sofort wieder durch eine neue Ziehung entwertet wird.
+
 ## English
 Repetierer was created to enable teachers to test students by selecting a random individual from a list contained in an Excel file.
 The teacher then has the ability to grade the student directly inside the application.
@@ -82,6 +90,14 @@ In addition to downloading the program there is also an Excel template file loca
 Use said file as a template and edit it according to Your needs.
 It currently supports up to 25 students (rows), a maximum six grades per student (columns) and infinite classes/subjects (individual worksheets).
 The program itself is pretty self-explanatory.
+
+## New Features
+- **Session protocol export:** Export the current session as CSV or PDF, including time, date, class, person, action, grade and Excel write status.
+- **Class list import:** Import an existing Excel or CSV list and save it as a new Repetierer workbook. Up to 25 unique names are converted into the required format.
+- **Undo last action:** Undo the most recent grade or joker action from the current session as long as the corresponding Excel entry still matches.
+- **Redo:** Restore an action that was undone by accident.
+- **Absences:** Mark students as absent for the current day. They are skipped during random and voluntary selection without changing the Excel file.
+- **Wiggersche Regel:** When a student uses a joker, their selection probability is heavily reduced for a limited time. By default, the penalty lasts 2 hours and reduces their weight to 5%. They can still be selected, but it becomes very unlikely.
 
 ![](https://raw.githubusercontent.com/srpnt3/Repetierer/master/public/images/preview.png)
 

@@ -454,6 +454,68 @@ function apply_entries(clss, entries, callback) {
 	}
 }
 
+function undo_entry(clss, entry, callback) {
+	const entryWorksheet = wb.getWorksheet(entry.className || clss);
+	if (!entryWorksheet || entryWorksheet.getCell('A1').value !== 'repetierer') {
+		callback(undefined, { success: false, reason: 'invalid-file' });
+		return;
+	}
+
+	const lockStatus = getFileLockStatus(f);
+	if (lockStatus.locked) {
+		callback(undefined, { success: false, reason: 'excel-locked', error: lockStatus.error });
+		return;
+	}
+
+	const row = Number(entry.personId) + 6;
+	if (!Number.isFinite(row) || row < 6 || row > 30) {
+		callback(undefined, { success: false, reason: 'invalid-person' });
+		return;
+	}
+
+	if (entry.type === 'grade') {
+		const gradeCount = countGradesForRow(entryWorksheet, row);
+		if (gradeCount <= 0) {
+			callback(undefined, { success: false, reason: 'grade-not-found' });
+			return;
+		}
+
+		const gradeCell = entryWorksheet.getCell(row, gradeCount + 1);
+		if (!sameCellValue(gradeCell.value, entry.grade)) {
+			callback(undefined, { success: false, reason: 'grade-mismatch' });
+			return;
+		}
+
+		gradeCell.value = null;
+		entryWorksheet.getCell(row, gradeCount + 10).value = null;
+		if (entry.awardExtraJoker) {
+			const jokerCell = entryWorksheet.getCell('H' + row);
+			jokerCell.value = Math.max(0, Number(jokerCell.value || 0) - 1);
+		}
+
+		writeWorkbook(clss, callback, { type: 'undo-grade' });
+		return;
+	}
+
+	if (entry.type === 'joker') {
+		const jokerCell = entryWorksheet.getCell('H' + row);
+		jokerCell.value = Number(jokerCell.value || 0) + 1;
+		const jokerDateCell = entryWorksheet.getCell('Q' + row);
+		if (!entry.date || sameCellValue(jokerDateCell.value, entry.date)) {
+			jokerDateCell.value = null;
+		}
+
+		writeWorkbook(clss, callback, { type: 'undo-joker' });
+		return;
+	}
+
+	callback(undefined, { success: false, reason: 'unsupported-entry-type' });
+}
+
+function sameCellValue(a, b) {
+	return String(a === null || a === undefined ? '' : a).trim() === String(b === null || b === undefined ? '' : b).trim();
+}
+
 function countGradesForRow(worksheet, row) {
 	let n = 0;
 	[1,2,3,4,5,6].map(x => {
@@ -489,6 +551,7 @@ module.exports = {
     write_joker: write_joker,
 	edit_persons: edit_persons,
 	apply_entries: apply_entries,
+	undo_entry: undo_entry,
 	getJokerMigrationStatus: getJokerMigrationStatus,
 	migrate_jokers: migrate_jokers,
 	getFileLockStatus: getFileLockStatus

@@ -6,7 +6,11 @@ const defaultAppSettings = {
 	extraJokerAfterThreeGrades: false,
 	probabilityDecreaseFactor: 3,
 	boostNeverSelected: false,
-	neverSelectedBoostFactor: 3
+	neverSelectedBoostFactor: 3,
+	logoAnimationEnabled: false,
+	wiggersRuleEnabled: true,
+	wiggersRulePenaltyFactor: 0.05,
+	wiggersRuleDurationMinutes: 120
 };
 
 function getPaths() {
@@ -49,13 +53,33 @@ function saveSettings(settings) {
 	writeJson(getPaths().settingsPath, Object.assign({}, getSettings(), settings));
 }
 
+function getWiggersRulePenalties() {
+	return getSettings().wiggersRulePenalties || {};
+}
+
+function saveWiggersRulePenalty(key, expiresAt) {
+	const penalties = getWiggersRulePenalties();
+	penalties[key] = expiresAt;
+	saveSettings({ wiggersRulePenalties: penalties });
+}
+
+function removeWiggersRulePenalty(key) {
+	const penalties = getWiggersRulePenalties();
+	delete penalties[key];
+	saveSettings({ wiggersRulePenalties: penalties });
+}
+
 function getAppSettings() {
 	const settings = getSettings();
 	return Object.assign({}, defaultAppSettings, {
 		extraJokerAfterThreeGrades: !!settings.extraJokerAfterThreeGrades,
 		probabilityDecreaseFactor: normalizeFactor(settings.probabilityDecreaseFactor, defaultAppSettings.probabilityDecreaseFactor),
 		boostNeverSelected: !!settings.boostNeverSelected,
-		neverSelectedBoostFactor: normalizeFactor(settings.neverSelectedBoostFactor, defaultAppSettings.neverSelectedBoostFactor)
+		neverSelectedBoostFactor: normalizeFactor(settings.neverSelectedBoostFactor, defaultAppSettings.neverSelectedBoostFactor),
+		logoAnimationEnabled: !!settings.logoAnimationEnabled,
+		wiggersRuleEnabled: settings.wiggersRuleEnabled !== false,
+		wiggersRulePenaltyFactor: normalizePenaltyFactor(settings.wiggersRulePenaltyFactor, defaultAppSettings.wiggersRulePenaltyFactor),
+		wiggersRuleDurationMinutes: normalizeDuration(settings.wiggersRuleDurationMinutes, defaultAppSettings.wiggersRuleDurationMinutes)
 	});
 }
 
@@ -64,7 +88,11 @@ function saveAppSettings(settings) {
 		extraJokerAfterThreeGrades: !!settings.extraJokerAfterThreeGrades,
 		probabilityDecreaseFactor: normalizeFactor(settings.probabilityDecreaseFactor, defaultAppSettings.probabilityDecreaseFactor),
 		boostNeverSelected: !!settings.boostNeverSelected,
-		neverSelectedBoostFactor: normalizeFactor(settings.neverSelectedBoostFactor, defaultAppSettings.neverSelectedBoostFactor)
+		neverSelectedBoostFactor: normalizeFactor(settings.neverSelectedBoostFactor, defaultAppSettings.neverSelectedBoostFactor),
+		logoAnimationEnabled: !!settings.logoAnimationEnabled,
+		wiggersRuleEnabled: settings.wiggersRuleEnabled !== false,
+		wiggersRulePenaltyFactor: normalizePenaltyFactor(settings.wiggersRulePenaltyFactor, defaultAppSettings.wiggersRulePenaltyFactor),
+		wiggersRuleDurationMinutes: normalizeDuration(settings.wiggersRuleDurationMinutes, defaultAppSettings.wiggersRuleDurationMinutes)
 	});
 }
 
@@ -72,6 +100,18 @@ function normalizeFactor(value, fallback) {
 	const factor = Number(value);
 	if (!Number.isFinite(factor)) return fallback;
 	return Math.max(1.1, Math.min(10, factor));
+}
+
+function normalizePenaltyFactor(value, fallback) {
+	const factor = Number(value);
+	if (!Number.isFinite(factor)) return fallback;
+	return Math.max(0.01, Math.min(1, factor));
+}
+
+function normalizeDuration(value, fallback) {
+	const duration = Number(value);
+	if (!Number.isFinite(duration)) return fallback;
+	return Math.max(1, Math.min(480, Math.round(duration)));
 }
 
 function getExcelFilePath() {
@@ -91,18 +131,22 @@ function getBackup() {
 
 function addBackupEntry(entry) {
 	const backup = getBackup();
-	backup.entries.push(Object.assign({
+	const backupEntry = Object.assign({}, entry, {
+		id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
 		createdAt: new Date().toISOString()
-	}, entry));
+	});
+	backup.entries.push(backupEntry);
 	writeJson(getPaths().backupPath, backup);
+	return backupEntry;
 }
 
 function addPendingExcelEntry(entry) {
 	const backup = getBackup();
-	const pendingEntry = Object.assign({
+	const pendingEntry = Object.assign({}, entry, {
 		id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+		backupEntryId: entry && entry.id,
 		createdAt: new Date().toISOString()
-	}, entry);
+	});
 	backup.pendingExcelEntries.push(pendingEntry);
 	writeJson(getPaths().backupPath, backup);
 	return pendingEntry;
@@ -116,6 +160,13 @@ function removePendingExcelEntries(ids) {
 	const idSet = new Set(ids || []);
 	const backup = getBackup();
 	backup.pendingExcelEntries = backup.pendingExcelEntries.filter(entry => !idSet.has(entry.id));
+	writeJson(getPaths().backupPath, backup);
+}
+
+function removeBackupEntries(ids) {
+	const idSet = new Set(ids || []);
+	const backup = getBackup();
+	backup.entries = backup.entries.filter(entry => !idSet.has(entry.id));
 	writeJson(getPaths().backupPath, backup);
 }
 
@@ -144,13 +195,17 @@ function getLogs() {
 module.exports = {
 	getBackup,
 	getAppSettings,
+	getWiggersRulePenalties,
 	getPendingExcelEntries,
 	getExcelFilePath,
 	saveExcelFilePath,
 	saveAppSettings,
+	saveWiggersRulePenalty,
+	removeWiggersRulePenalty,
 	addBackupEntry,
 	addPendingExcelEntry,
 	removePendingExcelEntries,
+	removeBackupEntries,
 	logEvent,
 	getLogs,
 	getPaths

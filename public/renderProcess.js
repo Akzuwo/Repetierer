@@ -14,17 +14,24 @@ const _file = document.getElementById('drawer-file-btn');
 const _filePath = document.getElementById('file-path');
 const _backupBtn = document.getElementById('backup-btn');
 const _logBtn = document.getElementById('log-btn');
+const _exportProtocolBtn = document.getElementById('export-protocol-btn');
+const _importClassListBtn = document.getElementById('import-class-list-btn');
+const _undoLastBtn = document.getElementById('undo-last-btn');
+const _redoLastBtn = document.getElementById('redo-last-btn');
 const _reloadExcelBtn = document.getElementById('reload-excel-btn');
 const _excelEditorBtn = document.getElementById('excel-editor-btn');
 const _debugActions = document.getElementById('debug-actions');
 const _debugTestAlertBtn = document.getElementById('debug-test-alert-btn');
 const _debugFakeUpdateBtn = document.getElementById('debug-fake-update-btn');
 const _settingsBtn = document.getElementById('settings-btn');
+const _classHelpBtn = document.getElementById('class-help-btn');
+const _repetitionHelpBtn = document.getElementById('repetition-help-btn');
 const _classes = document.getElementById('class-list').children.item(0);
 const _start = document.getElementById('start-btn');
 const _probabilitiesBtn = document.getElementById('probabilities-btn');
 const _flushExcelBtn = document.getElementById('flush-excel-btn');
 const _repetition = document.getElementById('repetition');
+const _title = document.getElementById('title');
 const _name = document.getElementById('name');
 const _label = document.getElementById('grade').children.item(0);
 const _grade = document.getElementById('grade').children.item(1);
@@ -32,10 +39,15 @@ const _cancel = document.getElementById('res').children.item(1);
 const _ok = document.getElementById('res').children.item(2);
 const _joker = document.getElementById('res').children.item(3);
 const _manualSelectBtn = document.getElementById('manual-select-btn');
+const _absencesBtn = document.getElementById('absences-btn');
 const _personModal = document.getElementById('person-modal');
 const _personList = document.getElementById('person-list');
 const _closeModal = document.getElementById('close-modal');
 const _randomSelectBtn = document.getElementById('random-select-btn');
+const _absenceModal = document.getElementById('absence-modal');
+const _absenceList = document.getElementById('absence-list');
+const _saveAbsencesBtn = document.getElementById('save-absences-btn');
+const _closeAbsenceModal = document.getElementById('close-absence-modal');
 const _className = document.getElementById('class-name');
 const _backupModal = document.getElementById('backup-modal');
 const _backupList = document.getElementById('backup-list');
@@ -50,6 +62,17 @@ const _reloadConflictModal = document.getElementById('reload-conflict-modal');
 const _conflictFlushBtn = document.getElementById('conflict-flush-btn');
 const _conflictForceReloadBtn = document.getElementById('conflict-force-reload-btn');
 const _conflictCancelBtn = document.getElementById('conflict-cancel-btn');
+const _classImportModal = document.getElementById('class-import-modal');
+const _classImportDetail = document.getElementById('class-import-detail');
+const _classImportName = document.getElementById('class-import-name');
+const _classImportPreview = document.getElementById('class-import-preview');
+const _confirmClassImportBtn = document.getElementById('confirm-class-import-btn');
+const _cancelClassImportBtn = document.getElementById('cancel-class-import-btn');
+const _teacherHelpModal = document.getElementById('teacher-help-modal');
+const _teacherHelpTitle = document.getElementById('teacher-help-title');
+const _teacherHelpBody = document.getElementById('teacher-help-body');
+const _closeTeacherHelpBtn = document.getElementById('close-teacher-help-btn');
+const _closeTeacherHelpBottomBtn = document.getElementById('close-teacher-help-bottom-btn');
 const _jokerMigrationModal = document.getElementById('joker-migration-modal');
 const _jokerMigrationSummary = document.getElementById('joker-migration-summary');
 const _jokerMigrationHelpBtn = document.getElementById('joker-migration-help-btn');
@@ -78,6 +101,10 @@ const _extraJokerSetting = document.getElementById('extra-joker-setting');
 const _probabilityFactorSetting = document.getElementById('probability-factor-setting');
 const _boostNeverSelectedSetting = document.getElementById('boost-never-selected-setting');
 const _neverSelectedBoostFactorSetting = document.getElementById('never-selected-boost-factor-setting');
+const _logoAnimationSetting = document.getElementById('logo-animation-setting');
+const _wiggersRuleSetting = document.getElementById('wiggers-rule-setting');
+const _wiggersRulePenaltySetting = document.getElementById('wiggers-rule-penalty-setting');
+const _wiggersRuleDurationSetting = document.getElementById('wiggers-rule-duration-setting');
 const _saveSettingsBtn = document.getElementById('save-settings-btn');
 const _closeSettingsModal = document.getElementById('close-settings-modal');
 const _updatePanel = document.getElementById('update-panel');
@@ -89,7 +116,10 @@ const _updatePrimaryBtn = document.getElementById('update-primary-btn');
 const _updateSecondaryBtn = document.getElementById('update-secondary-btn');
 
 let selectedPersonIds = [];
+let absentPersonIds = [];
 let excelEditorPersons = [];
+let pendingExcelCount = 0;
+let pendingClassImport = null;
 let _currentClass;
 let _nameSize;
 let updatePrimaryAction = requestUpdateDownload;
@@ -129,6 +159,22 @@ _backupBtn.addEventListener('click', () => {
 
 _logBtn.addEventListener('click', () => {
 	ipcRenderer.send('get-logs');
+});
+
+_exportProtocolBtn.addEventListener('click', () => {
+	ipcRenderer.send('export-session-protocol', 'both');
+});
+
+_importClassListBtn.addEventListener('click', () => {
+	ipcRenderer.send('import-class-list');
+});
+
+_undoLastBtn.addEventListener('click', () => {
+	ipcRenderer.send('undo-last-action');
+});
+
+_redoLastBtn.addEventListener('click', () => {
+	ipcRenderer.send('redo-last-action');
 });
 
 _closeBackupModal.addEventListener('click', () => {
@@ -172,6 +218,7 @@ _flushExcelBtn.addEventListener('click', () => {
 });
 
 _reloadExcelBtn.addEventListener('click', () => {
+	if (pendingExcelCount > 0) return;
 	ipcRenderer.send('reload-excel');
 });
 
@@ -191,6 +238,32 @@ _conflictForceReloadBtn.addEventListener('click', () => {
 
 _conflictCancelBtn.addEventListener('click', () => {
 	_reloadConflictModal.style.display = 'none';
+});
+
+_confirmClassImportBtn.addEventListener('click', () => {
+	if (!pendingClassImport) return;
+	const className = _classImportName.value.trim();
+	if (!className) {
+		error(_confirmClassImportBtn);
+		return;
+	}
+	closeModal(_classImportModal);
+	ipcRenderer.send('confirm-class-list-import', {
+		sourcePath: pendingClassImport.sourcePath,
+		className: className
+	});
+});
+
+_cancelClassImportBtn.addEventListener('click', () => {
+	pendingClassImport = null;
+	closeModal(_classImportModal);
+});
+
+_classImportModal.addEventListener('click', (e) => {
+	if (e.target === _classImportModal) {
+		pendingClassImport = null;
+		closeModal(_classImportModal);
+	}
 });
 
 _runJokerMigrationBtn.addEventListener('click', () => {
@@ -258,11 +331,37 @@ _settingsBtn.addEventListener('click', () => {
 	ipcRenderer.send('get-settings');
 });
 
+_classHelpBtn.addEventListener('click', () => {
+	openTeacherHelp('class');
+});
+
+_repetitionHelpBtn.addEventListener('click', () => {
+	openTeacherHelp('repetition');
+});
+
+_closeTeacherHelpBtn.addEventListener('click', () => {
+	closeModal(_teacherHelpModal);
+});
+
+_closeTeacherHelpBottomBtn.addEventListener('click', () => {
+	closeModal(_teacherHelpModal);
+});
+
+_teacherHelpModal.addEventListener('click', (e) => {
+	if (e.target === _teacherHelpModal) {
+		closeModal(_teacherHelpModal);
+	}
+});
+
 _saveSettingsBtn.addEventListener('click', () => {
 	const probabilityDecreaseFactor = parseFloat(_probabilityFactorSetting.value.replace(',', '.'));
 	const neverSelectedBoostFactor = parseFloat(_neverSelectedBoostFactorSetting.value.replace(',', '.'));
+	const wiggersRulePenaltyFactor = parseFloat(_wiggersRulePenaltySetting.value.replace(',', '.'));
+	const wiggersRuleDurationMinutes = parseInt(_wiggersRuleDurationSetting.value, 10);
 	if (!probabilityDecreaseFactor || probabilityDecreaseFactor < 1.1 || probabilityDecreaseFactor > 10 ||
-		!neverSelectedBoostFactor || neverSelectedBoostFactor < 1.1 || neverSelectedBoostFactor > 10) {
+		!neverSelectedBoostFactor || neverSelectedBoostFactor < 1.1 || neverSelectedBoostFactor > 10 ||
+		!wiggersRulePenaltyFactor || wiggersRulePenaltyFactor < 0.01 || wiggersRulePenaltyFactor > 1 ||
+		!wiggersRuleDurationMinutes || wiggersRuleDurationMinutes < 1 || wiggersRuleDurationMinutes > 480) {
 		error(_saveSettingsBtn);
 		return;
 	}
@@ -271,7 +370,11 @@ _saveSettingsBtn.addEventListener('click', () => {
 		extraJokerAfterThreeGrades: _extraJokerSetting.checked,
 		probabilityDecreaseFactor: probabilityDecreaseFactor,
 		boostNeverSelected: _boostNeverSelectedSetting.checked,
-		neverSelectedBoostFactor: neverSelectedBoostFactor
+		neverSelectedBoostFactor: neverSelectedBoostFactor,
+		logoAnimationEnabled: _logoAnimationSetting.checked,
+		wiggersRuleEnabled: _wiggersRuleSetting.checked,
+		wiggersRulePenaltyFactor: wiggersRulePenaltyFactor,
+		wiggersRuleDurationMinutes: wiggersRuleDurationMinutes
 	});
 	closeModal(_settingsModal);
 });
@@ -306,6 +409,14 @@ _settingsHelpModal.addEventListener('click', (e) => {
 
 _boostNeverSelectedSetting.addEventListener('change', () => {
 	updateNeverSelectedBoostField();
+});
+
+_wiggersRuleSetting.addEventListener('change', () => {
+	updateWiggersRuleFields();
+});
+
+_logoAnimationSetting.addEventListener('change', () => {
+	updateLogoAnimation(_logoAnimationSetting.checked);
 });
 
 _updatePrimaryBtn.addEventListener('click', () => {
@@ -390,6 +501,10 @@ _manualSelectBtn.addEventListener('click', () => {
 	ipcRenderer.send('get-persons');
 });
 
+_absencesBtn.addEventListener('click', () => {
+	ipcRenderer.send('get-absence-persons');
+});
+
 // close modal
 _closeModal.addEventListener('click', () => {
 	_personModal.style.display = 'none';
@@ -401,6 +516,20 @@ _personModal.addEventListener('click', (e) => {
 	if (e.target === _personModal) {
 		_personModal.style.display = 'none';
 		selectedPersonIds = [];
+	}
+});
+
+_saveAbsencesBtn.addEventListener('click', () => {
+	ipcRenderer.send('save-absences', absentPersonIds);
+});
+
+_closeAbsenceModal.addEventListener('click', () => {
+	closeModal(_absenceModal);
+});
+
+_absenceModal.addEventListener('click', (e) => {
+	if (e.target === _absenceModal) {
+		closeModal(_absenceModal);
 	}
 });
 
@@ -507,7 +636,13 @@ ipcRenderer.on('settings-data', (event, settings, paths) => {
 	_probabilityFactorSetting.value = settings.probabilityDecreaseFactor;
 	_boostNeverSelectedSetting.checked = !!settings.boostNeverSelected;
 	_neverSelectedBoostFactorSetting.value = settings.neverSelectedBoostFactor;
+	_logoAnimationSetting.checked = !!settings.logoAnimationEnabled;
+	updateLogoAnimation(settings.logoAnimationEnabled);
+	_wiggersRuleSetting.checked = settings.wiggersRuleEnabled !== false;
+	_wiggersRulePenaltySetting.value = settings.wiggersRulePenaltyFactor;
+	_wiggersRuleDurationSetting.value = settings.wiggersRuleDurationMinutes;
 	updateNeverSelectedBoostField();
+	updateWiggersRuleFields();
 	_settingsLocation.innerText = paths ? paths.settingsPath : '';
 	openModal(_settingsModal);
 });
@@ -520,16 +655,213 @@ ipcRenderer.on('window-restored', () => {
 	animateRestore();
 });
 
+ipcRenderer.on('settings-saved', (event, settings) => {
+	updateLogoAnimation(settings && settings.logoAnimationEnabled);
+});
+
+ipcRenderer.on('ui-settings', (event, settings) => {
+	updateLogoAnimation(settings && settings.logoAnimationEnabled);
+});
+
 ipcRenderer.on('pending-excel-status', (event, count) => {
+	pendingExcelCount = Number(count || 0);
 	if (count > 0) {
 		enableElement(_flushExcelBtn);
 		_flushExcelBtn.innerText = `Excel aktualisieren (${count})`;
+		disableElement(_reloadExcelBtn);
+		_reloadExcelBtn.title = `${count} lokale Änderung${count === 1 ? '' : 'en'} müssen zuerst mit "Excel aktualisieren" geschrieben werden.`;
 		_drawerStatus.innerText = `${count} Eintrag${count === 1 ? '' : 'e'} warten auf Excel.`;
 	} else {
 		disableElement(_flushExcelBtn);
 		_flushExcelBtn.innerText = 'Excel aktualisieren';
+		enableElement(_reloadExcelBtn);
+		_reloadExcelBtn.title = 'Liest die ausgewählte Excel-Datei erneut ein.';
 		if (_filePath.innerText) _drawerStatus.innerText = 'Excel und Backup sind synchron.';
 	}
+});
+
+ipcRenderer.on('undo-status', (event, status) => {
+	if (status && status.available) {
+		enableElement(_undoLastBtn);
+		const entry = status.entry || {};
+		const undoTarget = entry.type === 'joker'
+			? `${entry.personName || 'Joker'}: Joker rückgängig machen`
+			: `${entry.personName || 'Note'}: Note rückgängig machen`;
+		_undoLastBtn.innerText = '↶';
+		_undoLastBtn.title = undoTarget;
+		_undoLastBtn.setAttribute('aria-label', undoTarget);
+	} else {
+		disableElement(_undoLastBtn);
+		_undoLastBtn.innerText = '↶';
+		_undoLastBtn.title = 'Letzte Aktion rückgängig';
+		_undoLastBtn.setAttribute('aria-label', 'Letzte Aktion rückgängig');
+	}
+});
+
+ipcRenderer.on('redo-status', (event, status) => {
+	if (status && status.available) {
+		enableElement(_redoLastBtn);
+		const entry = status.entry || {};
+		const redoTarget = entry.type === 'joker'
+			? `${entry.personName || 'Joker'}: Joker wiederholen`
+			: `${entry.personName || 'Note'}: Note wiederholen`;
+		_redoLastBtn.innerText = '↷';
+		_redoLastBtn.title = redoTarget;
+		_redoLastBtn.setAttribute('aria-label', redoTarget);
+	} else {
+		disableElement(_redoLastBtn);
+		_redoLastBtn.innerText = '↷';
+		_redoLastBtn.title = 'Wiederholen';
+		_redoLastBtn.setAttribute('aria-label', 'Wiederholen');
+	}
+});
+
+ipcRenderer.on('undo-completed', (event, result) => {
+	const entry = result && result.entry ? result.entry : {};
+	state = 2;
+	updateState();
+	showUpdatePanel({
+		title: 'Aktion rückgängig gemacht',
+		detail: entry.type === 'joker'
+			? `${entry.personName || 'Die Person'} hat den Joker wieder zurückerhalten.`
+			: `Die letzte Note von ${entry.personName || 'der Person'} wurde entfernt.`,
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
+});
+
+ipcRenderer.on('redo-completed', (event, result) => {
+	const entry = result && result.entry ? result.entry : {};
+	state = 2;
+	updateState();
+	showUpdatePanel({
+		title: 'Aktion wiederhergestellt',
+		detail: entry.type === 'joker'
+			? `${entry.personName || 'Die Person'} hat den Joker wieder gesetzt.`
+			: `Die Note von ${entry.personName || 'der Person'} wurde wieder eingetragen.`,
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
+});
+
+ipcRenderer.on('redo-failed', (event, result) => {
+	const reason = result && result.reason;
+	showUpdatePanel({
+		title: 'Wiederholen nicht möglich',
+		detail: reason === 'excel-locked'
+			? 'Die Excel-Datei scheint geöffnet zu sein. Bitte schließe sie und versuche es erneut.'
+			: 'Die rückgängig gemachte Aktion konnte nicht wiederhergestellt werden.',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
+});
+
+ipcRenderer.on('undo-failed', (event, result) => {
+	const reason = result && result.reason;
+	showUpdatePanel({
+		title: 'Rückgängig nicht möglich',
+		detail: reason === 'excel-locked'
+			? 'Die Excel-Datei scheint geöffnet zu sein. Bitte schließe sie und versuche es erneut.'
+			: reason === 'grade-mismatch'
+				? 'Die letzte Note passt nicht mehr zum Excel-Inhalt. Es wurde nichts geändert.'
+				: 'Die letzte Aktion konnte nicht rückgängig gemacht werden.',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
+});
+
+ipcRenderer.on('session-protocol-empty', () => {
+	showUpdatePanel({
+		title: 'Kein Sitzungsprotokoll',
+		detail: 'In dieser Sitzung wurden noch keine Noten oder Joker erfasst.',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true,
+		placement: 'toast'
+	});
+});
+
+ipcRenderer.on('session-protocol-exported', (event, result) => {
+	const detail = result && result.format === 'both' && result.filePaths
+		? `PDF und CSV wurden gespeichert: ${result.filePaths.join(' | ')}`
+		: result && result.filePath ? result.filePath : 'Das Sitzungsprotokoll wurde gespeichert.';
+	showUpdatePanel({
+		title: 'Protokoll exportiert',
+		detail: detail,
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
+});
+
+ipcRenderer.on('session-protocol-export-failed', (event, result) => {
+	showUpdatePanel({
+		title: 'Export nicht möglich',
+		detail: 'Das Sitzungsprotokoll konnte nicht gespeichert werden.',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
+});
+
+ipcRenderer.on('class-list-import-preview', (event, result) => {
+	pendingClassImport = result;
+	_classImportName.value = result.detectedClassName || '';
+	_classImportDetail.innerText = `${result.count || 0} Name${result.count === 1 ? '' : 'n'} gefunden. Die Klasse wird zur aktuell geladenen Repetierer-Datei hinzugefügt.`;
+	_classImportPreview.innerHTML = '';
+
+	const title = document.createElement('strong');
+	title.innerText = result.truncated ? 'Vorschau (erste 25 Namen)' : 'Vorschau';
+	_classImportPreview.appendChild(title);
+
+	(result.names || []).slice(0, 25).forEach(name => {
+		const row = document.createElement('span');
+		row.innerText = name;
+		_classImportPreview.appendChild(row);
+	});
+
+	openModal(_classImportModal);
+	_classImportName.focus();
+	_classImportName.select();
+});
+
+ipcRenderer.on('class-list-imported', (event, result) => {
+	state = 1;
+	updateState();
+	showUpdatePanel({
+		title: 'Klassenliste importiert',
+		detail: `${result.count || 0} Namen wurden als Klasse ${result.className || ''} zur aktuellen Repetierer-Datei hinzugefügt.${result.truncated ? ' Es wurden maximal 25 Personen importiert.' : ''}`,
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
+	if (result.className) setActiveClassByName(result.className);
+	pendingClassImport = null;
+});
+
+ipcRenderer.on('class-list-import-failed', (event, result) => {
+	const reason = result && result.reason;
+	showUpdatePanel({
+		title: 'Import nicht möglich',
+		detail: reason === 'no-target-file'
+			? 'Lade zuerst eine bestehende Repetierer-Datei. Danach kann die Klasse dort hinzugefügt werden.'
+			: reason === 'class-exists'
+				? 'Diese Klasse existiert in der aktuellen Datei bereits. Wähle beim Import einen anderen Klassennamen.'
+				: reason === 'missing-class-name'
+					? 'Bitte gib einen Klassennamen ein.'
+					: reason === 'pending-changes'
+						? 'Aktualisiere zuerst die Excel-Datei, damit alle lokalen Änderungen gespeichert sind.'
+						: reason === 'no-names-found'
+							? 'In der ausgewählten Datei wurden keine Namen gefunden.'
+							: 'Die Klassenliste konnte nicht importiert werden.',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
 });
 
 // ready
@@ -692,6 +1024,33 @@ ipcRenderer.on('persons-list', (event, persons) => {
 	}
 });
 
+ipcRenderer.on('absence-persons-data', (event, persons) => {
+	renderAbsencePersons(persons || []);
+	openModal(_absenceModal);
+});
+
+ipcRenderer.on('absences-saved', (event, result) => {
+	closeModal(_absenceModal);
+	showUpdatePanel({
+		title: 'Abwesenheiten gespeichert',
+		detail: `${result.count || 0} Person${result.count === 1 ? '' : 'en'} werden heute übersprungen.`,
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true,
+		placement: 'toast'
+	});
+});
+
+ipcRenderer.on('absences-save-failed', (event, result) => {
+	showUpdatePanel({
+		title: 'Abwesenheiten nicht gespeichert',
+		detail: 'Wähle zuerst eine Klasse aus und versuche es erneut.',
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true
+	});
+});
+
 ipcRenderer.on('backup-data', (event, backup, paths) => {
 	const entries = backup && backup.entries ? backup.entries.slice().reverse() : [];
 	_backupList.innerHTML = '';
@@ -768,7 +1127,8 @@ ipcRenderer.on('probability-data', (event, probabilities) => {
 				const meta = document.createElement('small');
 				const jokerText = ` | ${person.joker} Joker übrig`;
 				const boostText = person.boostedNeverSelected ? ' | Boost aktiv' : '';
-				meta.innerText = `${person.grades} Noten${jokerText} | Gewicht ${person.weight.toFixed(2)}${boostText}`;
+				const wiggersText = person.wiggersRuleActive ? ` | Wiggersche Regel ${person.wiggersRuleRemainingMinutes} min` : '';
+				meta.innerText = `${person.grades} Noten${jokerText} | Gewicht ${person.weight.toFixed(2)}${boostText}${wiggersText}`;
 
 				header.appendChild(name);
 				header.appendChild(value);
@@ -857,6 +1217,7 @@ function updateState() {
 			disable(_joker);
 			disable(_manualSelectBtn);
 			disable(_probabilitiesBtn);
+			disable(_absencesBtn);
 			disable(_excelEditorBtn);
 			text();
 			break;
@@ -867,10 +1228,12 @@ function updateState() {
 			disable(_grade);
 			disable(_cancel);
 			disable(_ok);
-            disable(_joker);
+			disable(_joker);
 			enable(_manualSelectBtn);
 			enable(_probabilitiesBtn);
+			enable(_absencesBtn);
 			enable(_excelEditorBtn);
+			ipcRenderer.send('get-undo-status');
 			ipcRenderer.send('get-pending-excel-status');
 			text();
 			break;
@@ -884,6 +1247,7 @@ function updateState() {
             disable(_joker);
 			disable(_manualSelectBtn);
 			disable(_probabilitiesBtn);
+			disable(_absencesBtn);
 			disable(_excelEditorBtn);
 			break;
         case 4:
@@ -896,6 +1260,7 @@ function updateState() {
             enable(_joker);
 			disable(_manualSelectBtn);
 			disable(_probabilitiesBtn);
+			disable(_absencesBtn);
 			disable(_excelEditorBtn);
 			break;
 
@@ -943,6 +1308,52 @@ function parseGradeInput(value) {
 
 function isValidGrade(value) {
 	return Number.isFinite(value) && value >= 1 && value <= 6;
+}
+
+function renderAbsencePersons(persons) {
+	_absenceList.innerHTML = '';
+	absentPersonIds = [];
+
+	if (!persons || persons.length === 0) {
+		const empty = document.createElement('p');
+		empty.className = 'backup-empty';
+		empty.innerText = 'Keine Personen in dieser Klasse.';
+		_absenceList.appendChild(empty);
+		return;
+	}
+
+	persons.forEach(person => {
+		const personDiv = document.createElement('div');
+		personDiv.className = 'person-item';
+
+		const checkbox = document.createElement('input');
+		checkbox.type = 'checkbox';
+		checkbox.id = `absence-${person.id}`;
+		checkbox.checked = !!person.absent;
+		if (checkbox.checked) absentPersonIds.push(person.id);
+		checkbox.addEventListener('change', (e) => {
+			if (e.target.checked) {
+				absentPersonIds.push(person.id);
+			} else {
+				absentPersonIds = absentPersonIds.filter(id => id !== person.id);
+			}
+		});
+
+		const label = document.createElement('label');
+		label.htmlFor = `absence-${person.id}`;
+		label.textContent = `${person.name}`;
+		label.style.marginLeft = '10px';
+		label.style.cursor = 'pointer';
+		label.style.flexGrow = '1';
+
+		const meta = document.createElement('small');
+		meta.innerText = `${person.grades} Noten | ${person.joker} Joker`;
+
+		personDiv.appendChild(checkbox);
+		personDiv.appendChild(label);
+		personDiv.appendChild(meta);
+		_absenceList.appendChild(personDiv);
+	});
 }
 
 function renderExcelEditor() {
@@ -1055,6 +1466,38 @@ function saveExcelEditorPersons() {
 
 function parseJokerInput(value) {
 	return Number(String(value).trim().replace(',', '.'));
+}
+
+function openTeacherHelp(topic) {
+	const help = {
+		class: {
+			title: 'Klasse',
+			paragraphs: [
+				'Nach dem Laden der Excel-Datei erscheinen hier alle verfügbaren Klassenblätter.',
+				'Die ausgewählte Klasse bestimmt, aus welcher Namensliste Repetierer Personen auswählt.',
+				'Die Klasse kann jederzeit gewechselt werden, solange gerade keine Note eingetragen wird.'
+			]
+		},
+		repetition: {
+			title: 'Repetition',
+			paragraphs: [
+				'Start wählt eine Person zufällig aus. Personen mit weniger Noten werden dabei stärker berücksichtigt.',
+				'Freiwillig erlaubt eine manuelle Auswahl, Chancen zeigt die aktuelle Gewichtung und Abwesend überspringt Personen für den Tag.',
+				'Nach einer Auswahl kann eine Note gespeichert oder ein Joker gesetzt werden. Die runden Pfeile machen die letzte Aktion rückgängig oder stellen sie wieder her.'
+			]
+		}
+	}[topic];
+
+	if (!help) return;
+
+	_teacherHelpTitle.innerText = help.title;
+	_teacherHelpBody.innerHTML = '';
+	help.paragraphs.forEach(text => {
+		const paragraph = document.createElement('p');
+		paragraph.innerText = text;
+		_teacherHelpBody.appendChild(paragraph);
+	});
+	openModal(_teacherHelpModal);
 }
 
 // display the version
@@ -1264,6 +1707,27 @@ function updateNeverSelectedBoostField() {
 	_neverSelectedBoostFactorSetting.closest('.setting-field').classList.toggle('setting-disabled', !isEnabled);
 }
 
+function updateWiggersRuleFields() {
+	const isEnabled = _wiggersRuleSetting.checked;
+	_wiggersRulePenaltySetting.disabled = !isEnabled;
+	_wiggersRuleDurationSetting.disabled = !isEnabled;
+	_wiggersRulePenaltySetting.closest('.setting-field').classList.toggle('setting-disabled', !isEnabled);
+	_wiggersRuleDurationSetting.closest('.setting-field').classList.toggle('setting-disabled', !isEnabled);
+}
+
+function updateLogoAnimation(isEnabled) {
+	const enabled = !!isEnabled;
+	if (_container) _container.classList.toggle('logo-animation-enabled', enabled);
+	if (_title) {
+		_title.classList.toggle('logo-animation-enabled', enabled);
+		if (enabled) {
+			_title.classList.remove('logo-animation-kick');
+			void _title.offsetWidth;
+			_title.classList.add('logo-animation-kick');
+		}
+	}
+}
+
 function hideStartupSplash() {
 	if (!_startupSplash) return;
 	setTimeout(() => {
@@ -1322,4 +1786,4 @@ Math.clamp = function(a, b, c) {
 }
 
 // automatically scale the name on load
-module.exports = [scaleName(), updateState(), version(), hideStartupSplash(), ipcRenderer.send('get-debug-mode'), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status')];
+module.exports = [scaleName(), updateState(), version(), hideStartupSplash(), ipcRenderer.send('get-debug-mode'), ipcRenderer.send('get-ui-settings'), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status'), ipcRenderer.send('get-undo-status')];

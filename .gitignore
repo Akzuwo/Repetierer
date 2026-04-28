@@ -108,3 +108,6 @@ dist
 
 # Builds
 builds
+
+# Local importer test files
+importer-samples/
