@@ -289,6 +289,53 @@ function migrate_jokers(callback) {
 		});
 }
 
+function award_extra_jokers_after_three(callback) {
+	if (!wb || !f) {
+		callback({ success: false, reason: 'no-file-selected', updatedPersons: 0 });
+		return;
+	}
+
+	let updatedPersons = 0;
+	wb.worksheets.forEach(worksheet => {
+		if (!worksheet || worksheet.getCell('A1').value !== 'repetierer') return;
+
+		for (let row = 6; row <= 30; row++) {
+			if (!worksheet.getCell('A' + row).value) break;
+			if (countGradesForRow(worksheet, row) < 3) continue;
+
+			const jokerCell = worksheet.getCell('H' + row);
+			jokerCell.value = Number(jokerCell.value || 0) + 1;
+			updatedPersons++;
+		}
+	});
+
+	if (updatedPersons === 0) {
+		callback({
+			success: true,
+			updatedPersons: 0,
+			worksheets: wb.worksheets.map(worksheet => worksheet.name)
+		});
+		return;
+	}
+
+	const lockStatus = getFileLockStatus(f);
+	if (lockStatus.locked) {
+		callback({ success: false, reason: 'excel-locked', error: lockStatus.error, updatedPersons: 0 });
+		return;
+	}
+
+	wb.xlsx.writeFile(f)
+		.then(() => init(f, worksheets => callback({ success: !!worksheets, worksheets: worksheets, updatedPersons: updatedPersons })))
+		.catch(error => {
+			callback({
+				success: false,
+				reason: 'excel-write-failed',
+				updatedPersons: updatedPersons,
+				error: error && error.message ? error.message : String(error)
+			});
+		});
+}
+
 // write grade to file
 function write_grade(clss, person, grade, callback, awardExtraJoker) {
 
@@ -557,5 +604,6 @@ module.exports = {
 	undo_entry: undo_entry,
 	getJokerMigrationStatus: getJokerMigrationStatus,
 	migrate_jokers: migrate_jokers,
+	award_extra_jokers_after_three: award_extra_jokers_after_three,
 	getFileLockStatus: getFileLockStatus
 }

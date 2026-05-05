@@ -98,6 +98,8 @@ const _closeSettingsHelpBtn = document.getElementById('close-settings-help-btn')
 const _closeSettingsHelpBottomBtn = document.getElementById('close-settings-help-bottom-btn');
 const _settingsLocation = document.getElementById('settings-location');
 const _extraJokerSetting = document.getElementById('extra-joker-setting');
+const _extraJokerMigrationBtn = document.getElementById('extra-joker-migration-btn');
+const _extraJokerMigrationStatus = document.getElementById('extra-joker-migration-status');
 const _probabilityFactorSetting = document.getElementById('probability-factor-setting');
 const _boostNeverSelectedSetting = document.getElementById('boost-never-selected-setting');
 const _neverSelectedBoostFactorSetting = document.getElementById('never-selected-boost-factor-setting');
@@ -120,6 +122,7 @@ let absentPersonIds = [];
 let excelEditorPersons = [];
 let pendingExcelCount = 0;
 let pendingClassImport = null;
+let extraJokerMigrationStatus = { hasFile: false, completed: false };
 let _currentClass;
 let _nameSize;
 let updatePrimaryAction = requestUpdateDownload;
@@ -379,6 +382,21 @@ _saveSettingsBtn.addEventListener('click', () => {
 	closeModal(_settingsModal);
 });
 
+_extraJokerMigrationBtn.addEventListener('click', () => {
+	if (!extraJokerMigrationStatus || !extraJokerMigrationStatus.hasFile) {
+		showExtraJokerMigrationMessage('Extra-Joker-Migration', 'Bitte zuerst eine Datei laden.');
+		return;
+	}
+	if (extraJokerMigrationStatus.completed) {
+		showExtraJokerMigrationMessage('Extra-Joker-Migration', 'Diese Migration wurde für diese Datei bereits durchgeführt.');
+		return;
+	}
+
+	disableElement(_extraJokerMigrationBtn);
+	_extraJokerMigrationBtn.disabled = true;
+	ipcRenderer.send('run-extra-joker-migration');
+});
+
 _closeSettingsModal.addEventListener('click', () => {
 	closeModal(_settingsModal);
 });
@@ -631,7 +649,7 @@ ipcRenderer.on('debug-mode', (event, isDebugMode) => {
 	}
 });
 
-ipcRenderer.on('settings-data', (event, settings, paths) => {
+ipcRenderer.on('settings-data', (event, settings, paths, migrationStatus) => {
 	_extraJokerSetting.checked = !!settings.extraJokerAfterThreeGrades;
 	_probabilityFactorSetting.value = settings.probabilityDecreaseFactor;
 	_boostNeverSelectedSetting.checked = !!settings.boostNeverSelected;
@@ -643,8 +661,30 @@ ipcRenderer.on('settings-data', (event, settings, paths) => {
 	_wiggersRuleDurationSetting.value = settings.wiggersRuleDurationMinutes;
 	updateNeverSelectedBoostField();
 	updateWiggersRuleFields();
+	updateExtraJokerMigrationStatus(migrationStatus);
 	_settingsLocation.innerText = paths ? paths.settingsPath : '';
 	openModal(_settingsModal);
+});
+
+ipcRenderer.on('extra-joker-migration-done', (event, result) => {
+	updateExtraJokerMigrationStatus(result && result.status);
+	const updatedPersons = result && result.updatedPersons ? result.updatedPersons : 0;
+	showExtraJokerMigrationMessage(
+		'Extra-Joker-Migration',
+		updatedPersons > 0
+			? `Extra-Joker-Migration abgeschlossen: ${updatedPersons} Personen aktualisiert.`
+			: 'Keine berechtigten Personen gefunden.'
+	);
+});
+
+ipcRenderer.on('extra-joker-migration-failed', (event, result) => {
+	updateExtraJokerMigrationStatus(result && result.status ? result.status : extraJokerMigrationStatus);
+	const reason = result && result.reason;
+	let detail = 'Die Extra-Joker-Migration konnte nicht durchgeführt werden.';
+	if (reason === 'no-file-selected') detail = 'Bitte zuerst eine Datei laden.';
+	if (reason === 'already-completed') detail = 'Diese Migration wurde für diese Datei bereits durchgeführt.';
+	if (reason === 'excel-locked') detail = 'Die Excel-Datei scheint geöffnet zu sein. Bitte schließe sie und versuche es erneut.';
+	showExtraJokerMigrationMessage('Extra-Joker-Migration', detail);
 });
 
 ipcRenderer.on('update-status', (event, payload) => {
@@ -1707,6 +1747,39 @@ function closeSettingsHelp() {
 
 function closeJokerMigrationHelp() {
 	closeModal(_jokerMigrationHelpModal, () => openModal(_jokerMigrationModal));
+}
+
+function updateExtraJokerMigrationStatus(status) {
+	extraJokerMigrationStatus = Object.assign({ hasFile: false, completed: false }, status || {});
+
+	if (!extraJokerMigrationStatus.hasFile) {
+		_extraJokerMigrationStatus.innerText = 'Bitte zuerst eine Datei laden.';
+		disableElement(_extraJokerMigrationBtn);
+		_extraJokerMigrationBtn.disabled = true;
+		return;
+	}
+
+	if (extraJokerMigrationStatus.completed) {
+		_extraJokerMigrationStatus.innerText = 'Diese Migration wurde für diese Datei bereits durchgeführt.';
+		disableElement(_extraJokerMigrationBtn);
+		_extraJokerMigrationBtn.disabled = true;
+		return;
+	}
+
+	_extraJokerMigrationStatus.innerText = 'Bereit: prüft alle Personen mit mindestens 3 Noten in der aktuellen Datei.';
+	enableElement(_extraJokerMigrationBtn);
+	_extraJokerMigrationBtn.disabled = false;
+}
+
+function showExtraJokerMigrationMessage(title, detail) {
+	showUpdatePanel({
+		title: title,
+		detail: detail,
+		primaryVisible: false,
+		secondaryText: 'OK',
+		secondaryVisible: true,
+		placement: 'toast'
+	});
 }
 
 function updateNeverSelectedBoostField() {

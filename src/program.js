@@ -1,11 +1,12 @@
-const { init, read, read_editor_persons, write_grade, write_joker, edit_persons, apply_entries, undo_entry, getJokerMigrationStatus, migrate_jokers } = require('./excelReader.js');
-const { getAppSettings, getWiggersRulePenalties, saveWiggersRulePenalty, removeWiggersRulePenalty } = require('./storage.js');
+const { init, read, read_editor_persons, write_grade, write_joker, edit_persons, apply_entries, undo_entry, getJokerMigrationStatus, migrate_jokers, award_extra_jokers_after_three } = require('./excelReader.js');
+const { getAppSettings, getFileMigrationStatus, getWiggersRulePenalties, markFileMigrationCompleted, saveWiggersRulePenalty, removeWiggersRulePenalty } = require('./storage.js');
 let cls;
 let persons;
 let person;
 let filePath;
 const absences = new Set();
 const wiggersRulePenalties = new Map();
+const EXTRA_JOKER_MIGRATION_ID = 'extra-joker-after-three-existing-data';
 
 // set the file
 function setFile(file, callback) {
@@ -218,6 +219,40 @@ function migrateJokers(callback) {
 	});
 }
 
+function getExtraJokerMigrationStatus() {
+	const status = getFileMigrationStatus(filePath, EXTRA_JOKER_MIGRATION_ID);
+	return {
+		hasFile: !!(status && status.hasFile),
+		completed: !!(status && status.completed),
+		completedAt: status && status.completedAt
+	};
+}
+
+function migrateExtraJokersAfterThree(callback) {
+	const status = getExtraJokerMigrationStatus();
+	if (!status.hasFile) {
+		callback({ success: false, reason: 'no-file-selected', updatedPersons: 0, status: status });
+		return;
+	}
+	if (status.completed) {
+		callback({ success: false, reason: 'already-completed', updatedPersons: 0, status: status });
+		return;
+	}
+
+	award_extra_jokers_after_three(result => {
+		if (result && result.success) {
+			markFileMigrationCompleted(filePath, EXTRA_JOKER_MIGRATION_ID, {
+				updatedPersons: result.updatedPersons || 0
+			});
+			if (cls) persons = read(cls);
+			callback(Object.assign({}, result, { status: getExtraJokerMigrationStatus() }));
+			return;
+		}
+
+		callback(result || { success: false, reason: 'unknown', updatedPersons: 0, status: getExtraJokerMigrationStatus() });
+	});
+}
+
 function applyPendingExcelEntries(entries, callback) {
 	if (!cls) {
 		callback({ success: false, reason: 'no-class-selected', applied: [] });
@@ -380,6 +415,8 @@ module.exports = {
 	getCurrentFilePath: getCurrentFilePath,
 	getJokerMigrationStatus: getJokerMigrationStatus,
 	migrateJokers: migrateJokers,
+	getExtraJokerMigrationStatus: getExtraJokerMigrationStatus,
+	migrateExtraJokersAfterThree: migrateExtraJokersAfterThree,
 	getPersons: getPersons,
 	getEditorPersons: getEditorPersons,
 	getProbabilities: getProbabilities,

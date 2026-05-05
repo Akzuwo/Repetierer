@@ -1278,7 +1278,8 @@
 }
 
 .setting-row,
-.setting-field {
+.setting-field,
+.setting-action {
 	display: flex;
 	gap: 1rem;
 	align-items: center;
@@ -1292,7 +1293,8 @@
 }
 
 .setting-row:hover,
-.setting-field:hover {
+.setting-field:hover,
+.setting-action:hover {
 	border-color: rgba(24, 168, 144, 0.42);
 	transform: translateY(-0.06rem);
 }
@@ -1309,16 +1311,31 @@
 }
 
 .setting-row span,
-.setting-field span {
+.setting-field span,
+.setting-action span {
 	font-weight: 500;
 }
 
-.setting-row small {
+.setting-row small,
+.setting-action small {
 	color: #bfc0c4;
 	display: block;
 	font-size: 0.84rem;
 	line-height: 1.35;
 	margin-top: 0.35rem;
+}
+
+.setting-action {
+	align-items: flex-start;
+	flex-direction: column;
+}
+
+.setting-action button {
+	align-self: stretch;
+	font-size: 0.95rem;
+	margin: 0;
+	min-height: 2.7rem;
+	white-space: normal;
 }
 
 .setting-field input {

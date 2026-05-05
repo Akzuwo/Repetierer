@@ -46,7 +46,7 @@ ipcMain.on('get-debug-mode', (event, args) => {
 
 // settings
 ipcMain.on('get-settings', (event, args) => {
-	event.sender.send('settings-data', getAppSettings(), getPaths());
+	event.sender.send('settings-data', getAppSettings(), getPaths(), getProgram().getExtraJokerMigrationStatus());
 });
 
 ipcMain.on('get-ui-settings', (event, args) => {
@@ -269,6 +269,23 @@ ipcMain.on('run-joker-migration', (event, args) => {
 			logEvent('Joker-Migration fehlgeschlagen', result || {});
 			event.sender.send('joker-migration-failed', result || { success: false, reason: 'unknown' });
 		}
+	});
+});
+
+ipcMain.on('run-extra-joker-migration', (event, args) => {
+	logEvent('Extra-Joker-Migration gestartet', { filePath: getProgram().getCurrentFilePath() });
+	getProgram().migrateExtraJokersAfterThree(result => {
+		if (result && result.success) {
+			logEvent('Extra-Joker-Migration abgeschlossen', {
+				updatedPersons: result.updatedPersons || 0,
+				filePath: getProgram().getCurrentFilePath()
+			});
+			event.sender.send('extra-joker-migration-done', result);
+			return;
+		}
+
+		logEvent('Extra-Joker-Migration nicht durchgefuehrt', result || {});
+		event.sender.send('extra-joker-migration-failed', result || { success: false, reason: 'unknown' });
 	});
 });
 

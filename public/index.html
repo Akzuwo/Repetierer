@@ -306,6 +306,13 @@
 					<input type="checkbox" id="extra-joker-setting">
 					<span>Extra Joker ab 3 Noten</span>
 				</label>
+				<div class="setting-action" id="extra-joker-migration-setting">
+					<span>
+						Extra-Joker f&uuml;r bestehende Daten
+						<small id="extra-joker-migration-status">Bitte zuerst eine Datei laden.</small>
+					</span>
+					<button class="btn-2" id="extra-joker-migration-btn">Extra-Joker f&uuml;r bestehende Daten nachtragen</button>
+				</div>
 				<label class="setting-field">
 					<span>Wahrscheinlichkeits-Faktor</span>
 					<input id="probability-factor-setting" type="number" min="1.1" max="10" step="0.1">
@@ -354,6 +361,8 @@
 			<div class="settings-guide settings-scroll-area">
 				<h3>Extra Joker ab 3 Noten</h3>
 				<p>Wenn diese Option aktiv ist, dürfen Personen, die bereits mindestens 3 Noten haben, einen zusätzlichen Joker erhalten. Standardmäßig ist das deaktiviert.</p>
+				<h3>Extra-Joker f&uuml;r bestehende Daten</h3>
+				<p>Diese einmalige Migration tr&auml;gt den Extra-Joker f&uuml;r Personen nach, die in der aktuellen Excel-Datei bereits mindestens 3 Noten haben. Der Status wird lokal pro Datei gespeichert und nicht in die Excel-Datei geschrieben.</p>
 				<h3>Wahrscheinlichkeits-Faktor</h3>
 				<p>Dieser Wert bestimmt, wie stark die Chance sinkt, wenn eine Person schon einmal dran war. Der Standard ist 3. Das bedeutet: Nach jeder Note hat die Person nur noch ein Drittel ihres vorherigen Gewichts.</p>
 				<h3>Boost für nie ausgewählte Personen</h3>

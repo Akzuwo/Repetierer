@@ -21,6 +21,7 @@ function getPaths() {
 		storageDir: storageDir,
 		settingsPath: path.join(storageDir, 'settings.json'),
 		backupPath: path.join(storageDir, 'backup.json'),
+		migrationsPath: path.join(storageDir, 'migrations.json'),
 		logPath: path.join(storageDir, 'repetierer.log')
 	};
 }
@@ -69,6 +70,57 @@ function removeWiggersRulePenalty(key) {
 	const penalties = getWiggersRulePenalties();
 	delete penalties[key];
 	saveSettings({ wiggersRulePenalties: penalties });
+}
+
+function getMigrations() {
+	const migrations = readJson(getPaths().migrationsPath, { files: {} });
+	if (!migrations.files) migrations.files = {};
+	return migrations;
+}
+
+function getFileMigrationStatus(filePath, migrationId) {
+	const fileId = getFileIdentifier(filePath);
+	if (!fileId || !migrationId) {
+		return {
+			hasFile: false,
+			fileId: '',
+			completed: false
+		};
+	}
+
+	const migrations = getMigrations();
+	const fileMigrations = migrations.files[fileId] || {};
+	return {
+		hasFile: true,
+		fileId: fileId,
+		completed: !!fileMigrations[migrationId],
+		completedAt: fileMigrations[migrationId] && fileMigrations[migrationId].completedAt
+	};
+}
+
+function markFileMigrationCompleted(filePath, migrationId, details) {
+	const fileId = getFileIdentifier(filePath);
+	if (!fileId || !migrationId) return false;
+
+	const migrations = getMigrations();
+	if (!migrations.files[fileId]) migrations.files[fileId] = {};
+	migrations.files[fileId][migrationId] = Object.assign({}, details || {}, {
+		filePath: path.resolve(filePath),
+		completedAt: new Date().toISOString()
+	});
+	writeJson(getPaths().migrationsPath, migrations);
+	return true;
+}
+
+function getFileIdentifier(filePath) {
+	if (!filePath) return '';
+	let resolvedPath;
+	try {
+		resolvedPath = fs.realpathSync.native ? fs.realpathSync.native(filePath) : fs.realpathSync(filePath);
+	} catch (error) {
+		resolvedPath = path.resolve(filePath);
+	}
+	return process.platform === 'win32' ? resolvedPath.toLowerCase() : resolvedPath;
 }
 
 function getAppSettings() {
@@ -221,11 +273,13 @@ module.exports = {
 	getBackup,
 	getBackupPreview,
 	getAppSettings,
+	getFileMigrationStatus,
 	getWiggersRulePenalties,
 	getPendingExcelEntries,
 	getExcelFilePath,
 	saveExcelFilePath,
 	saveAppSettings,
+	markFileMigrationCompleted,
 	saveWiggersRulePenalty,
 	removeWiggersRulePenalty,
 	addBackupEntry,
