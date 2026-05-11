@@ -12,21 +12,7 @@
 </head>
 
 <body>
-<div id="container" class="startup-active">
-	<div id="startup-splash">
-		<svg class="startup-loader" viewBox="0 0 760 150" role="img" aria-label="Repetierer">
-			<defs>
-				<linearGradient gradientUnits="userSpaceOnUse" y2="0" x2="760" y1="150" x1="0" id="startup-gradient">
-					<stop stop-color="#0f1113" />
-					<stop stop-color="#18a890" />
-					<stop stop-color="#0f1113" offset="1" />
-					<animateTransform repeatCount="indefinite" dur="14s" values="0 380 75;-270 380 75;-270 380 75;-540 380 75;-540 380 75;-810 380 75;-810 380 75;-1080 380 75;-1080 380 75" type="rotate" attributeName="gradientTransform" />
-				</linearGradient>
-			</defs>
-			<text class="startup-loader-text" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle">Repetierer</text>
-		</svg>
-	</div>
-
+<div id="container">
 	<div id="title-bar">
 		<div class="title-actions">
 			<div class="ico" id="drawer-toggle" title="Menü">
@@ -63,6 +49,7 @@
 			<button class="btn-2" id="backup-btn" title="Zeigt gespeicherte Backup-Einträge dieser Sitzung und Datei.">Backup anzeigen</button>
 			<button class="btn-2" id="log-btn" title="Öffnet technische Meldungen, falls etwas geprüft werden muss.">Log anzeigen</button>
 			<button class="btn-2" id="export-protocol-btn" title="Exportiert das Sitzungsprotokoll gleichzeitig als PDF und CSV.">Protokoll exportieren</button>
+			<button class="btn-2 disabled" id="stats-view-btn" title="Zeigt Klassenstatistiken der geladenen Datei.">Statistiken</button>
 			<button class="btn-2" id="import-class-list-btn" title="Importiert eine Namensliste und erstellt daraus eine Repetierer-Klasse.">Klassenliste importieren</button>
 			<button class="btn-2 disabled" id="flush-excel-btn" title="Schreibt wartende lokale Änderungen in die Excel-Datei.">Excel aktualisieren</button>
 			<button class="btn-2" id="reload-excel-btn" title="Liest die ausgewählte Excel-Datei erneut ein.">Excel neu laden</button>
@@ -119,6 +106,14 @@
 				<button class="btn-1 disabled">OK</button>
 				<button class="btn-1 disabled">Joker</button>
 			</div>
+		</div>
+		<div class="neum update-hidden" id="stats-view">
+			<div class="stats-header">
+				<h2>Statistiken</h2>
+				<button class="btn-2" id="stats-back-btn">Zurück</button>
+			</div>
+			<p class="stats-empty update-hidden" id="stats-empty">Noch keine Statistikdaten vorhanden.</p>
+			<div id="stats-list"></div>
 		</div>
 	</div>
 
@@ -333,12 +328,8 @@
 					<input type="checkbox" id="wiggers-rule-setting">
 					<span>
 						Wiggersche Regel aktivieren
-						<small>Wenn jemand den Joker setzt, wird diese Person für eine begrenzte Zeit deutlich unwahrscheinlicher erneut ausgewählt.</small>
+						<small>Wenn jemand den Joker setzt, wird diese Person für eine begrenzte Zeit nicht zufällig ausgewählt.</small>
 					</span>
-				</label>
-				<label class="setting-field">
-					<span>Wiggers-Malus</span>
-					<input id="wiggers-rule-penalty-setting" type="number" min="0.01" max="1" step="0.01">
 				</label>
 				<label class="setting-field">
 					<span>Wiggers-Dauer in Minuten</span>
@@ -370,11 +361,9 @@
 				<h3>Boost-Faktor</h3>
 				<p>Dieser Wert wird nur verwendet, wenn der Boost aktiviert ist. Je höher der Faktor, desto stärker werden Personen bevorzugt, die noch nie ausgewählt wurden.</p>
 				<h3>Wiggersche Regel</h3>
-				<p>Wenn eine Person ihren Joker setzt, sinkt ihre Auswahlwahrscheinlichkeit für eine begrenzte Zeit stark. Standardmäßig gilt der Malus 2 Stunden. Die Regel verhindert nicht vollständig, dass jemand erneut drankommt, macht es aber sehr unwahrscheinlich.</p>
-				<h3>Wiggers-Malus</h3>
-				<p>Dieser Faktor wird während der Wiggerschen Regel auf das normale Gewicht angewendet. 0.05 bedeutet, dass die Person nur noch 5% ihres eigentlichen Gewichts hat.</p>
+				<p>Wenn eine Person ihren Joker setzt, wird ihre Auswahlwahrscheinlichkeit für eine begrenzte Zeit auf 0 gesetzt. Standardmäßig gilt die Regel 2 Stunden.</p>
 				<h3>Wiggers-Dauer</h3>
-				<p>Diese Dauer bestimmt, wie lange der Joker-Malus nach einer Joker-Nutzung aktiv bleibt.</p>
+				<p>Diese Dauer bestimmt, wie lange die Person nach einer Joker-Nutzung nicht zufällig ausgewählt wird.</p>
 			</div>
 			<div class="modal-buttons info-modal-buttons">
 				<button class="btn-2" id="close-settings-help-bottom-btn">Zurück</button>

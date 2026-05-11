@@ -48,7 +48,8 @@ Aktuell werden bis zu 25 Personen, maximal 6 Noten pro Person und beliebig viele
 - **Letzte Aktion rückgängig machen:** Die letzte Note oder Joker-Nutzung der aktuellen Sitzung kann rückgängig gemacht werden, solange der passende Excel-Eintrag noch unverändert ist. Falls Excel beim Speichern gesperrt war, wird der offene lokale Eintrag entfernt.
 - **Wiederholen:** Eine versehentlich rückgängig gemachte Aktion kann direkt wiederhergestellt werden.
 - **Abwesenheiten:** Personen können für den aktuellen Tag als abwesend markiert werden. Diese Personen werden bei der zufälligen Auswahl und bei der freiwilligen Auswahl übersprungen, ohne dass die Excel-Datei verändert wird.
-- **Wiggersche Regel:** Wenn eine Person ihren Joker setzt, fällt ihre Auswahlwahrscheinlichkeit für eine begrenzte Zeit stark ab. Standardmäßig gilt dieser Malus 2 Stunden und reduziert das Gewicht auf 5%. Die Person kann weiterhin ausgewählt werden, aber es wird sehr unwahrscheinlich. Die Regel ist als Balancing-Maßnahme gedacht, damit ein Joker nicht sofort wieder durch eine neue Ziehung entwertet wird.
+- **Joker-Historie:** Joker-Nutzungen werden in der Excel-Datei als Datumsverlauf gespeichert, damit nicht nur die letzte Nutzung sichtbar bleibt.
+- **Wiggersche Regel:** Wenn eine Person ihren Joker setzt, wird ihre zufällige Auswahlwahrscheinlichkeit für eine begrenzte Zeit auf 0 gesetzt. Standardmäßig gilt diese Sperre 2 Stunden. Die Regel ist als Balancing-Maßnahme gedacht, damit ein Joker nicht sofort wieder durch eine neue Ziehung entwertet wird.
 
 ## English
 Repetierer was created to enable teachers to test students by selecting a random individual from a list contained in an Excel file.
@@ -97,7 +98,7 @@ The program itself is pretty self-explanatory.
 - **Undo last action:** Undo the most recent grade or joker action from the current session as long as the corresponding Excel entry still matches.
 - **Redo:** Restore an action that was undone by accident.
 - **Absences:** Mark students as absent for the current day. They are skipped during random and voluntary selection without changing the Excel file.
-- **Wiggersche Regel:** When a student uses a joker, their selection probability is heavily reduced for a limited time. By default, the penalty lasts 2 hours and reduces their weight to 5%. They can still be selected, but it becomes very unlikely.
+- **Wiggersche Regel:** When a student uses a joker, their random selection probability is set to 0 for a limited time. By default, this block lasts 2 hours.
 
 ![](https://raw.githubusercontent.com/srpnt3/Repetierer/master/public/images/preview.png)
 

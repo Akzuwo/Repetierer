@@ -1,0 +1,35 @@
+<!doctype html>
+
+<html lang="de">
+
+<head>
+	<meta charset="utf-8">
+	<title>Repetierer</title>
+	<meta name="description" content="(:">
+	<meta name="author" content="srpnt3, Jonas-Luetolf, Akzuwo">
+	<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+<div id="container" class="startup-active splash-container">
+	<div id="startup-splash">
+		<svg class="startup-loader" viewBox="0 0 760 150" role="img" aria-label="Repetierer">
+			<defs>
+				<linearGradient gradientUnits="userSpaceOnUse" y2="0" x2="760" y1="150" x1="0" id="startup-gradient">
+					<stop stop-color="#0f1113" />
+					<stop stop-color="#18a890" />
+					<stop stop-color="#0f1113" offset="1" />
+					<animateTransform repeatCount="indefinite" dur="14s" values="0 380 75;-270 380 75;-270 380 75;-540 380 75;-540 380 75;-810 380 75;-810 380 75;-1080 380 75;-1080 380 75" type="rotate" attributeName="gradientTransform" />
+				</linearGradient>
+			</defs>
+			<text class="startup-loader-text" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle">Repetierer</text>
+		</svg>
+	</div>
+</div>
+</body>
+
+<script>
+	require('./splash.js');
+</script>
+
+</html>

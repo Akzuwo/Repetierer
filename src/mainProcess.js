@@ -1,7 +1,7 @@
 const { ipcMain, app, BrowserWindow, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { getBackupPreview, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, removeBackupEntries, logEvent, getLogs, getPaths } = require('./storage.js');
+const { getBackupPreview, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, clearWiggersRulePenalties, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, removeBackupEntries, logEvent, getLogs, getPaths } = require('./storage.js');
 const isDebugMode = process.argv.includes('--dev-mode');
 const sessionEntries = [];
 let lastUndoEntry;
@@ -55,6 +55,10 @@ ipcMain.on('get-ui-settings', (event, args) => {
 
 ipcMain.on('save-settings', (event, settings) => {
 	saveAppSettings(settings || {});
+	if (!settings || settings.wiggersRuleEnabled === false) {
+		clearWiggersRulePenalties();
+		getProgram().clearWiggersRulePenalties();
+	}
 	logEvent('Einstellungen gespeichert');
 	event.sender.send('settings-saved', getAppSettings());
 });
@@ -117,6 +121,10 @@ ipcMain.on('get-persons', (event, args) => {
 ipcMain.on('get-editor-persons', (event, args) => {
 	const persons = getProgram().getEditorPersons();
 	event.sender.send('editor-persons-data', persons);
+});
+
+ipcMain.on('get-class-statistics', (event, args) => {
+	event.sender.send('class-statistics-data', getProgram().getClassStatistics());
 });
 
 ipcMain.on('get-absence-persons', (event, args) => {
@@ -909,7 +917,7 @@ function fillImportedWorksheet(worksheet, names) {
 		'Datum 4',
 		'Datum 5',
 		'Datum 6',
-		'Joker Datum'
+		'Joker Daten'
 	];
 	headers.forEach((header, index) => {
 		worksheet.getCell(5, index + 1).value = header;

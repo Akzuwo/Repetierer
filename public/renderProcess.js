@@ -5,7 +5,6 @@ let state = 0; // 0: select file, 1: select class, 2: click start, 3: set grade
 const _container = document.getElementById('container');
 const _minimize = document.getElementById('minimize');
 const _quit = document.getElementById('quit');
-const _startupSplash = document.getElementById('startup-splash');
 const _drawerToggle = document.getElementById('drawer-toggle');
 const _drawer = document.getElementById('drawer');
 const _drawerScrim = document.getElementById('drawer-scrim');
@@ -15,6 +14,7 @@ const _filePath = document.getElementById('file-path');
 const _backupBtn = document.getElementById('backup-btn');
 const _logBtn = document.getElementById('log-btn');
 const _exportProtocolBtn = document.getElementById('export-protocol-btn');
+const _statsViewBtn = document.getElementById('stats-view-btn');
 const _importClassListBtn = document.getElementById('import-class-list-btn');
 const _undoLastBtn = document.getElementById('undo-last-btn');
 const _redoLastBtn = document.getElementById('redo-last-btn');
@@ -31,6 +31,11 @@ const _start = document.getElementById('start-btn');
 const _probabilitiesBtn = document.getElementById('probabilities-btn');
 const _flushExcelBtn = document.getElementById('flush-excel-btn');
 const _repetition = document.getElementById('repetition');
+const _classPanel = document.getElementById('class');
+const _statsView = document.getElementById('stats-view');
+const _statsBackBtn = document.getElementById('stats-back-btn');
+const _statsEmpty = document.getElementById('stats-empty');
+const _statsList = document.getElementById('stats-list');
 const _title = document.getElementById('title');
 const _name = document.getElementById('name');
 const _label = document.getElementById('grade').children.item(0);
@@ -105,7 +110,6 @@ const _boostNeverSelectedSetting = document.getElementById('boost-never-selected
 const _neverSelectedBoostFactorSetting = document.getElementById('never-selected-boost-factor-setting');
 const _logoAnimationSetting = document.getElementById('logo-animation-setting');
 const _wiggersRuleSetting = document.getElementById('wiggers-rule-setting');
-const _wiggersRulePenaltySetting = document.getElementById('wiggers-rule-penalty-setting');
 const _wiggersRuleDurationSetting = document.getElementById('wiggers-rule-duration-setting');
 const _saveSettingsBtn = document.getElementById('save-settings-btn');
 const _closeSettingsModal = document.getElementById('close-settings-modal');
@@ -166,6 +170,14 @@ _logBtn.addEventListener('click', () => {
 
 _exportProtocolBtn.addEventListener('click', () => {
 	ipcRenderer.send('export-session-protocol', 'both');
+});
+
+_statsViewBtn.addEventListener('click', () => {
+	openStatsView();
+});
+
+_statsBackBtn.addEventListener('click', () => {
+	closeStatsView();
 });
 
 _importClassListBtn.addEventListener('click', () => {
@@ -359,11 +371,9 @@ _teacherHelpModal.addEventListener('click', (e) => {
 _saveSettingsBtn.addEventListener('click', () => {
 	const probabilityDecreaseFactor = parseFloat(_probabilityFactorSetting.value.replace(',', '.'));
 	const neverSelectedBoostFactor = parseFloat(_neverSelectedBoostFactorSetting.value.replace(',', '.'));
-	const wiggersRulePenaltyFactor = parseFloat(_wiggersRulePenaltySetting.value.replace(',', '.'));
 	const wiggersRuleDurationMinutes = parseInt(_wiggersRuleDurationSetting.value, 10);
 	if (!probabilityDecreaseFactor || probabilityDecreaseFactor < 1.1 || probabilityDecreaseFactor > 10 ||
 		!neverSelectedBoostFactor || neverSelectedBoostFactor < 1.1 || neverSelectedBoostFactor > 10 ||
-		!wiggersRulePenaltyFactor || wiggersRulePenaltyFactor < 0.01 || wiggersRulePenaltyFactor > 1 ||
 		!wiggersRuleDurationMinutes || wiggersRuleDurationMinutes < 1 || wiggersRuleDurationMinutes > 480) {
 		error(_saveSettingsBtn);
 		return;
@@ -376,7 +386,6 @@ _saveSettingsBtn.addEventListener('click', () => {
 		neverSelectedBoostFactor: neverSelectedBoostFactor,
 		logoAnimationEnabled: _logoAnimationSetting.checked,
 		wiggersRuleEnabled: _wiggersRuleSetting.checked,
-		wiggersRulePenaltyFactor: wiggersRulePenaltyFactor,
 		wiggersRuleDurationMinutes: wiggersRuleDurationMinutes
 	});
 	closeModal(_settingsModal);
@@ -583,6 +592,7 @@ ipcRenderer.on('classes', (event, args, filePath) => {
 
 		_classes.innerHTML = '';
 		_currentClass = null;
+		enableElement(_statsViewBtn);
 		for (let i = 0; i < args.length; i++) {
 			let x = document.createElement('button')
 			x.className = 'btn-2';
@@ -594,6 +604,8 @@ ipcRenderer.on('classes', (event, args, filePath) => {
 		state = 0;
 		_filePath.innerText = '';
 		_drawerStatus.innerText = 'Die Datei konnte nicht gelesen werden.';
+		closeStatsView();
+		disableElement(_statsViewBtn);
 		updateState();
 		error(_file);
 	}
@@ -602,12 +614,16 @@ ipcRenderer.on('classes', (event, args, filePath) => {
 ipcRenderer.on('saved-file-missing', (event, filePath) => {
 	if (filePath) _filePath.innerText = `Gespeicherte Datei nicht gefunden: ${filePath}`;
 	_drawerStatus.innerText = 'Die zuletzt gespeicherte Datei wurde nicht gefunden.';
+	closeStatsView();
+	disableElement(_statsViewBtn);
 });
 
 ipcRenderer.on('joker-migration-required', (event, status, filePath) => {
 	state = 0;
 	_classes.innerHTML = '';
 	_className.innerText = '';
+	closeStatsView();
+	disableElement(_statsViewBtn);
 	if (filePath) _filePath.innerText = filePath;
 	const emptyText = `${status.emptyCells || 0} leere Joker-Felder`;
 	const usedText = `${status.usedJokerCells || 0} bisherige 1-Werte`;
@@ -643,6 +659,10 @@ ipcRenderer.on('version', (event, appVersion) => {
 	document.getElementById("version").innerText = "Repetierer v" + appVersion;
 });
 
+ipcRenderer.on('class-statistics-data', (event, stats) => {
+	renderClassStatistics(stats || []);
+});
+
 ipcRenderer.on('debug-mode', (event, isDebugMode) => {
 	if (isDebugMode) {
 		_debugActions.classList.remove('update-hidden');
@@ -657,7 +677,6 @@ ipcRenderer.on('settings-data', (event, settings, paths, migrationStatus) => {
 	_logoAnimationSetting.checked = !!settings.logoAnimationEnabled;
 	updateLogoAnimation(settings.logoAnimationEnabled);
 	_wiggersRuleSetting.checked = settings.wiggersRuleEnabled !== false;
-	_wiggersRulePenaltySetting.value = settings.wiggersRulePenaltyFactor;
 	_wiggersRuleDurationSetting.value = settings.wiggersRuleDurationMinutes;
 	updateNeverSelectedBoostField();
 	updateWiggersRuleFields();
@@ -1255,6 +1274,7 @@ function updateState() {
 		case 0:
 			_classes.innerHTML = '';
 			_className.innerText = '';
+			disableElement(_statsViewBtn);
 		case 1:
 			disable(_start);
 			disable(_name);
@@ -1402,6 +1422,89 @@ function renderAbsencePersons(persons) {
 		personDiv.appendChild(meta);
 		_absenceList.appendChild(personDiv);
 	});
+}
+
+function openStatsView() {
+	if (_statsViewBtn.classList.contains('disabled')) return;
+	closeDrawer();
+	_classPanel.classList.add('update-hidden');
+	_repetition.classList.add('update-hidden');
+	_statsView.classList.remove('update-hidden');
+	_statsEmpty.classList.add('update-hidden');
+	_statsList.innerHTML = '';
+	ipcRenderer.send('get-class-statistics');
+}
+
+function closeStatsView() {
+	if (!_statsView) return;
+	_statsView.classList.add('update-hidden');
+	if (_classPanel) _classPanel.classList.remove('update-hidden');
+	if (_repetition) _repetition.classList.remove('update-hidden');
+}
+
+function renderClassStatistics(stats) {
+	_statsList.innerHTML = '';
+
+	if (!stats || stats.length === 0) {
+		_statsEmpty.classList.remove('update-hidden');
+		return;
+	}
+
+	_statsEmpty.classList.add('update-hidden');
+	stats.forEach(classStats => {
+		_statsList.appendChild(createStatsClassCard(classStats));
+	});
+}
+
+function createStatsClassCard(classStats) {
+	const card = document.createElement('section');
+	card.className = 'stats-class-card';
+
+	const title = document.createElement('h3');
+	title.innerText = classStats.className || 'Klasse';
+	card.appendChild(title);
+
+	const rows = [
+		['Anzahl Personen', formatInteger(classStats.personCount)],
+		['Repetitionen total', formatInteger(classStats.repetitionsTotal)],
+		['Durchschnittliche Note der Klasse', formatDecimal(classStats.averageGrade)],
+		['Person mit den meisten Repetitionen', formatTopRepetitionPerson(classStats)],
+		['Durchschnittliche Repetitionen pro Person', formatDecimal(classStats.averageRepetitionsPerPerson)]
+	];
+
+	rows.forEach(([label, value]) => {
+		const row = document.createElement('div');
+		row.className = 'stats-row';
+
+		const labelElement = document.createElement('span');
+		labelElement.innerText = label;
+
+		const valueElement = document.createElement('strong');
+		valueElement.innerText = value;
+
+		row.appendChild(labelElement);
+		row.appendChild(valueElement);
+		card.appendChild(row);
+	});
+
+	return card;
+}
+
+function formatTopRepetitionPerson(classStats) {
+	const person = classStats && classStats.topRepetitionPerson;
+	if (!person || !person.name) return '–';
+	const additionalCount = Number(classStats.topRepetitionAdditionalCount || 0);
+	return `${person.name} (${formatInteger(person.repetitions)})${additionalCount > 0 ? ` + ${additionalCount} weitere` : ''}`;
+}
+
+function formatInteger(value) {
+	const number = Number(value);
+	return Number.isFinite(number) ? String(number) : '–';
+}
+
+function formatDecimal(value) {
+	const number = Number(value);
+	return Number.isFinite(number) ? number.toFixed(2) : '–';
 }
 
 function renderExcelEditor() {
@@ -1790,9 +1893,7 @@ function updateNeverSelectedBoostField() {
 
 function updateWiggersRuleFields() {
 	const isEnabled = _wiggersRuleSetting.checked;
-	_wiggersRulePenaltySetting.disabled = !isEnabled;
 	_wiggersRuleDurationSetting.disabled = !isEnabled;
-	_wiggersRulePenaltySetting.closest('.setting-field').classList.toggle('setting-disabled', !isEnabled);
 	_wiggersRuleDurationSetting.closest('.setting-field').classList.toggle('setting-disabled', !isEnabled);
 }
 
@@ -1807,20 +1908,6 @@ function updateLogoAnimation(isEnabled) {
 			_title.classList.add('logo-animation-kick');
 		}
 	}
-}
-
-function hideStartupSplash() {
-	if (!_startupSplash) return;
-	setTimeout(() => {
-		_startupSplash.classList.add('startup-splash-hidden');
-		setTimeout(() => {
-			ipcRenderer.send('startup-splash-finished');
-			if (_container) {
-				_container.classList.remove('startup-active');
-				requestAnimationFrame(() => animateRestore());
-			}
-		}, 650);
-	}, 2600);
 }
 
 function animateMinimize() {
@@ -1867,4 +1954,4 @@ Math.clamp = function(a, b, c) {
 }
 
 // automatically scale the name on load
-module.exports = [scaleName(), updateState(), version(), hideStartupSplash(), ipcRenderer.send('get-debug-mode'), ipcRenderer.send('get-ui-settings'), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status'), ipcRenderer.send('get-undo-status')];
+module.exports = [scaleName(), updateState(), version(), ipcRenderer.send('get-debug-mode'), ipcRenderer.send('get-ui-settings'), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status'), ipcRenderer.send('get-undo-status')];

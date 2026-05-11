@@ -1,6 +1,6 @@
 {
   "name": "repetierer",
-  "version": "6.1.3",
+  "version": "6.1.4",
   "description": "(:",
   "license": "GPL-3.0",
   "repository": {
@@ -26,6 +26,8 @@
       "app.js",
       "src/**/*",
       "public/index.html",
+      "public/splash.html",
+      "public/splash.js",
       "public/renderProcess.js",
       "public/style.css",
       "public/tailwind.css",

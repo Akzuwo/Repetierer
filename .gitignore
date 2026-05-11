@@ -108,6 +108,7 @@ dist
 
 # Builds
 builds
+release_notes.md
 
 # Local importer test files
 importer-samples/

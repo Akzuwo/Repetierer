@@ -27,7 +27,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate release notes
+        id: release-notes
+        run: node scripts/generate-release-notes.js
+
       - name: Build and publish release
         run: npm run release:ci
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update release body
+        run: gh release edit "${{ steps.release-notes.outputs.tag }}" --notes-file "${{ steps.release-notes.outputs.release_notes_path }}"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

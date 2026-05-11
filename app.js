@@ -3,7 +3,8 @@ const fs = require('fs');
 const path = require('path');
 require('./src/mainProcess.js');
 
-let win;
+let mainWindow;
+let splashWindow;
 let autoUpdater;
 const isDebugMode = process.argv.includes('--dev-mode');
 const mainWindowSize = { width: 1100, height: 800 };
@@ -19,9 +20,18 @@ const updateFeed = {
 	releaseType: 'release'
 };
 
-// initialize the window
-function initWindow() {
-	win = new BrowserWindow({
+function getWindowPreferences() {
+	return {
+		nodeIntegration: true,
+		contextIsolation: false,
+		spellcheck: false,
+		devTools: isDebugMode,
+		backgroundThrottling: true
+	};
+}
+
+function createSplashWindow() {
+	splashWindow = new BrowserWindow({
 		width: startupWindowSize.width,
 		height: startupWindowSize.height,
 		resizable: false,
@@ -30,52 +40,71 @@ function initWindow() {
 		frame: false,
 		center: true,
 		icon: path.join(__dirname, 'public', 'icons', 'icon.ico'),
-		webPreferences: {
-			nodeIntegration: true,
-			contextIsolation: false,
-			spellcheck: false,
-			devTools: isDebugMode,
-			backgroundThrottling: true
-		},
+		webPreferences: getWindowPreferences(),
+	});
+
+	console.log('Splash erstellt');
+	splashWindow.loadFile('public/splash.html');
+	splashWindow.on('closed', () => {
+		splashWindow = null;
 	});
 }
 
-ipcMain.on('startup-splash-finished', () => {
-	if (!win || win.isDestroyed()) return;
-	win.setSize(mainWindowSize.width, mainWindowSize.height, true);
-	win.center();
-});
+function createMainWindow() {
+	if (mainWindow && !mainWindow.isDestroyed()) return;
 
-// load the index.html file and display it
-function loadHTML() {
-	win.loadFile('public/index.html')
-}
+	mainWindow = new BrowserWindow({
+		width: mainWindowSize.width,
+		height: mainWindowSize.height,
+		resizable: false,
+		transparent: true,
+		backgroundColor: '#00000000',
+		frame: false,
+		center: true,
+		show: false,
+		icon: path.join(__dirname, 'public', 'icons', 'icon.ico'),
+		webPreferences: getWindowPreferences(),
+	});
 
-// close the window
-function closeWindow() {
-	win = null;
-}
-
-function createApp() {
-	initWindow();
-	loadHTML();
-	win.webContents.on('did-finish-load', () => {
+	console.log('MainWindow erstellt');
+	mainWindow.loadFile('public/index.html');
+	mainWindow.once('ready-to-show', () => {
+		if (!mainWindow || mainWindow.isDestroyed()) return;
+		console.log('MainWindow ready');
+		mainWindow.show();
+		closeSplashWindow();
+	});
+	mainWindow.webContents.on('did-finish-load', () => {
 		notifyInstalledUpdateIfNeeded();
 		checkForUpdatesWithConsent();
 	});
-	win.on('restore', () => {
+	mainWindow.on('restore', () => {
 		sendWindowRestored();
 	});
-	win.on('close', () => {
-		closeWindow();
-	})
+	mainWindow.on('closed', () => {
+		mainWindow = null;
+	});
+}
+
+function closeSplashWindow() {
+	if (!splashWindow || splashWindow.isDestroyed()) return;
+	splashWindow.close();
+	console.log('Splash geschlossen');
+}
+
+function createApp() {
+	createSplashWindow();
 }
 
 function sendWindowRestored() {
-	if (win && !win.isDestroyed() && win.webContents) {
-		win.webContents.send('window-restored');
+	if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
+		mainWindow.webContents.send('window-restored');
 	}
 }
+
+ipcMain.on('startup-splash-finished', () => {
+	createMainWindow();
+});
 
 function checkForUpdatesWithConsent() {
 	if (updateCheckStarted) return;
@@ -224,8 +253,8 @@ function notifyInstalledUpdateIfNeeded() {
 
 function sendUpdateStatus(status, data) {
 	const payload = Object.assign({ status: status }, data || {});
-	if (win && !win.isDestroyed() && win.webContents) {
-		win.webContents.send('update-status', payload);
+	if (mainWindow && !mainWindow.isDestroyed() && mainWindow.webContents) {
+		mainWindow.webContents.send('update-status', payload);
 	}
 }
 

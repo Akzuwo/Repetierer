@@ -1,10 +1,11 @@
-const { init, read, read_editor_persons, write_grade, write_joker, edit_persons, apply_entries, undo_entry, getJokerMigrationStatus, migrate_jokers, award_extra_jokers_after_three } = require('./excelReader.js');
+const { init, read, read_editor_persons, read_class_statistics, write_grade, write_joker, edit_persons, apply_entries, undo_entry, getJokerMigrationStatus, migrate_jokers, award_extra_jokers_after_three } = require('./excelReader.js');
 const { getAppSettings, getFileMigrationStatus, getWiggersRulePenalties, markFileMigrationCompleted, saveWiggersRulePenalty, removeWiggersRulePenalty } = require('./storage.js');
 let cls;
 let persons;
 let person;
 let filePath;
 const absences = new Set();
+let absenceDate = getFormattedDate();
 const wiggersRulePenalties = new Map();
 const EXTRA_JOKER_MIGRATION_ID = 'extra-joker-after-three-existing-data';
 
@@ -33,7 +34,12 @@ function getEditorPersons() {
 	return read_editor_persons(cls) || [];
 }
 
+function getClassStatistics() {
+	return read_class_statistics() || [];
+}
+
 function getAbsencePersons() {
+	resetAbsencesIfDateChanged();
 	return getEditorPersons().map(e => ({
 		id: e.id,
 		name: e.name,
@@ -44,6 +50,7 @@ function getAbsencePersons() {
 }
 
 function setAbsences(absentIds, callback) {
+	resetAbsencesIfDateChanged();
 	if (!cls) {
 		callback({ success: false, reason: 'no-class-selected' });
 		return;
@@ -93,20 +100,21 @@ function selectPerson() {
 	if (!persons || persons.length === 0) return null;
 
 	const weightedPersons = getWeightedPersons();
-	if (weightedPersons.length === 0) return null;
-	const totalWeight = weightedPersons.reduce((sum, e) => sum + e.weight, 0);
+	const selectablePersons = weightedPersons.filter(e => e.weight > 0);
+	if (selectablePersons.length === 0) return null;
+	const totalWeight = selectablePersons.reduce((sum, e) => sum + e.weight, 0);
 	let randomWeight = Math.random() * totalWeight;
 	person = null;
 
-	for (let i = 0; i < weightedPersons.length; i++) {
-		randomWeight -= weightedPersons[i].weight;
+	for (let i = 0; i < selectablePersons.length; i++) {
+		randomWeight -= selectablePersons[i].weight;
 		if (randomWeight <= 0) {
-			person = weightedPersons[i].person;
+			person = selectablePersons[i].person;
 			break;
 		}
 	}
 
-	if (!person) person = weightedPersons[weightedPersons.length - 1].person;
+	if (!person) person = selectablePersons[selectablePersons.length - 1].person;
 	return getPersonResult(person);
 }
 
@@ -125,7 +133,7 @@ function getWeightedPersons() {
 		}
 		const wiggersRule = getWiggersRuleState(e.id, settings, storedPenalties);
 		if (wiggersRule.active) {
-			weight *= settings.wiggersRulePenaltyFactor;
+			weight = 0;
 		}
 
 		return {
@@ -332,6 +340,7 @@ function getFormattedDate() {
 
 function filterAbsentPersons(personList) {
 	if (!personList) return personList;
+	resetAbsencesIfDateChanged();
 	return personList.filter(e => !isPersonAbsent(e.id));
 }
 
@@ -341,11 +350,19 @@ function isPersonAbsent(personId) {
 }
 
 function getAbsenceKeyPrefix() {
+	resetAbsencesIfDateChanged();
 	return `${cls}::${getFormattedDate()}::`;
 }
 
 function getAbsenceKey(personId) {
 	return `${getAbsenceKeyPrefix()}${Number(personId)}`;
+}
+
+function resetAbsencesIfDateChanged() {
+	const today = getFormattedDate();
+	if (absenceDate === today) return;
+	absences.clear();
+	absenceDate = today;
 }
 
 function activateWiggersRule(personId) {
@@ -373,6 +390,10 @@ function deactivateWiggersRuleForEntry(entry) {
 	if (entry && entry.type === 'joker') {
 		deactivateWiggersRule(entry.personId);
 	}
+}
+
+function clearWiggersRulePenalties() {
+	wiggersRulePenalties.clear();
 }
 
 function getWiggersRuleState(personId, settings, storedPenalties) {
@@ -419,6 +440,7 @@ module.exports = {
 	migrateExtraJokersAfterThree: migrateExtraJokersAfterThree,
 	getPersons: getPersons,
 	getEditorPersons: getEditorPersons,
+	getClassStatistics: getClassStatistics,
 	getProbabilities: getProbabilities,
 	selectSpecificPerson: selectSpecificPerson,
 	getAbsencePersons: getAbsencePersons,
@@ -427,4 +449,5 @@ module.exports = {
 	redoExcelEntry: redoExcelEntry,
 	activateWiggersRuleForEntry: activateWiggersRuleForEntry,
 	deactivateWiggersRuleForEntry: deactivateWiggersRuleForEntry,
+	clearWiggersRulePenalties: clearWiggersRulePenalties,
 }

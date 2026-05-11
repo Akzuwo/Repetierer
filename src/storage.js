@@ -9,7 +9,6 @@ const defaultAppSettings = {
 	neverSelectedBoostFactor: 3,
 	logoAnimationEnabled: false,
 	wiggersRuleEnabled: true,
-	wiggersRulePenaltyFactor: 0.05,
 	wiggersRuleDurationMinutes: 120
 };
 const MAX_BACKUP_PREVIEW_ENTRIES = 100;
@@ -72,6 +71,10 @@ function removeWiggersRulePenalty(key) {
 	saveSettings({ wiggersRulePenalties: penalties });
 }
 
+function clearWiggersRulePenalties() {
+	saveSettings({ wiggersRulePenalties: {} });
+}
+
 function getMigrations() {
 	const migrations = readJson(getPaths().migrationsPath, { files: {} });
 	if (!migrations.files) migrations.files = {};
@@ -132,21 +135,21 @@ function getAppSettings() {
 		neverSelectedBoostFactor: normalizeFactor(settings.neverSelectedBoostFactor, defaultAppSettings.neverSelectedBoostFactor),
 		logoAnimationEnabled: !!settings.logoAnimationEnabled,
 		wiggersRuleEnabled: settings.wiggersRuleEnabled !== false,
-		wiggersRulePenaltyFactor: normalizePenaltyFactor(settings.wiggersRulePenaltyFactor, defaultAppSettings.wiggersRulePenaltyFactor),
 		wiggersRuleDurationMinutes: normalizeDuration(settings.wiggersRuleDurationMinutes, defaultAppSettings.wiggersRuleDurationMinutes)
 	});
 }
 
 function saveAppSettings(settings) {
+	const wiggersRuleEnabled = settings.wiggersRuleEnabled !== false;
 	saveSettings({
 		extraJokerAfterThreeGrades: !!settings.extraJokerAfterThreeGrades,
 		probabilityDecreaseFactor: normalizeFactor(settings.probabilityDecreaseFactor, defaultAppSettings.probabilityDecreaseFactor),
 		boostNeverSelected: !!settings.boostNeverSelected,
 		neverSelectedBoostFactor: normalizeFactor(settings.neverSelectedBoostFactor, defaultAppSettings.neverSelectedBoostFactor),
 		logoAnimationEnabled: !!settings.logoAnimationEnabled,
-		wiggersRuleEnabled: settings.wiggersRuleEnabled !== false,
-		wiggersRulePenaltyFactor: normalizePenaltyFactor(settings.wiggersRulePenaltyFactor, defaultAppSettings.wiggersRulePenaltyFactor),
-		wiggersRuleDurationMinutes: normalizeDuration(settings.wiggersRuleDurationMinutes, defaultAppSettings.wiggersRuleDurationMinutes)
+		wiggersRuleEnabled: wiggersRuleEnabled,
+		wiggersRuleDurationMinutes: normalizeDuration(settings.wiggersRuleDurationMinutes, defaultAppSettings.wiggersRuleDurationMinutes),
+		...(wiggersRuleEnabled ? {} : { wiggersRulePenalties: {} })
 	});
 }
 
@@ -154,12 +157,6 @@ function normalizeFactor(value, fallback) {
 	const factor = Number(value);
 	if (!Number.isFinite(factor)) return fallback;
 	return Math.max(1.1, Math.min(10, factor));
-}
-
-function normalizePenaltyFactor(value, fallback) {
-	const factor = Number(value);
-	if (!Number.isFinite(factor)) return fallback;
-	return Math.max(0.01, Math.min(1, factor));
 }
 
 function normalizeDuration(value, fallback) {
@@ -282,6 +279,7 @@ module.exports = {
 	markFileMigrationCompleted,
 	saveWiggersRulePenalty,
 	removeWiggersRulePenalty,
+	clearWiggersRulePenalties,
 	addBackupEntry,
 	addPendingExcelEntry,
 	removePendingExcelEntries,

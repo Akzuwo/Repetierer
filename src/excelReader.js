@@ -2,6 +2,7 @@ const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { buildClassStatistics } = require('./classStats.js');
 let f;
 let wb;
 let ws;
@@ -30,9 +31,6 @@ function init(file, callback) {
 function read(clss) {
 	ws = wb.getWorksheet(clss);
 
-	const currentDate = new Date();
-	const formattedDate = `${String(currentDate.getDate()).padStart(2, '0')}.${String(currentDate.getMonth() + 1).padStart(2, '0')}.${currentDate.getFullYear()}`;
-
 	// check file
 	if (ws.getCell('A1').value !== 'repetierer') return;
 
@@ -40,12 +38,8 @@ function read(clss) {
 	let persons = [];
 	for (let i = 0; i < 25; i++) {
 		let name = ws.getCell('A' + (i + 6));
-		let joker_date = ws.getCell('Q' + (i + 6))
 
 		if (!name.value) break;
-
-		// check if a person used the joker on the current date
-		if (joker_date.value == formattedDate) continue;
 
 		let grades = countGrades(i)
         let joker = Number(ws.getCell('H' + (i + 6)).value || 0);
@@ -89,6 +83,10 @@ function read_editor_persons(clss) {
 	}
 
 	return persons;
+}
+
+function read_class_statistics() {
+	return buildClassStatistics(wb);
 }
 
 function getFormattedDate() {
@@ -381,7 +379,7 @@ function write_joker(clss, person, callback) {
 	}
 	jokerCell.value = remainingJokers - 1;
 
-	ws.getCell('Q' + (person.id + 6)).value = getFormattedDate();
+	appendJokerDate(ws.getCell('Q' + (person.id + 6)), getFormattedDate());
 	writeWorkbook(clss, callback, { type: 'joker' });
 }
 
@@ -483,7 +481,7 @@ function apply_entries(clss, entries, callback) {
 			const remainingJokers = Number(jokerCell.value || 0);
 			if (remainingJokers <= 0) return;
 			jokerCell.value = remainingJokers - 1;
-			entryWorksheet.getCell('Q' + row).value = entry.date || getFormattedDate();
+			appendJokerDate(entryWorksheet.getCell('Q' + row), entry.date || getFormattedDate());
 			applied.push(entry.id);
 		}
 	});
@@ -551,9 +549,7 @@ function undo_entry(clss, entry, callback) {
 		const jokerCell = entryWorksheet.getCell('H' + row);
 		jokerCell.value = Number(jokerCell.value || 0) + 1;
 		const jokerDateCell = entryWorksheet.getCell('Q' + row);
-		if (!entry.date || sameCellValue(jokerDateCell.value, entry.date)) {
-			jokerDateCell.value = null;
-		}
+		removeJokerDate(jokerDateCell, entry.date);
 
 		writeWorkbook(clss, callback, { type: 'undo-joker' });
 		return;
@@ -564,6 +560,43 @@ function undo_entry(clss, entry, callback) {
 
 function sameCellValue(a, b) {
 	return String(a === null || a === undefined ? '' : a).trim() === String(b === null || b === undefined ? '' : b).trim();
+}
+
+function getJokerHistoryDates(value) {
+	const normalized = String(value === null || value === undefined ? '' : value)
+		.split(/[;,]/)
+		.map(date => date.trim())
+		.filter(Boolean);
+	return normalized;
+}
+
+function appendJokerDate(cell, date) {
+	const dates = getJokerHistoryDates(cell.value);
+	dates.push(date);
+	cell.value = dates.join('; ');
+}
+
+function removeJokerDate(cell, date) {
+	const dates = getJokerHistoryDates(cell.value);
+	if (dates.length === 0) {
+		cell.value = null;
+		return;
+	}
+
+	let indexToRemove = dates.length - 1;
+	if (date) {
+		indexToRemove = -1;
+		for (let i = dates.length - 1; i >= 0; i--) {
+			if (sameCellValue(dates[i], date)) {
+				indexToRemove = i;
+				break;
+			}
+		}
+		if (indexToRemove === -1) return;
+	}
+
+	dates.splice(indexToRemove, 1);
+	cell.value = dates.length > 0 ? dates.join('; ') : null;
 }
 
 function countGradesForRow(worksheet, row) {
@@ -597,6 +630,7 @@ module.exports = {
 	init: init,
 	read: read,
 	read_editor_persons: read_editor_persons,
+	read_class_statistics: read_class_statistics,
 	write_grade: write_grade,
     write_joker: write_joker,
 	edit_persons: edit_persons,

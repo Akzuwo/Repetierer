@@ -1,0 +1,13 @@
+{
+  "6.1.4": {
+    "title": "Performance und Appstart-Fix",
+    "changes": [
+      "Performance verbessert",
+      "Bug beim Appstart behoben",
+      "Splash-Screen rendert die Hauptoberfläche nicht mehr falsch",
+      "Neue Statistik-Ansicht mit Klassenstats hinzugefügt",
+      "Modals optisch an den dunklen App-Look angepasst",
+      "Abwesenheiten werden nach jedem Tag automatisch zurückgesetzt"
+    ]
+  }
+}
