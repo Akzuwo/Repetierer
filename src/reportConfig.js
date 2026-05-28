@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const REPORT_ENDPOINT = 'https://issues.akzuwo.ch';
+const REPORT_ENDPOINT = 'https://issues.akzuwo.ch/report';
 
 function getReportApiKey(appRoot) {
 	if (process.env.REPETIERER_REPORT_API_KEY) return process.env.REPETIERER_REPORT_API_KEY;
