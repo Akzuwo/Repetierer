@@ -1,0 +1,7 @@
+name = "hwm-issue-handler"
+main = "src/index.ts"
+compatibility_date = "2026-05-28"
+
+[[r2_buckets]]
+binding = "REPORT_BUCKET"
+bucket_name = "hwm-issue-reports"

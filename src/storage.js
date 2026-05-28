@@ -55,6 +55,14 @@ function saveSettings(settings) {
 	writeJson(getPaths().settingsPath, Object.assign({}, getSettings(), settings));
 }
 
+function getLastShownUpdateVersion() {
+	return getSettings().lastShownUpdateVersion || '';
+}
+
+function saveLastShownUpdateVersion(version) {
+	saveSettings({ lastShownUpdateVersion: version || '' });
+}
+
 function getWiggersRulePenalties() {
 	return getSettings().wiggersRulePenalties || {};
 }
@@ -286,5 +294,7 @@ module.exports = {
 	removeBackupEntries,
 	logEvent,
 	getLogs,
-	getPaths
+	getPaths,
+	getLastShownUpdateVersion,
+	saveLastShownUpdateVersion
 };

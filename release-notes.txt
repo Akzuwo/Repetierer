@@ -1,0 +1,4 @@
+## 6.2.0
+
+Neu Strukturierung des Drawers und zusätzliche Tooltips.
+Checkboxes im Einstellungsmenü wurden durch Toggle-Switches ersetzt.

@@ -9,6 +9,14 @@ const _drawerToggle = document.getElementById('drawer-toggle');
 const _drawer = document.getElementById('drawer');
 const _drawerScrim = document.getElementById('drawer-scrim');
 const _drawerStatus = document.getElementById('drawer-status');
+const _drawerTitle = document.getElementById('drawer-title');
+const _drawerBackBtn = document.getElementById('drawer-back-btn');
+const _drawerHelpBtn = document.getElementById('drawer-help-btn');
+const _drawerMainView = document.getElementById('drawer-main-view');
+const _drawerDataView = document.getElementById('drawer-data-view');
+const _drawerProtocolView = document.getElementById('drawer-protocol-view');
+const _drawerDataViewBtn = document.getElementById('drawer-data-view-btn');
+const _drawerProtocolViewBtn = document.getElementById('drawer-protocol-view-btn');
 const _file = document.getElementById('drawer-file-btn');
 const _filePath = document.getElementById('file-path');
 const _backupBtn = document.getElementById('backup-btn');
@@ -102,6 +110,10 @@ const _settingsHelpModal = document.getElementById('settings-help-modal');
 const _closeSettingsHelpBtn = document.getElementById('close-settings-help-btn');
 const _closeSettingsHelpBottomBtn = document.getElementById('close-settings-help-bottom-btn');
 const _settingsLocation = document.getElementById('settings-location');
+const _updateNewsModal = document.getElementById('update-news-modal');
+const _updateNewsTitle = document.getElementById('update-news-title');
+const _updateNewsBody = document.getElementById('update-news-body');
+const _closeUpdateNewsBtn = document.getElementById('close-update-news-btn');
 const _extraJokerSetting = document.getElementById('extra-joker-setting');
 const _extraJokerMigrationBtn = document.getElementById('extra-joker-migration-btn');
 const _extraJokerMigrationStatus = document.getElementById('extra-joker-migration-status');
@@ -131,6 +143,8 @@ let _currentClass;
 let _nameSize;
 let updatePrimaryAction = requestUpdateDownload;
 let restoreAnimationActive = false;
+let drawerView = 'main';
+let updateNewsVersion = '';
 
 /*
  * events to main
@@ -157,6 +171,22 @@ _drawerToggle.addEventListener('click', () => {
 
 _drawerScrim.addEventListener('click', () => {
 	closeDrawer();
+});
+
+_drawerBackBtn.addEventListener('click', () => {
+	setDrawerView('main');
+});
+
+_drawerDataViewBtn.addEventListener('click', () => {
+	setDrawerView('data');
+});
+
+_drawerProtocolViewBtn.addEventListener('click', () => {
+	setDrawerView('protocol');
+});
+
+_drawerHelpBtn.addEventListener('click', () => {
+	openTeacherHelp(`drawer-${drawerView}`);
 });
 
 // backup
@@ -416,6 +446,16 @@ _settingsModal.addEventListener('click', (e) => {
 	}
 });
 
+_closeUpdateNewsBtn.addEventListener('click', () => {
+	closeUpdateNewsModal();
+});
+
+_updateNewsModal.addEventListener('click', (e) => {
+	if (e.target === _updateNewsModal) {
+		closeUpdateNewsModal();
+	}
+});
+
 _settingsHelpBtn.addEventListener('click', () => {
 	closeModal(_settingsModal, () => openModal(_settingsHelpModal));
 });
@@ -657,6 +697,10 @@ ipcRenderer.on('joker-migration-failed', (event, result) => {
 
 ipcRenderer.on('version', (event, appVersion) => {
 	document.getElementById("version").innerText = "Repetierer v" + appVersion;
+});
+
+ipcRenderer.on('update-news-data', (event, payload) => {
+	showUpdateNews(payload || {});
 });
 
 ipcRenderer.on('class-statistics-data', (event, stats) => {
@@ -1636,6 +1680,32 @@ function openTeacherHelp(topic) {
 				'Freiwillig erlaubt eine manuelle Auswahl, Chancen zeigt die aktuelle Gewichtung und Abwesend überspringt Personen für den Tag.',
 				'Nach einer Auswahl kann eine Note gespeichert oder ein Joker gesetzt werden. Die runden Pfeile machen die letzte Aktion rückgängig oder stellen sie wieder her.'
 			]
+		},
+		'drawer-main': {
+			title: 'Dateien',
+			paragraphs: [
+				'Datenverwaltung bündelt das Auswählen der Excel-Datei, den Import von Klassenlisten und das Synchronisieren der Excel-Daten.',
+				'Protokoll öffnet Backups, technische Logs und den Export des Sitzungsprotokolls.',
+				'Statistiken zeigt Auswertungen der geladenen Klassen und bleibt direkt aus diesem Menü erreichbar.'
+			]
+		},
+		'drawer-data': {
+			title: 'Datenverwaltung',
+			paragraphs: [
+				'Datei auswählen lädt die Excel-Datei, aus der Klassen, Namen, Noten und Joker gelesen werden.',
+				'Klassenliste importieren übernimmt eine Namensliste aus Excel oder CSV und erstellt daraus eine neue Repetierer-Klasse.',
+				'Excel aktualisieren schreibt wartende lokale Änderungen in die Excel-Datei, sobald Änderungen vorhanden sind.',
+				'Excel neu laden liest die ausgewählte Excel-Datei erneut ein. Bei wartenden lokalen Änderungen bleibt diese Funktion gesperrt.',
+				'Excel bearbeiten öffnet die Bearbeitung von Personen und Jokern der ausgewählten Klasse.'
+			]
+		},
+		'drawer-protocol': {
+			title: 'Protokoll',
+			paragraphs: [
+				'Backup anzeigen zeigt gespeicherte Backup-Einträge dieser Sitzung und Datei.',
+				'Log anzeigen öffnet technische Meldungen, falls etwas geprüft werden muss.',
+				'Protokoll exportieren speichert das Sitzungsprotokoll als PDF und CSV.'
+			]
 		}
 	}[topic];
 
@@ -1668,6 +1738,7 @@ function toggleDrawer() {
 	if (_drawer.classList.contains('drawer-open')) {
 		closeDrawer();
 	} else {
+		setDrawerView('main');
 		_drawer.classList.add('drawer-open');
 		_drawerScrim.classList.add('scrim-visible');
 		_drawerToggle.classList.add('drawer-toggle-open');
@@ -1678,6 +1749,26 @@ function closeDrawer() {
 	_drawer.classList.remove('drawer-open');
 	_drawerScrim.classList.remove('scrim-visible');
 	_drawerToggle.classList.remove('drawer-toggle-open');
+}
+
+function setDrawerView(view) {
+	drawerView = view;
+	_drawerTitle.innerText = view === 'data' ? 'Datenverwaltung' : view === 'protocol' ? 'Protokoll' : 'Dateien';
+
+	[_drawerMainView, _drawerDataView, _drawerProtocolView].forEach(drawerViewElement => {
+		drawerViewElement.classList.add('update-hidden');
+	});
+
+	if (view === 'data') {
+		_drawerDataView.classList.remove('update-hidden');
+		_drawerBackBtn.classList.remove('update-hidden');
+	} else if (view === 'protocol') {
+		_drawerProtocolView.classList.remove('update-hidden');
+		_drawerBackBtn.classList.remove('update-hidden');
+	} else {
+		_drawerMainView.classList.remove('update-hidden');
+		_drawerBackBtn.classList.add('update-hidden');
+	}
 }
 
 function setActiveClassButton(button) {
@@ -1830,6 +1921,50 @@ function requestUpdateDownload() {
 	});
 }
 
+function showUpdateNews(payload) {
+	if (!payload.version || !payload.notes) return;
+
+	updateNewsVersion = payload.version;
+	_updateNewsTitle.innerText = `Update ${payload.version}`;
+	renderUpdateNewsNotes(payload.notes);
+	openModal(_updateNewsModal);
+}
+
+function renderUpdateNewsNotes(notes) {
+	_updateNewsBody.innerHTML = '';
+	let currentList = null;
+
+	String(notes).split(/\r?\n/).forEach(line => {
+		const text = line.trim();
+		if (!text) {
+			currentList = null;
+			return;
+		}
+
+		if (text.startsWith('- ')) {
+			if (!currentList) {
+				currentList = document.createElement('ul');
+				_updateNewsBody.appendChild(currentList);
+			}
+			const item = document.createElement('li');
+			item.innerText = text.slice(2).trim();
+			currentList.appendChild(item);
+			return;
+		}
+
+		currentList = null;
+		const paragraph = document.createElement('p');
+		paragraph.innerText = text;
+		_updateNewsBody.appendChild(paragraph);
+	});
+}
+
+function closeUpdateNewsModal() {
+	closeModal(_updateNewsModal);
+	ipcRenderer.send('update-news-dismissed', updateNewsVersion);
+	updateNewsVersion = '';
+}
+
 function openModal(modal) {
 	modal.classList.remove('modal-closing');
 	modal.style.display = 'block';
@@ -1954,4 +2089,4 @@ Math.clamp = function(a, b, c) {
 }
 
 // automatically scale the name on load
-module.exports = [scaleName(), updateState(), version(), ipcRenderer.send('get-debug-mode'), ipcRenderer.send('get-ui-settings'), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status'), ipcRenderer.send('get-undo-status')];
+module.exports = [scaleName(), updateState(), version(), ipcRenderer.send('get-update-news'), ipcRenderer.send('get-debug-mode'), ipcRenderer.send('get-ui-settings'), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status'), ipcRenderer.send('get-undo-status')];

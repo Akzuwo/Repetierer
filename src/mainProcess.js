@@ -1,7 +1,8 @@
 const { ipcMain, app, BrowserWindow, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { getBackupPreview, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, clearWiggersRulePenalties, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, removeBackupEntries, logEvent, getLogs, getPaths } = require('./storage.js');
+const { getBackupPreview, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, clearWiggersRulePenalties, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, removeBackupEntries, logEvent, getLogs, getPaths, getLastShownUpdateVersion, saveLastShownUpdateVersion } = require('./storage.js');
+const { readReleaseNotesForVersion, stripReleaseNotesHeader } = require('./releaseNotes.js');
 const isDebugMode = process.argv.includes('--dev-mode');
 const sessionEntries = [];
 let lastUndoEntry;
@@ -38,6 +39,27 @@ ipcMain.on('quit', (event, args) => {
 // app version
 ipcMain.on('get-version', (event, args) => {
 	event.sender.send('version', app.getVersion());
+});
+
+ipcMain.on('get-update-news', (event, args) => {
+	const version = app.getVersion();
+	if (getLastShownUpdateVersion() === version) return;
+
+	const section = readReleaseNotesForVersion(app.getAppPath(), version);
+	const notes = stripReleaseNotesHeader(section);
+	if (!notes) return;
+
+	event.sender.send('update-news-data', {
+		version: version,
+		notes: notes
+	});
+});
+
+ipcMain.on('update-news-dismissed', (event, version) => {
+	const currentVersion = app.getVersion();
+	if (version && version !== currentVersion) return;
+	saveLastShownUpdateVersion(currentVersion);
+	logEvent('Update-News angezeigt', { version: currentVersion });
 });
 
 ipcMain.on('get-debug-mode', (event, args) => {

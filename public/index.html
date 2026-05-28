@@ -42,18 +42,34 @@
 
 	<div id="drawer-scrim"></div>
 	<aside id="drawer">
-		<h2>Dateien</h2>
-		<button class="btn-1" id="drawer-file-btn" title="Excel-Datei auswählen, aus der Klassen, Namen, Noten und Joker gelesen werden.">Datei auswählen</button>
-		<p id="file-path"></p>
-		<div class="drawer-actions">
-			<button class="btn-2" id="backup-btn" title="Zeigt gespeicherte Backup-Einträge dieser Sitzung und Datei.">Backup anzeigen</button>
-			<button class="btn-2" id="log-btn" title="Öffnet technische Meldungen, falls etwas geprüft werden muss.">Log anzeigen</button>
-			<button class="btn-2" id="export-protocol-btn" title="Exportiert das Sitzungsprotokoll gleichzeitig als PDF und CSV.">Protokoll exportieren</button>
-			<button class="btn-2 disabled" id="stats-view-btn" title="Zeigt Klassenstatistiken der geladenen Datei.">Statistiken</button>
-			<button class="btn-2" id="import-class-list-btn" title="Importiert eine Namensliste und erstellt daraus eine Repetierer-Klasse.">Klassenliste importieren</button>
-			<button class="btn-2 disabled" id="flush-excel-btn" title="Schreibt wartende lokale Änderungen in die Excel-Datei.">Excel aktualisieren</button>
-			<button class="btn-2" id="reload-excel-btn" title="Liest die ausgewählte Excel-Datei erneut ein.">Excel neu laden</button>
-			<button class="btn-2 disabled" id="excel-editor-btn" title="Bearbeitet Personen und Joker der ausgewählten Klasse direkt in der Excel-Datei.">Excel bearbeiten</button>
+		<div class="drawer-header">
+			<button class="help-button help-button-back drawer-back-button update-hidden" id="drawer-back-btn" title="Zurück">‹</button>
+			<h2 id="drawer-title">Dateien</h2>
+			<button class="help-button mini-help-button" id="drawer-help-btn" title="Erklärung">?</button>
+		</div>
+		<div class="drawer-view" id="drawer-main-view">
+			<div class="drawer-actions">
+				<button class="btn-2" id="drawer-data-view-btn" title="Datei laden, Klassen importieren und Excel-Daten synchronisieren.">Datenverwaltung</button>
+				<button class="btn-2" id="drawer-protocol-view-btn" title="Backups, Logs und Sitzungsprotokolle ansehen oder exportieren.">Protokoll</button>
+				<button class="btn-2 disabled" id="stats-view-btn" title="Zeigt Klassenstatistiken der geladenen Datei.">Statistiken</button>
+			</div>
+		</div>
+		<div class="drawer-view update-hidden" id="drawer-data-view">
+			<button class="btn-1" id="drawer-file-btn" title="Excel-Datei auswählen, aus der Klassen, Namen, Noten und Joker gelesen werden.">Datei auswählen</button>
+			<p id="file-path"></p>
+			<div class="drawer-actions">
+				<button class="btn-2" id="import-class-list-btn" title="Importiert eine Namensliste und erstellt daraus eine Repetierer-Klasse.">Klassenliste importieren</button>
+				<button class="btn-2 disabled" id="flush-excel-btn" title="Schreibt wartende lokale Änderungen in die Excel-Datei.">Excel aktualisieren</button>
+				<button class="btn-2" id="reload-excel-btn" title="Liest die ausgewählte Excel-Datei erneut ein.">Excel neu laden</button>
+				<button class="btn-2 disabled" id="excel-editor-btn" title="Bearbeitet Personen und Joker der ausgewählten Klasse direkt in der Excel-Datei.">Excel bearbeiten</button>
+			</div>
+		</div>
+		<div class="drawer-view update-hidden" id="drawer-protocol-view">
+			<div class="drawer-actions">
+				<button class="btn-2" id="backup-btn" title="Zeigt gespeicherte Backup-Einträge dieser Sitzung und Datei.">Backup anzeigen</button>
+				<button class="btn-2" id="log-btn" title="Öffnet technische Meldungen, falls etwas geprüft werden muss.">Log anzeigen</button>
+				<button class="btn-2" id="export-protocol-btn" title="Exportiert das Sitzungsprotokoll gleichzeitig als PDF und CSV.">Protokoll exportieren</button>
+			</div>
 		</div>
 		<div class="drawer-actions debug-actions update-hidden" id="debug-actions">
 			<button class="btn-2" id="debug-test-alert-btn">Testalert</button>
@@ -297,9 +313,10 @@
 			</div>
 			<div class="settings-scroll-area">
 				<p id="settings-location"></p>
-				<label class="setting-row">
-					<input type="checkbox" id="extra-joker-setting">
-					<span>Extra Joker ab 3 Noten</span>
+				<label class="setting-row setting-toggle">
+					<span class="setting-copy">Extra Joker ab 3 Noten</span>
+					<input class="toggle-input" type="checkbox" id="extra-joker-setting" role="switch">
+					<span class="toggle-switch" aria-hidden="true"></span>
 				</label>
 				<div class="setting-action" id="extra-joker-migration-setting">
 					<span>
@@ -312,24 +329,27 @@
 					<span>Wahrscheinlichkeits-Faktor</span>
 					<input id="probability-factor-setting" type="number" min="1.1" max="10" step="0.1">
 				</label>
-				<label class="setting-row">
-					<input type="checkbox" id="boost-never-selected-setting">
-					<span>Boost für nie ausgewählte Personen</span>
+				<label class="setting-row setting-toggle">
+					<span class="setting-copy">Boost für nie ausgewählte Personen</span>
+					<input class="toggle-input" type="checkbox" id="boost-never-selected-setting" role="switch">
+					<span class="toggle-switch" aria-hidden="true"></span>
 				</label>
 				<label class="setting-field">
 					<span>Boost-Faktor</span>
 					<input id="never-selected-boost-factor-setting" type="number" min="1.1" max="10" step="0.1">
 				</label>
-				<label class="setting-row">
-					<input type="checkbox" id="logo-animation-setting">
-					<span>Titelanimation aktivieren</span>
+				<label class="setting-row setting-toggle">
+					<span class="setting-copy">Titelanimation aktivieren</span>
+					<input class="toggle-input" type="checkbox" id="logo-animation-setting" role="switch">
+					<span class="toggle-switch" aria-hidden="true"></span>
 				</label>
-				<label class="setting-row">
-					<input type="checkbox" id="wiggers-rule-setting">
-					<span>
+				<label class="setting-row setting-toggle">
+					<span class="setting-copy">
 						Wiggersche Regel aktivieren
 						<small>Wenn jemand den Joker setzt, wird diese Person für eine begrenzte Zeit nicht zufällig ausgewählt.</small>
 					</span>
+					<input class="toggle-input" type="checkbox" id="wiggers-rule-setting" role="switch">
+					<span class="toggle-switch" aria-hidden="true"></span>
 				</label>
 				<label class="setting-field">
 					<span>Wiggers-Dauer in Minuten</span>
@@ -339,6 +359,19 @@
 			<div class="modal-buttons">
 				<button class="btn-1" id="save-settings-btn">Speichern</button>
 				<button class="btn-2" id="close-settings-modal">Abbrechen</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="update-news-modal" class="modal">
+		<div class="modal-content update-news-content">
+			<div class="update-news-header">
+				<h2 id="update-news-title">Update</h2>
+				<p class="update-news-kicker">Was ist neu?</p>
+			</div>
+			<div class="update-news-body" id="update-news-body"></div>
+			<div class="modal-buttons info-modal-buttons">
+				<button class="btn-1" id="close-update-news-btn">Verstanden</button>
 			</div>
 		</div>
 	</div>
