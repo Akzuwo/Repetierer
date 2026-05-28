@@ -1,14 +1,18 @@
 const { ipcMain, app, BrowserWindow, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { getBackupPreview, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, clearWiggersRulePenalties, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, removeBackupEntries, logEvent, getLogs, getPaths, getLastShownUpdateVersion, saveLastShownUpdateVersion } = require('./storage.js');
 const { readReleaseNotesForVersion, stripReleaseNotesHeader } = require('./releaseNotes.js');
+const { REPORT_ENDPOINT, getReportApiKey } = require('./reportConfig.js');
 const isDebugMode = process.argv.includes('--dev-mode');
 const sessionEntries = [];
 let lastUndoEntry;
 let lastRedoEntry;
 let programModule;
 let ExcelJSModule;
+const MAX_REPORT_COMMENT_LENGTH = 4000;
+const MAX_REPORT_LOG_LENGTH = 200000;
 
 function getProgram() {
 	if (!programModule) programModule = require('./program.js');
@@ -239,6 +243,58 @@ ipcMain.on('get-backup', (event, args) => {
 ipcMain.on('get-logs', (event, args) => {
 	logEvent('Log geöffnet');
 	event.sender.send('log-data', getLogs(), getPaths());
+});
+
+ipcMain.on('get-report-preview', (event, args) => {
+	event.sender.send('report-preview-data', buildReportPayload(''));
+});
+
+ipcMain.on('send-problem-report', async (event, args) => {
+	const comment = args && typeof args.comment === 'string' ? args.comment : '';
+	const payload = buildReportPayload(comment.slice(0, MAX_REPORT_COMMENT_LENGTH));
+	const headers = {
+		'Content-Type': 'application/json'
+	};
+	const reportApiKey = getReportApiKey(app.getPath('userData'));
+	if (reportApiKey) headers.Authorization = `Bearer ${reportApiKey}`;
+
+	try {
+		const response = await fetch(REPORT_ENDPOINT, {
+			method: 'POST',
+			headers: headers,
+			body: JSON.stringify(payload)
+		});
+		const responseText = await response.text();
+		let responseBody = {};
+		try {
+			responseBody = responseText ? JSON.parse(responseText) : {};
+		} catch (error) {
+			responseBody = {};
+		}
+
+		if (!response.ok || !responseBody.ok) {
+			const errorCode = responseBody && responseBody.error ? responseBody.error : `http_${response.status}`;
+			logEvent('Fehlerbericht konnte nicht gesendet werden', { error: errorCode, status: response.status });
+			event.sender.send('problem-report-result', {
+				ok: false,
+				error: errorCode
+			});
+			return;
+		}
+
+		logEvent('Fehlerbericht gesendet', { id: responseBody.id });
+		event.sender.send('problem-report-result', {
+			ok: true,
+			id: responseBody.id || '',
+			storedAs: responseBody.storedAs || ''
+		});
+	} catch (error) {
+		logEvent('Fehlerbericht konnte nicht gesendet werden', { error: getErrorMessage(error) });
+		event.sender.send('problem-report-result', {
+			ok: false,
+			error: 'network_error'
+		});
+	}
 });
 
 // pending excel entries
@@ -979,6 +1035,43 @@ function escapeHtml(value) {
 		.replace(/>/g, '&gt;')
 		.replace(/"/g, '&quot;')
 		.replace(/'/g, '&#39;');
+}
+
+function buildReportPayload(comment) {
+	return {
+		appVersion: app.getVersion(),
+		windowsUser: getWindowsUserName(),
+		comment: typeof comment === 'string' ? comment : '',
+		log: getSanitizedReportLog(),
+		clientTimestamp: new Date().toISOString(),
+		os: `${os.type()} ${os.release()}`,
+		platform: process.platform,
+		appName: app.getName()
+	};
+}
+
+function getWindowsUserName() {
+	try {
+		return os.userInfo().username || '';
+	} catch (error) {
+		return process.env.USERNAME || process.env.USER || '';
+	}
+}
+
+function getSanitizedReportLog() {
+	const logs = getLogs();
+	if (!logs || !logs.trim()) return '';
+	return sanitizeReportLog(logs).slice(-MAX_REPORT_LOG_LENGTH);
+}
+
+function sanitizeReportLog(logs) {
+	return String(logs)
+		.replace(/(authorization|bearer|token|api[_-]?key|password|passwort|secret)(["'\s:=]+)([^"',\s}]+)/gi, '$1$2[REDACTED]')
+		.replace(/("(?:filePath|sourcePath|targetPath|backupPath|settingsPath|logPath)"\s*:\s*)"[^"]*"/gi, '$1"[PATH_REDACTED]"')
+		.replace(/("(?:filePaths)"\s*:\s*)\[[^\]]*\]/gi, '$1["PATH_REDACTED"]')
+		.replace(/("(?:personName|className|name)"\s*:\s*)"[^"]*"/gi, '$1"[REDACTED]"')
+		.replace(/[A-Za-z]:\\(?:[^\\\r\n"',}]+\\)*[^\\\r\n"',}]*/g, '[PATH_REDACTED]')
+		.replace(/\/(?:Users|home)\/[^\s"',}]+/g, '[PATH_REDACTED]');
 }
 
 function getErrorMessage(error) {

@@ -69,6 +69,7 @@
 				<button class="btn-2" id="backup-btn" title="Zeigt gespeicherte Backup-Einträge dieser Sitzung und Datei.">Backup anzeigen</button>
 				<button class="btn-2" id="log-btn" title="Öffnet technische Meldungen, falls etwas geprüft werden muss.">Log anzeigen</button>
 				<button class="btn-2" id="export-protocol-btn" title="Exportiert das Sitzungsprotokoll gleichzeitig als PDF und CSV.">Protokoll exportieren</button>
+				<button class="btn-2" id="problem-report-btn" title="Sendet einen Fehlerbericht mit Kommentar und bereinigten Logs.">Problem melden</button>
 			</div>
 		</div>
 		<div class="drawer-actions debug-actions update-hidden" id="debug-actions">
@@ -189,6 +190,31 @@
 			<div class="modal-buttons">
 				<button class="btn-1" id="copy-log-btn">Logs kopieren</button>
 				<button class="btn-2" id="close-log-modal">Schließen</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="problem-report-modal" class="modal">
+		<div class="modal-content problem-report-content">
+			<h2>Problem melden</h2>
+			<p class="excel-editor-help">Sende einen Fehlerbericht, damit das Problem besser analysiert werden kann.</p>
+			<p class="privacy-note">Gesendet werden App-Version, Windoofs-Benutzername, dein Kommentar und die letzten Logeinträge. Es werden keine Excel-Dateien oder Klassendaten übertragen.</p>
+			<label class="setting-field">
+				<span>Kommentar</span>
+				<textarea id="problem-report-comment" maxlength="4000" placeholder="Was ist passiert? Was hast du gerade gemacht?"></textarea>
+			</label>
+			<div class="problem-report-preview">
+				<div class="problem-report-preview-header">
+					<h3>Vorschau</h3>
+					<button class="btn-2" id="toggle-problem-report-details-btn">Details anzeigen</button>
+				</div>
+				<div id="problem-report-summary"></div>
+				<pre class="update-hidden" id="problem-report-details"></pre>
+			</div>
+			<p class="report-status" id="problem-report-status"></p>
+			<div class="modal-buttons">
+				<button class="btn-1" id="send-problem-report-btn">Senden</button>
+				<button class="btn-2" id="close-problem-report-btn">Abbrechen</button>
 			</div>
 		</div>
 	</div>

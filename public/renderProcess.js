@@ -22,6 +22,7 @@ const _filePath = document.getElementById('file-path');
 const _backupBtn = document.getElementById('backup-btn');
 const _logBtn = document.getElementById('log-btn');
 const _exportProtocolBtn = document.getElementById('export-protocol-btn');
+const _problemReportBtn = document.getElementById('problem-report-btn');
 const _statsViewBtn = document.getElementById('stats-view-btn');
 const _importClassListBtn = document.getElementById('import-class-list-btn');
 const _undoLastBtn = document.getElementById('undo-last-btn');
@@ -71,6 +72,14 @@ const _logList = document.getElementById('log-list');
 const _logLocation = document.getElementById('log-location');
 const _copyLogBtn = document.getElementById('copy-log-btn');
 const _closeLogModal = document.getElementById('close-log-modal');
+const _problemReportModal = document.getElementById('problem-report-modal');
+const _problemReportComment = document.getElementById('problem-report-comment');
+const _problemReportSummary = document.getElementById('problem-report-summary');
+const _problemReportDetails = document.getElementById('problem-report-details');
+const _problemReportStatus = document.getElementById('problem-report-status');
+const _sendProblemReportBtn = document.getElementById('send-problem-report-btn');
+const _closeProblemReportBtn = document.getElementById('close-problem-report-btn');
+const _toggleProblemReportDetailsBtn = document.getElementById('toggle-problem-report-details-btn');
 const _reloadConflictModal = document.getElementById('reload-conflict-modal');
 const _conflictFlushBtn = document.getElementById('conflict-flush-btn');
 const _conflictForceReloadBtn = document.getElementById('conflict-force-reload-btn');
@@ -145,6 +154,8 @@ let updatePrimaryAction = requestUpdateDownload;
 let restoreAnimationActive = false;
 let drawerView = 'main';
 let updateNewsVersion = '';
+let problemReportPreview = null;
+let problemReportSending = false;
 
 /*
  * events to main
@@ -202,6 +213,10 @@ _exportProtocolBtn.addEventListener('click', () => {
 	ipcRenderer.send('export-session-protocol', 'both');
 });
 
+_problemReportBtn.addEventListener('click', () => {
+	openProblemReportModal();
+});
+
 _statsViewBtn.addEventListener('click', () => {
 	openStatsView();
 });
@@ -251,6 +266,30 @@ _logModal.addEventListener('click', (e) => {
 	if (e.target === _logModal) {
 		_logModal.style.display = 'none';
 	}
+});
+
+_closeProblemReportBtn.addEventListener('click', () => {
+	closeProblemReportModal();
+});
+
+_problemReportModal.addEventListener('click', (e) => {
+	if (e.target === _problemReportModal) {
+		closeProblemReportModal();
+	}
+});
+
+_problemReportComment.addEventListener('input', () => {
+	renderProblemReportPreview();
+});
+
+_toggleProblemReportDetailsBtn.addEventListener('click', () => {
+	const isHidden = _problemReportDetails.classList.contains('update-hidden');
+	_problemReportDetails.classList.toggle('update-hidden', !isHidden);
+	_toggleProblemReportDetailsBtn.innerText = isHidden ? 'Details ausblenden' : 'Details anzeigen';
+});
+
+_sendProblemReportBtn.addEventListener('click', () => {
+	sendProblemReport();
 });
 
 // probabilities
@@ -1204,6 +1243,33 @@ ipcRenderer.on('log-data', (event, logs, paths) => {
 	_logModal.style.display = 'block';
 });
 
+ipcRenderer.on('report-preview-data', (event, payload) => {
+	problemReportPreview = payload || {};
+	renderProblemReportPreview();
+});
+
+ipcRenderer.on('problem-report-result', (event, result) => {
+	problemReportSending = false;
+	_sendProblemReportBtn.innerText = 'Senden';
+	enableElement(_sendProblemReportBtn);
+
+	if (result && result.ok) {
+		const reportIdText = result.id ? ` ID: ${result.id}` : '';
+		setProblemReportStatus(`Fehlerbericht wurde gesendet.${reportIdText}`, 'success');
+		showUpdatePanel({
+			title: 'Fehlerbericht wurde gesendet',
+			detail: result.id ? `Report-ID: ${result.id}` : 'Danke. Der Bericht wurde gespeichert.',
+			primaryVisible: false,
+			secondaryText: 'OK',
+			secondaryVisible: true
+		});
+		setTimeout(() => closeProblemReportModal(), 650);
+		return;
+	}
+
+	setProblemReportStatus('Fehlerbericht konnte nicht gesendet werden. Bitte prüfe deine Internetverbindung.', 'error');
+});
+
 ipcRenderer.on('probability-data', (event, probabilities) => {
 	_probabilityList.innerHTML = '';
 
@@ -1685,7 +1751,7 @@ function openTeacherHelp(topic) {
 			title: 'Dateien',
 			paragraphs: [
 				'Datenverwaltung bündelt das Auswählen der Excel-Datei, den Import von Klassenlisten und das Synchronisieren der Excel-Daten.',
-				'Protokoll öffnet Backups, technische Logs und den Export des Sitzungsprotokolls.',
+				'Protokoll öffnet Backups, technische Logs, den Export des Sitzungsprotokolls und das Melden von Problemen.',
 				'Statistiken zeigt Auswertungen der geladenen Klassen und bleibt direkt aus diesem Menü erreichbar.'
 			]
 		},
@@ -1704,7 +1770,8 @@ function openTeacherHelp(topic) {
 			paragraphs: [
 				'Backup anzeigen zeigt gespeicherte Backup-Einträge dieser Sitzung und Datei.',
 				'Log anzeigen öffnet technische Meldungen, falls etwas geprüft werden muss.',
-				'Protokoll exportieren speichert das Sitzungsprotokoll als PDF und CSV.'
+				'Protokoll exportieren speichert das Sitzungsprotokoll als PDF und CSV.',
+				'Problem melden sendet einen bereinigten Fehlerbericht mit Kommentar und den letzten Logeinträgen.'
 			]
 		}
 	}[topic];
@@ -1963,6 +2030,81 @@ function closeUpdateNewsModal() {
 	closeModal(_updateNewsModal);
 	ipcRenderer.send('update-news-dismissed', updateNewsVersion);
 	updateNewsVersion = '';
+}
+
+function openProblemReportModal() {
+	problemReportPreview = null;
+	problemReportSending = false;
+	_problemReportComment.value = '';
+	_problemReportSummary.innerHTML = '';
+	_problemReportDetails.innerText = 'Vorschau wird geladen...';
+	_problemReportDetails.classList.add('update-hidden');
+	_toggleProblemReportDetailsBtn.innerText = 'Details anzeigen';
+	setProblemReportStatus('', '');
+	_sendProblemReportBtn.innerText = 'Senden';
+	enableElement(_sendProblemReportBtn);
+	openModal(_problemReportModal);
+	ipcRenderer.send('get-report-preview');
+}
+
+function closeProblemReportModal() {
+	if (problemReportSending) return;
+	closeModal(_problemReportModal);
+}
+
+function renderProblemReportPreview() {
+	if (!problemReportPreview) return;
+
+	const payload = Object.assign({}, problemReportPreview, {
+		comment: _problemReportComment.value || ''
+	});
+	const summaryRows = [
+		['App-Version', payload.appVersion || ''],
+		['Windoofs-Benutzer', payload.windowsUser || ''],
+		['Kommentar', payload.comment ? `${payload.comment.length} Zeichen` : 'leer'],
+		['Log', payload.log ? `${payload.log.length} Zeichen, bereinigt und gekürzt` : 'leer'],
+		['Zeitpunkt', payload.clientTimestamp || ''],
+		['System', [payload.os, payload.platform].filter(Boolean).join(' / ')],
+		['App', payload.appName || '']
+	];
+
+	_problemReportSummary.innerHTML = '';
+	summaryRows.forEach(([label, value]) => {
+		const row = document.createElement('div');
+		row.className = 'report-summary-row';
+		const labelElement = document.createElement('span');
+		labelElement.innerText = label;
+		const valueElement = document.createElement('strong');
+		valueElement.innerText = value || '-';
+		row.appendChild(labelElement);
+		row.appendChild(valueElement);
+		_problemReportSummary.appendChild(row);
+	});
+
+	_problemReportDetails.innerText = JSON.stringify(payload, null, 2);
+}
+
+function sendProblemReport() {
+	if (problemReportSending) return;
+	if ((_problemReportComment.value || '').length > 4000) {
+		setProblemReportStatus('Der Kommentar ist zu lang.', 'error');
+		return;
+	}
+
+	problemReportSending = true;
+	setProblemReportStatus('Fehlerbericht wird gesendet...', '');
+	_sendProblemReportBtn.innerText = 'Senden...';
+	disableElement(_sendProblemReportBtn);
+	ipcRenderer.send('send-problem-report', {
+		comment: _problemReportComment.value || ''
+	});
+}
+
+function setProblemReportStatus(message, type) {
+	_problemReportStatus.innerText = message || '';
+	_problemReportStatus.classList.remove('report-status-error', 'report-status-success');
+	if (type === 'error') _problemReportStatus.classList.add('report-status-error');
+	if (type === 'success') _problemReportStatus.classList.add('report-status-success');
 }
 
 function openModal(modal) {

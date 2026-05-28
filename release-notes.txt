@@ -2,3 +2,4 @@
 
 Neu Strukturierung des Drawers und zusätzliche Tooltips.
 Checkboxes im Einstellungsmenü wurden durch Toggle-Switches ersetzt.
+Neues Fehlermeldungs Formular
