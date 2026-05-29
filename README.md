@@ -1,5 +1,5 @@
 
-![](https://raw.githubusercontent.com/Akuzwo/Repetierer/master/public/images/banner.png)
+![](https://raw.githubusercontent.com/Akzuwo/Repetierer/master/public/images/banner.png)
 
 # Repetierer
 
