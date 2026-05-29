@@ -1,5 +1,5 @@
 
-![](https://raw.githubusercontent.com/srpnt3/Repetierer/master/public/images/banner.png)
+![](https://raw.githubusercontent.com/Akuzwo/Repetierer/master/public/images/banner.png)
 
 # Repetierer
 
