@@ -4,7 +4,7 @@ const path = require('path');
 const os = require('os');
 const { getBackupPreview, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, clearWiggersRulePenalties, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, removeBackupEntries, logEvent, getLogs, getPaths, getLastShownUpdateVersion, saveLastShownUpdateVersion } = require('./storage.js');
 const { readReleaseNotesForVersion, stripReleaseNotesHeader } = require('./releaseNotes.js');
-const { REPORT_ENDPOINT, getReportApiKey } = require('./reportConfig.js');
+const { ANALYTICS_ENDPOINT, ANALYTICS_APP_ID, getAnalyticsApiKey } = require('./analyticsConfig.js');
 const isDebugMode = process.argv.includes('--dev-mode');
 const sessionEntries = [];
 let lastUndoEntry;
@@ -253,13 +253,14 @@ ipcMain.on('send-problem-report', async (event, args) => {
 	const comment = args && typeof args.comment === 'string' ? args.comment : '';
 	const payload = buildReportPayload(comment.slice(0, MAX_REPORT_COMMENT_LENGTH));
 	const headers = {
-		'Content-Type': 'application/json'
+		'Content-Type': 'application/json',
+		'X-App-Id': ANALYTICS_APP_ID
 	};
-	const reportApiKey = getReportApiKey(app.getPath('userData'));
-	if (reportApiKey) headers.Authorization = `Bearer ${reportApiKey}`;
+	const analyticsApiKey = getAnalyticsApiKey(app.getPath('userData'));
+	if (analyticsApiKey) headers['X-Analytics-Key'] = analyticsApiKey;
 
 	try {
-		const response = await fetch(REPORT_ENDPOINT, {
+		const response = await fetch(ANALYTICS_ENDPOINT, {
 			method: 'POST',
 			headers: headers,
 			body: JSON.stringify(payload)
@@ -282,11 +283,11 @@ ipcMain.on('send-problem-report', async (event, args) => {
 			return;
 		}
 
-		logEvent('Fehlerbericht gesendet', { id: responseBody.id });
+		logEvent('Fehlerbericht gesendet', { requestId: responseBody.requestId, storagePath: responseBody.storagePath });
 		event.sender.send('problem-report-result', {
 			ok: true,
-			id: responseBody.id || '',
-			storedAs: responseBody.storedAs || ''
+			id: responseBody.requestId || '',
+			storedAs: responseBody.storagePath || ''
 		});
 	} catch (error) {
 		logEvent('Fehlerbericht konnte nicht gesendet werden', { error: getErrorMessage(error) });
@@ -1038,15 +1039,23 @@ function escapeHtml(value) {
 }
 
 function buildReportPayload(comment) {
+	const safeComment = typeof comment === 'string' ? comment : '';
 	return {
-		appVersion: app.getVersion(),
-		windowsUser: getWindowsUserName(),
-		comment: typeof comment === 'string' ? comment : '',
-		log: getSanitizedReportLog(),
-		clientTimestamp: new Date().toISOString(),
-		os: `${os.type()} ${os.release()}`,
-		platform: process.platform,
-		appName: app.getName()
+		appId: ANALYTICS_APP_ID,
+		type: 'issue',
+		message: safeComment || 'User reported a problem in Repetierer',
+		sourceType: 'electron',
+		severity: 'error',
+		version: app.getVersion(),
+		environment: isDebugMode ? 'dev' : 'production',
+		consoleOutput: getSanitizedReportLog(),
+		metadata: {
+			windowsUser: getWindowsUserName(),
+			clientTimestamp: new Date().toISOString(),
+			os: `${os.type()} ${os.release()}`,
+			platform: process.platform,
+			appName: app.getName()
+		}
 	};
 }
 

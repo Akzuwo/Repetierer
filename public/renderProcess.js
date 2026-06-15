@@ -2055,17 +2055,20 @@ function closeProblemReportModal() {
 function renderProblemReportPreview() {
 	if (!problemReportPreview) return;
 
+	const comment = _problemReportComment.value || '';
 	const payload = Object.assign({}, problemReportPreview, {
-		comment: _problemReportComment.value || ''
+		message: comment || problemReportPreview.message || ''
 	});
+	const metadata = payload.metadata || {};
 	const summaryRows = [
-		['App-Version', payload.appVersion || ''],
-		['Windoofs-Benutzer', payload.windowsUser || ''],
-		['Kommentar', payload.comment ? `${payload.comment.length} Zeichen` : 'leer'],
-		['Log', payload.log ? `${payload.log.length} Zeichen, bereinigt und gekürzt` : 'leer'],
-		['Zeitpunkt', payload.clientTimestamp || ''],
-		['System', [payload.os, payload.platform].filter(Boolean).join(' / ')],
-		['App', payload.appName || '']
+		['App', payload.appId || metadata.appName || ''],
+		['Typ', payload.type || ''],
+		['Version', payload.version || ''],
+		['Kommentar', comment ? `${comment.length} Zeichen` : 'leer'],
+		['Log', payload.consoleOutput ? `${payload.consoleOutput.length} Zeichen, bereinigt und gekürzt` : 'leer'],
+		['Zeitpunkt', metadata.clientTimestamp || ''],
+		['System', [metadata.os, metadata.platform].filter(Boolean).join(' / ')],
+		['Umgebung', payload.environment || '']
 	];
 
 	_problemReportSummary.innerHTML = '';

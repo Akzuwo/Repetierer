@@ -42,6 +42,12 @@ Zusätzlich zum Programm gibt es im Repository und/oder in den Releases eine Exc
 Diese Datei kann als Vorlage verwendet und an die eigenen Bedürfnisse angepasst werden.
 Aktuell werden bis zu 25 Personen, maximal 6 Noten pro Person und beliebig viele Klassen/Fächer unterstützt.
 
+### Problemberichte / AnalyticsManager
+Die frühere Cloudflare-Worker-Implementierung für das direkte Speichern von Fehlerberichten wurde aus diesem Repository entfernt.
+Repetierer enthält nur noch einen kleinen Client, der Problemberichte an den zentralen AnalyticsManager unter `https://analytics.akzuwo.ch` sendet.
+Gesendet wird über `POST /` mit `appId: "Repetierer"` und `type: "issue"`.
+Der benötigte App-Key wird lokal über `REPETIERER_ANALYTICS_KEY`, `ANALYTICS_KEY` oder eine nicht committete `analytics-config.local.json` mit `{ "analyticsKey": "..." }` bereitgestellt.
+
 ### Neue Funktionen
 - **Sitzungsprotokoll exportieren:** Im Menü kann die aktuelle Sitzung als CSV oder PDF exportiert werden. Das Protokoll enthält Zeitpunkt, Datum, Klasse, Person, Aktion, Note und Excel-Status.
 - **Klassenliste importieren:** Eine bestehende Excel- oder CSV-Datei kann importiert und als neue Repetierer-Datei gespeichert werden. Das Programm übernimmt bis zu 25 eindeutige Namen und legt die nötige Excel-Struktur automatisch an.
@@ -91,6 +97,12 @@ In addition to downloading the program there is also an Excel template file loca
 Use said file as a template and edit it according to Your needs.
 It currently supports up to 25 students (rows), a maximum six grades per student (columns) and infinite classes/subjects (individual worksheets).
 The program itself is pretty self-explanatory.
+
+## Problem Reports / AnalyticsManager
+The previous Cloudflare Worker for directly storing problem reports was removed from this repository.
+Repetierer now only keeps a small client that sends reports to the central AnalyticsManager at `https://analytics.akzuwo.ch`.
+Reports use `POST /` with `appId: "Repetierer"` and `type: "issue"`.
+Provide the app key locally through `REPETIERER_ANALYTICS_KEY`, `ANALYTICS_KEY` or an uncommitted `analytics-config.local.json` containing `{ "analyticsKey": "..." }`.
 
 ## New Features
 - **Session protocol export:** Export the current session as CSV or PDF, including time, date, class, person, action, grade and Excel write status.
