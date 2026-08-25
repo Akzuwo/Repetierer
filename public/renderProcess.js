@@ -156,6 +156,15 @@ let drawerView = 'main';
 let updateNewsVersion = '';
 let problemReportPreview = null;
 let problemReportSending = false;
+let statsCloseTimer = null;
+let statsReturnTimer = null;
+let statsResultsTimer = null;
+let statsScrollFrame = null;
+let statsScrollIdleTimer = null;
+let statsLastScrollTop = 0;
+let statsCardObserver = null;
+const modalCloseTimers = new WeakMap();
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 /*
  * events to main
@@ -225,6 +234,8 @@ _statsBackBtn.addEventListener('click', () => {
 	closeStatsView();
 });
 
+_statsList.addEventListener('scroll', handleStatsScroll, { passive: true });
+
 _importClassListBtn.addEventListener('click', () => {
 	ipcRenderer.send('import-class-list');
 });
@@ -238,17 +249,17 @@ _redoLastBtn.addEventListener('click', () => {
 });
 
 _closeBackupModal.addEventListener('click', () => {
-	_backupModal.style.display = 'none';
+	closeModal(_backupModal);
 });
 
 _backupModal.addEventListener('click', (e) => {
 	if (e.target === _backupModal) {
-		_backupModal.style.display = 'none';
+		closeModal(_backupModal);
 	}
 });
 
 _closeLogModal.addEventListener('click', () => {
-	_logModal.style.display = 'none';
+	closeModal(_logModal);
 });
 
 _copyLogBtn.addEventListener('click', () => {
@@ -264,7 +275,7 @@ _copyLogBtn.addEventListener('click', () => {
 
 _logModal.addEventListener('click', (e) => {
 	if (e.target === _logModal) {
-		_logModal.style.display = 'none';
+		closeModal(_logModal);
 	}
 });
 
@@ -311,17 +322,17 @@ _excelEditorBtn.addEventListener('click', () => {
 });
 
 _conflictFlushBtn.addEventListener('click', () => {
-	_reloadConflictModal.style.display = 'none';
+	closeModal(_reloadConflictModal);
 	ipcRenderer.send('flush-pending-excel');
 });
 
 _conflictForceReloadBtn.addEventListener('click', () => {
-	_reloadConflictModal.style.display = 'none';
+	closeModal(_reloadConflictModal);
 	ipcRenderer.send('reload-excel-force');
 });
 
 _conflictCancelBtn.addEventListener('click', () => {
-	_reloadConflictModal.style.display = 'none';
+	closeModal(_reloadConflictModal);
 });
 
 _confirmClassImportBtn.addEventListener('click', () => {
@@ -383,12 +394,12 @@ _jokerMigrationHelpModal.addEventListener('click', (e) => {
 });
 
 _closeProbabilitiesModal.addEventListener('click', () => {
-	_probabilitiesModal.style.display = 'none';
+	closeModal(_probabilitiesModal);
 });
 
 _probabilitiesModal.addEventListener('click', (e) => {
 	if (e.target === _probabilitiesModal) {
-		_probabilitiesModal.style.display = 'none';
+		closeModal(_probabilitiesModal);
 	}
 });
 
@@ -613,14 +624,14 @@ _absencesBtn.addEventListener('click', () => {
 
 // close modal
 _closeModal.addEventListener('click', () => {
-	_personModal.style.display = 'none';
+	closeModal(_personModal);
 	selectedPersonIds = [];
 });
 
 // close modal when clicking outside
 _personModal.addEventListener('click', (e) => {
 	if (e.target === _personModal) {
-		_personModal.style.display = 'none';
+		closeModal(_personModal);
 		selectedPersonIds = [];
 	}
 });
@@ -647,7 +658,7 @@ _randomSelectBtn.addEventListener('click', () => {
 	}
 	randomId = selectedPersonIds[Math.floor(Math.random() * selectedPersonIds.length)];
 	ipcRenderer.send('select-person', randomId);
-	_personModal.style.display = 'none';
+	closeModal(_personModal);
 	selectedPersonIds = [];
 });
 
@@ -1072,7 +1083,7 @@ ipcRenderer.on('pending-excel-flushed', (event, result) => {
 
 ipcRenderer.on('reload-excel-conflict', (event, pendingCount) => {
 	_drawerStatus.innerText = `${pendingCount} lokale Änderung${pendingCount === 1 ? '' : 'en'} blockieren das Neuladen.`;
-	_reloadConflictModal.style.display = 'block';
+	openModal(_reloadConflictModal);
 });
 
 ipcRenderer.on('excel-reloaded', (event, result) => {
@@ -1160,7 +1171,7 @@ ipcRenderer.on('persons-list', (event, persons) => {
 			personDiv.appendChild(label);
 			_personList.appendChild(personDiv);
 		});
-		_personModal.style.display = 'block';
+		openModal(_personModal);
 	} else {
 		error(_manualSelectBtn);
 	}
@@ -1234,13 +1245,13 @@ ipcRenderer.on('backup-data', (event, backup, paths) => {
 		});
 	}
 
-	_backupModal.style.display = 'block';
+	openModal(_backupModal);
 });
 
 ipcRenderer.on('log-data', (event, logs, paths) => {
 	_logLocation.innerText = paths ? paths.logPath : '';
 	_logList.innerText = logs && logs.trim() ? logs : 'Noch keine Logs vorhanden.';
-	_logModal.style.display = 'block';
+	openModal(_logModal);
 });
 
 ipcRenderer.on('report-preview-data', (event, payload) => {
@@ -1282,9 +1293,10 @@ ipcRenderer.on('probability-data', (event, probabilities) => {
 		probabilities
 			.slice()
 			.sort((a, b) => b.probability - a.probability)
-			.forEach(person => {
+			.forEach((person, index) => {
 				const item = document.createElement('div');
 				item.className = 'probability-item';
+				item.style.setProperty('--item-index', Math.min(index, 12));
 
 				const header = document.createElement('div');
 				header.className = 'probability-header';
@@ -1316,7 +1328,7 @@ ipcRenderer.on('probability-data', (event, probabilities) => {
 			});
 	}
 
-	_probabilitiesModal.style.display = 'block';
+	openModal(_probabilitiesModal);
 });
 
 ipcRenderer.on('editor-persons-data', (event, persons) => {
@@ -1536,20 +1548,64 @@ function renderAbsencePersons(persons) {
 
 function openStatsView() {
 	if (_statsViewBtn.classList.contains('disabled')) return;
+	if (statsCloseTimer) {
+		clearTimeout(statsCloseTimer);
+		statsCloseTimer = null;
+	}
+	if (statsReturnTimer) {
+		clearTimeout(statsReturnTimer);
+		statsReturnTimer = null;
+	}
+	resetStatsScrollMotion();
+	disconnectStatsCardObserver();
 	closeDrawer();
-	_classPanel.classList.add('update-hidden');
-	_repetition.classList.add('update-hidden');
+	[_classPanel, _repetition].forEach(panel => {
+		if (!panel) return;
+		panel.classList.remove('stats-panel-return');
+		panel.classList.add('update-hidden');
+	});
+	_statsView.classList.remove('stats-closing', 'stats-opening', 'stats-results-entering');
 	_statsView.classList.remove('update-hidden');
+	void _statsView.offsetWidth;
+	_statsView.classList.add('stats-opening');
 	_statsEmpty.classList.add('update-hidden');
 	_statsList.innerHTML = '';
+	_statsList.scrollTop = 0;
+	statsLastScrollTop = 0;
 	ipcRenderer.send('get-class-statistics');
 }
 
 function closeStatsView() {
 	if (!_statsView) return;
-	_statsView.classList.add('update-hidden');
-	if (_classPanel) _classPanel.classList.remove('update-hidden');
-	if (_repetition) _repetition.classList.remove('update-hidden');
+	if (_statsView.classList.contains('update-hidden')) {
+		if (_classPanel) _classPanel.classList.remove('update-hidden');
+		if (_repetition) _repetition.classList.remove('update-hidden');
+		return;
+	}
+	if (_statsView.classList.contains('stats-closing')) return;
+
+	resetStatsScrollMotion(false);
+	disconnectStatsCardObserver();
+	clearTimeout(statsResultsTimer);
+	_statsView.classList.remove('stats-opening', 'stats-results-entering');
+	_statsView.classList.add('stats-closing');
+	[_classPanel, _repetition].forEach(panel => {
+		if (!panel) return;
+		panel.classList.remove('update-hidden', 'stats-panel-return');
+		void panel.offsetWidth;
+		panel.classList.add('stats-panel-return');
+	});
+	statsReturnTimer = setTimeout(() => {
+		if (_classPanel) _classPanel.classList.remove('stats-panel-return');
+		if (_repetition) _repetition.classList.remove('stats-panel-return');
+		statsReturnTimer = null;
+	}, motionDelay(520));
+
+	statsCloseTimer = setTimeout(() => {
+		_statsView.classList.add('update-hidden');
+		_statsView.classList.remove('stats-closing', 'stats-scrolling-up', 'stats-scrolling-down', 'stats-is-scrolling');
+		statsCloseTimer = null;
+	}, motionDelay(340));
 }
 
 function renderClassStatistics(stats) {
@@ -1561,9 +1617,88 @@ function renderClassStatistics(stats) {
 	}
 
 	_statsEmpty.classList.add('update-hidden');
-	stats.forEach(classStats => {
-		_statsList.appendChild(createStatsClassCard(classStats));
+	stats.forEach((classStats, index) => {
+		const card = createStatsClassCard(classStats);
+		card.style.setProperty('--stats-index', Math.min(index, 10));
+		_statsList.appendChild(card);
 	});
+
+	if (!_statsView.classList.contains('update-hidden') && !_statsView.classList.contains('stats-closing')) {
+		_statsView.classList.remove('stats-results-entering');
+		void _statsView.offsetWidth;
+		_statsView.classList.add('stats-results-entering');
+		clearTimeout(statsResultsTimer);
+		statsResultsTimer = setTimeout(() => {
+			_statsView.classList.remove('stats-results-entering');
+		}, motionDelay(1100));
+		setupStatsCardObserver();
+	}
+}
+
+function handleStatsScroll() {
+	if (_statsView.classList.contains('update-hidden') || statsScrollFrame) return;
+	statsScrollFrame = requestAnimationFrame(() => {
+		const currentScrollTop = _statsList.scrollTop;
+		const difference = currentScrollTop - statsLastScrollTop;
+		if (Math.abs(difference) > 1) {
+			const scrollingDown = difference > 0;
+			_statsView.classList.toggle('stats-scrolling-down', scrollingDown);
+			_statsView.classList.toggle('stats-scrolling-up', !scrollingDown);
+			_statsView.classList.add('stats-is-scrolling');
+			statsLastScrollTop = currentScrollTop;
+			clearTimeout(statsScrollIdleTimer);
+			statsScrollIdleTimer = setTimeout(() => {
+				_statsView.classList.remove('stats-is-scrolling');
+			}, motionDelay(180));
+		}
+		statsScrollFrame = null;
+	});
+}
+
+function setupStatsCardObserver() {
+	disconnectStatsCardObserver();
+	if (!('IntersectionObserver' in window)) return;
+
+	statsCardObserver = new IntersectionObserver(entries => {
+		entries.forEach(entry => {
+			if (entry.isIntersecting) {
+				entry.target.classList.remove('stats-card-outside');
+				return;
+			}
+			const leftThroughTop = entry.rootBounds && entry.boundingClientRect.bottom <= entry.rootBounds.top;
+			entry.target.classList.toggle('stats-from-top', !!leftThroughTop);
+			entry.target.classList.toggle('stats-from-bottom', !leftThroughTop);
+			entry.target.classList.add('stats-card-outside');
+		});
+	}, {
+		root: _statsList,
+		rootMargin: '-0.35rem 0px',
+		threshold: 0.08
+	});
+
+	Array.from(_statsList.children).forEach(card => statsCardObserver.observe(card));
+}
+
+function disconnectStatsCardObserver() {
+	if (statsCardObserver) {
+		statsCardObserver.disconnect();
+		statsCardObserver = null;
+	}
+	Array.from(_statsList.children).forEach(card => {
+		card.classList.remove('stats-card-outside', 'stats-from-top', 'stats-from-bottom');
+	});
+}
+
+function resetStatsScrollMotion(removeDirection = true) {
+	if (statsScrollFrame) {
+		cancelAnimationFrame(statsScrollFrame);
+		statsScrollFrame = null;
+	}
+	clearTimeout(statsScrollIdleTimer);
+	_statsView.classList.remove('stats-is-scrolling');
+	if (removeDirection) {
+		_statsView.classList.remove('stats-scrolling-up', 'stats-scrolling-down');
+	}
 }
 
 function createStatsClassCard(classStats) {
@@ -2111,17 +2246,35 @@ function setProblemReportStatus(message, type) {
 }
 
 function openModal(modal) {
-	modal.classList.remove('modal-closing');
+	if (modal == null) return;
+	const pendingClose = modalCloseTimers.get(modal);
+	if (pendingClose) {
+		clearTimeout(pendingClose);
+		modalCloseTimers.delete(modal);
+	}
+	modal.classList.remove('modal-open', 'modal-closing');
 	modal.style.display = 'block';
+	modal.setAttribute('aria-hidden', 'false');
+	void modal.offsetWidth;
+	modal.classList.add('modal-open');
 }
 
 function closeModal(modal, afterClose) {
+	if (modal == null || modal.classList.contains('modal-closing')) return;
+	modal.classList.remove('modal-open');
 	modal.classList.add('modal-closing');
-	setTimeout(() => {
+	modal.setAttribute('aria-hidden', 'true');
+	const closeTimer = setTimeout(() => {
 		modal.style.display = 'none';
 		modal.classList.remove('modal-closing');
+		modalCloseTimers.delete(modal);
 		if (afterClose) afterClose();
-	}, 180);
+	}, motionDelay(340));
+	modalCloseTimers.set(modal, closeTimer);
+}
+
+function motionDelay(duration) {
+	return prefersReducedMotion.matches ? 0 : duration;
 }
 
 function closeSettingsHelp() {

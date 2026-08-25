@@ -408,6 +408,25 @@
 		grid-area: 1 / 1 / 2 / 3;
 		min-height: 0;
 		overflow: hidden;
+		transform-origin: 50% 45%;
+		will-change: opacity, transform, filter;
+	}
+
+	#content #stats-view.stats-opening {
+		animation: stats-view-enter .46s cubic-bezier(.16, 1, .3, 1) both;
+	}
+
+	#content #stats-view.stats-closing {
+		animation: stats-view-exit .34s cubic-bezier(.4, 0, .6, 1) both;
+		pointer-events: none;
+	}
+
+	#content .neum.stats-panel-return {
+		animation: stats-panel-return .48s cubic-bezier(.16, 1, .3, 1) both;
+	}
+
+	#content #repetition.stats-panel-return {
+		animation-delay: .045s;
 	}
 
 	.stats-header {
@@ -434,6 +453,7 @@
 		grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
 		max-height: calc(100% - 5rem);
 		overflow-y: auto;
+		overscroll-behavior: contain;
 		padding: 0.2rem 0.35rem 0.2rem 0;
 		scrollbar-color: #18a890 #202125;
 		scrollbar-width: thin;
@@ -449,15 +469,70 @@
 	}
 
 	#stats-list::-webkit-scrollbar-thumb {
-		background: #18a890;
+		background: linear-gradient(180deg, #20c0a5, #138b78);
 		border-radius: 999px;
+		box-shadow: 0 0 0 rgba(24, 168, 144, 0);
+		transition: box-shadow .2s ease, filter .2s ease;
+	}
+
+	#stats-view.stats-is-scrolling #stats-list::-webkit-scrollbar-thumb {
+		box-shadow: 0 0 .8rem rgba(24, 168, 144, .42);
+		filter: brightness(1.18);
 	}
 
 	.stats-class-card {
-		background-color: #202125;
-		border: 0.1rem solid #414246;
-		border-radius: 0.75rem;
+		background:
+			linear-gradient(145deg, rgba(39, 41, 46, .94), rgba(26, 28, 32, .96));
+		border: 0.1rem solid rgba(255, 255, 255, .1);
+		border-radius: 0.95rem;
+		box-shadow: 0 .5rem 1.4rem rgba(0, 0, 0, .13);
+		opacity: 1;
+		overflow: hidden;
 		padding: 1.1rem;
+		position: relative;
+		transform: translateY(0) scale(1);
+		transition:
+			opacity .34s cubic-bezier(.2, .8, .2, 1),
+			transform .34s cubic-bezier(.2, .8, .2, 1),
+			border-color .25s ease,
+			box-shadow .25s ease,
+			filter .34s ease;
+		will-change: opacity, transform;
+	}
+
+	.stats-class-card::before {
+		background: linear-gradient(90deg, transparent, rgba(32, 192, 165, .9), rgba(240, 196, 76, .52), transparent);
+		content: "";
+		height: 0.1rem;
+		left: 12%;
+		opacity: .62;
+		position: absolute;
+		right: 12%;
+		top: 0;
+	}
+
+	.stats-class-card:hover {
+		border-color: rgba(24, 168, 144, .36);
+		box-shadow: 0 .9rem 2rem rgba(0, 0, 0, .2), 0 0 1.5rem rgba(24, 168, 144, .08);
+		transform: translateY(-0.12rem) scale(1.002);
+	}
+
+	.stats-results-entering .stats-class-card {
+		animation: stats-card-enter .52s cubic-bezier(.16, 1, .3, 1) both;
+		animation-delay: calc(.055s * var(--stats-index, 0));
+	}
+
+	.stats-class-card.stats-card-outside {
+		filter: saturate(.86);
+		opacity: .38;
+	}
+
+	.stats-class-card.stats-card-outside.stats-from-top {
+		transform: translateY(-0.8rem) scale(.985);
+	}
+
+	.stats-class-card.stats-card-outside.stats-from-bottom {
+		transform: translateY(0.8rem) scale(.985);
 	}
 
 	.stats-class-card h3 {
@@ -495,6 +570,10 @@
 		color: #bfc0c4;
 		font-size: 1rem;
 		line-height: 1.35;
+	}
+
+	.stats-empty:not(.update-hidden) {
+		animation: stats-card-enter .42s cubic-bezier(.16, 1, .3, 1) both;
 	}
 
 	.repetition-header {
@@ -830,11 +909,17 @@
 		radial-gradient(circle at 50% 14%, rgba(24, 168, 144, 0.1), transparent 34rem),
 		rgba(8, 9, 11, 0.58);
 	backdrop-filter: blur(0.45rem);
-	animation: modal-backdrop .18s ease-out;
+	opacity: 0;
+	will-change: opacity, backdrop-filter;
+}
+
+.modal.modal-open {
+	animation: modal-backdrop .34s cubic-bezier(.16, 1, .3, 1) both;
 }
 
 .modal.modal-closing {
-	animation: modal-backdrop-out .18s ease-in forwards;
+	animation: modal-backdrop-out .32s cubic-bezier(.4, 0, .6, 1) forwards;
+	pointer-events: none;
 }
 
 .modal-content {
@@ -857,7 +942,12 @@
 	scrollbar-gutter: stable;
 	scrollbar-color: rgba(24, 168, 144, 0.5) transparent;
 	scrollbar-width: thin;
-	animation: modal-content-enter .22s ease-out;
+	transform-origin: 50% 44%;
+	will-change: opacity, transform, filter;
+}
+
+.modal.modal-open .modal-content {
+	animation: modal-content-enter .42s cubic-bezier(.16, 1, .3, 1) both;
 }
 
 .modal-content::-webkit-scrollbar,
@@ -916,7 +1006,7 @@
 }
 
 .modal.modal-closing .modal-content {
-	animation: modal-content-exit .18s ease-in forwards;
+	animation: modal-content-exit .32s cubic-bezier(.4, 0, .6, 1) forwards;
 }
 
 .modal-content h2 {
@@ -1301,6 +1391,25 @@
 .probability-item:hover {
 	transform: translateX(0.2rem);
 	background-color: #303236;
+}
+
+#probabilities-modal.modal-open .probability-content {
+	animation: probability-modal-enter .48s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+#probabilities-modal.modal-closing .probability-content {
+	animation: probability-modal-exit .34s cubic-bezier(.4, 0, .6, 1) both;
+}
+
+#probabilities-modal.modal-open .probability-item {
+	animation: probability-item-enter .44s cubic-bezier(.16, 1, .3, 1) backwards;
+	animation-delay: calc(.08s + (.032s * var(--item-index, 0)));
+}
+
+#probabilities-modal.modal-open .probability-bar div {
+	animation: probability-bar-grow .62s cubic-bezier(.16, 1, .3, 1) backwards;
+	animation-delay: calc(.13s + (.032s * var(--item-index, 0)));
+	transform-origin: left center;
 }
 
 .excel-editor-item {
@@ -1917,22 +2026,88 @@
 	}
 }
 
+@keyframes stats-view-enter {
+	from {
+		filter: blur(0.18rem);
+		opacity: 0;
+		transform: translateY(0.85rem) scale(.982);
+	}
+	to {
+		filter: blur(0);
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+@keyframes stats-view-exit {
+	from {
+		filter: blur(0);
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+	to {
+		filter: blur(0.14rem);
+		opacity: 0;
+		transform: translateY(0.72rem) scale(.982);
+	}
+}
+
+@keyframes stats-panel-return {
+	from {
+		filter: blur(0.12rem);
+		opacity: 0;
+		transform: translateY(-0.55rem) scale(.99);
+	}
+	to {
+		filter: blur(0);
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+@keyframes stats-card-enter {
+	from {
+		filter: blur(0.1rem);
+		opacity: 0;
+		transform: translateY(0.9rem) scale(.975);
+	}
+	to {
+		filter: blur(0);
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
 @keyframes modal-backdrop {
-	from { background-color: rgba(0,0,0,0); }
-	to { background-color: rgba(0,0,0,0.5); }
+	from {
+		backdrop-filter: blur(0);
+		opacity: 0;
+	}
+	to {
+		backdrop-filter: blur(0.45rem);
+		opacity: 1;
+	}
 }
 
 @keyframes modal-backdrop-out {
-	from { background-color: rgba(0,0,0,0.5); }
-	to { background-color: rgba(0,0,0,0); }
+	from {
+		backdrop-filter: blur(0.45rem);
+		opacity: 1;
+	}
+	to {
+		backdrop-filter: blur(0);
+		opacity: 0;
+	}
 }
 
 @keyframes modal-content-enter {
 	from {
+		filter: blur(0.14rem);
 		opacity: 0;
-		transform: translateY(0.75rem) scale(0.98);
+		transform: translateY(1rem) scale(.965);
 	}
 	to {
+		filter: blur(0);
 		opacity: 1;
 		transform: translateY(0) scale(1);
 	}
@@ -1940,12 +2115,62 @@
 
 @keyframes modal-content-exit {
 	from {
+		filter: blur(0);
 		opacity: 1;
 		transform: translateY(0) scale(1);
 	}
 	to {
+		filter: blur(0.12rem);
 		opacity: 0;
-		transform: translateY(0.6rem) scale(0.98);
+		transform: translateY(0.8rem) scale(.972);
+	}
+}
+
+@keyframes probability-modal-enter {
+	from {
+		filter: blur(0.18rem);
+		opacity: 0;
+		transform: translateY(1.25rem) scale(.955) rotateX(-2deg);
+	}
+	to {
+		filter: blur(0);
+		opacity: 1;
+		transform: translateY(0) scale(1) rotateX(0);
+	}
+}
+
+@keyframes probability-modal-exit {
+	from {
+		filter: blur(0);
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+	to {
+		filter: blur(0.16rem);
+		opacity: 0;
+		transform: translateY(1rem) scale(.96);
+	}
+}
+
+@keyframes probability-item-enter {
+	from {
+		opacity: 0;
+		transform: translateX(-0.6rem) scale(.985);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0) scale(1);
+	}
+}
+
+@keyframes probability-bar-grow {
+	from {
+		opacity: .35;
+		transform: scaleX(0);
+	}
+	to {
+		opacity: 1;
+		transform: scaleX(1);
 	}
 }
 
