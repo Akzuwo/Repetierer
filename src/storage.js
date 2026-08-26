@@ -7,7 +7,7 @@ const defaultAppSettings = {
 	probabilityDecreaseFactor: 3,
 	boostNeverSelected: false,
 	neverSelectedBoostFactor: 3,
-	logoAnimationEnabled: false,
+	visualEffectsEnabled: false,
 	wiggersRuleEnabled: true,
 	wiggersRuleDurationMinutes: 120
 };
@@ -141,7 +141,7 @@ function getAppSettings() {
 		probabilityDecreaseFactor: normalizeFactor(settings.probabilityDecreaseFactor, defaultAppSettings.probabilityDecreaseFactor),
 		boostNeverSelected: !!settings.boostNeverSelected,
 		neverSelectedBoostFactor: normalizeFactor(settings.neverSelectedBoostFactor, defaultAppSettings.neverSelectedBoostFactor),
-		logoAnimationEnabled: !!settings.logoAnimationEnabled,
+		visualEffectsEnabled: !!settings.visualEffectsEnabled,
 		wiggersRuleEnabled: settings.wiggersRuleEnabled !== false,
 		wiggersRuleDurationMinutes: normalizeDuration(settings.wiggersRuleDurationMinutes, defaultAppSettings.wiggersRuleDurationMinutes)
 	});
@@ -154,7 +154,7 @@ function saveAppSettings(settings) {
 		probabilityDecreaseFactor: normalizeFactor(settings.probabilityDecreaseFactor, defaultAppSettings.probabilityDecreaseFactor),
 		boostNeverSelected: !!settings.boostNeverSelected,
 		neverSelectedBoostFactor: normalizeFactor(settings.neverSelectedBoostFactor, defaultAppSettings.neverSelectedBoostFactor),
-		logoAnimationEnabled: !!settings.logoAnimationEnabled,
+		visualEffectsEnabled: !!settings.visualEffectsEnabled,
 		wiggersRuleEnabled: wiggersRuleEnabled,
 		wiggersRuleDurationMinutes: normalizeDuration(settings.wiggersRuleDurationMinutes, defaultAppSettings.wiggersRuleDurationMinutes),
 		...(wiggersRuleEnabled ? {} : { wiggersRulePenalties: {} })

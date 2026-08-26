@@ -5,6 +5,12 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      release_notes:
+        description: "Optionale Release Notes für den GitHub-Release (Markdown möglich)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -30,6 +36,8 @@ jobs:
       - name: Generate release notes
         id: release-notes
         run: node scripts/generate-release-notes.js
+        env:
+          RELEASE_NOTES_OVERRIDE: ${{ inputs.release_notes }}
 
       - name: Build and publish release
         run: npm run release:ci

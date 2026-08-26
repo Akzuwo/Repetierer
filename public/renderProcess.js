@@ -47,6 +47,11 @@ const _statsEmpty = document.getElementById('stats-empty');
 const _statsList = document.getElementById('stats-list');
 const _title = document.getElementById('title');
 const _name = document.getElementById('name');
+const _selectionEffect = document.getElementById('selection-effect');
+const _spinwheelTrack = document.getElementById('spinwheel-track');
+const _winnerName = document.getElementById('winner-name');
+const _confettiStage = document.getElementById('confetti-stage');
+const _completionEffect = document.getElementById('completion-effect');
 const _label = document.getElementById('grade').children.item(0);
 const _grade = document.getElementById('grade').children.item(1);
 const _cancel = document.getElementById('res').children.item(1);
@@ -129,7 +134,7 @@ const _extraJokerMigrationStatus = document.getElementById('extra-joker-migratio
 const _probabilityFactorSetting = document.getElementById('probability-factor-setting');
 const _boostNeverSelectedSetting = document.getElementById('boost-never-selected-setting');
 const _neverSelectedBoostFactorSetting = document.getElementById('never-selected-boost-factor-setting');
-const _logoAnimationSetting = document.getElementById('logo-animation-setting');
+const _visualEffectsSetting = document.getElementById('visual-effects-setting');
 const _wiggersRuleSetting = document.getElementById('wiggers-rule-setting');
 const _wiggersRuleDurationSetting = document.getElementById('wiggers-rule-duration-setting');
 const _saveSettingsBtn = document.getElementById('save-settings-btn');
@@ -163,6 +168,11 @@ let statsScrollFrame = null;
 let statsScrollIdleTimer = null;
 let statsLastScrollTop = 0;
 let statsCardObserver = null;
+let visualEffectsEnabled = false;
+let selectionEffectRun = 0;
+let completionEffectRun = 0;
+const selectionEffectTimers = [];
+const completionEffectTimers = [];
 const modalCloseTimers = new WeakMap();
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -464,7 +474,7 @@ _saveSettingsBtn.addEventListener('click', () => {
 		probabilityDecreaseFactor: probabilityDecreaseFactor,
 		boostNeverSelected: _boostNeverSelectedSetting.checked,
 		neverSelectedBoostFactor: neverSelectedBoostFactor,
-		logoAnimationEnabled: _logoAnimationSetting.checked,
+		visualEffectsEnabled: _visualEffectsSetting.checked,
 		wiggersRuleEnabled: _wiggersRuleSetting.checked,
 		wiggersRuleDurationMinutes: wiggersRuleDurationMinutes
 	});
@@ -530,10 +540,6 @@ _boostNeverSelectedSetting.addEventListener('change', () => {
 
 _wiggersRuleSetting.addEventListener('change', () => {
 	updateWiggersRuleFields();
-});
-
-_logoAnimationSetting.addEventListener('change', () => {
-	updateLogoAnimation(_logoAnimationSetting.checked);
 });
 
 _updatePrimaryBtn.addEventListener('click', () => {
@@ -768,8 +774,8 @@ ipcRenderer.on('settings-data', (event, settings, paths, migrationStatus) => {
 	_probabilityFactorSetting.value = settings.probabilityDecreaseFactor;
 	_boostNeverSelectedSetting.checked = !!settings.boostNeverSelected;
 	_neverSelectedBoostFactorSetting.value = settings.neverSelectedBoostFactor;
-	_logoAnimationSetting.checked = !!settings.logoAnimationEnabled;
-	updateLogoAnimation(settings.logoAnimationEnabled);
+	_visualEffectsSetting.checked = !!settings.visualEffectsEnabled;
+	updateVisualEffects(settings.visualEffectsEnabled);
 	_wiggersRuleSetting.checked = settings.wiggersRuleEnabled !== false;
 	_wiggersRuleDurationSetting.value = settings.wiggersRuleDurationMinutes;
 	updateNeverSelectedBoostField();
@@ -809,11 +815,11 @@ ipcRenderer.on('window-restored', () => {
 });
 
 ipcRenderer.on('settings-saved', (event, settings) => {
-	updateLogoAnimation(settings && settings.logoAnimationEnabled);
+	updateVisualEffects(settings && settings.visualEffectsEnabled);
 });
 
 ipcRenderer.on('ui-settings', (event, settings) => {
-	updateLogoAnimation(settings && settings.logoAnimationEnabled);
+	updateVisualEffects(settings && settings.visualEffectsEnabled);
 });
 
 ipcRenderer.on('pending-excel-status', (event, count) => {
@@ -1043,6 +1049,10 @@ ipcRenderer.on('finished', (event, args) => {
 
 })
 
+ipcRenderer.on('repetition-saved', () => {
+	runCompletionEffect();
+});
+
 ipcRenderer.on('excel-write-pending', (event, entry) => {
 	showUpdatePanel({
 		title: 'Excel-Datei ist geöffnet',
@@ -1115,7 +1125,7 @@ ipcRenderer.on('excel-reload-failed', (event, result) => {
 });
 
 // name
-ipcRenderer.on('name', (event, args) => {
+ipcRenderer.on('name', (event, args, selectionNames) => {
 	
 	const [name, joker] = args
     
@@ -1131,6 +1141,7 @@ ipcRenderer.on('name', (event, args) => {
 	_name.innerText = name;
 	_nameSize = 10;
 	scaleName();
+	runSelectionEffect(name, selectionNames);
 
 })
 
@@ -2330,8 +2341,119 @@ function updateWiggersRuleFields() {
 	_wiggersRuleDurationSetting.closest('.setting-field').classList.toggle('setting-disabled', !isEnabled);
 }
 
-function updateLogoAnimation(isEnabled) {
+function runSelectionEffect(selectedName, names) {
+	clearSelectionEffect();
+	if (!visualEffectsEnabled || prefersReducedMotion.matches || !_selectionEffect || !_spinwheelTrack) return;
+
+	const runId = selectionEffectRun;
+	const candidates = Array.from(new Set((names || []).map(name => String(name || '').trim()).filter(Boolean)));
+	if (!candidates.includes(selectedName)) candidates.push(selectedName);
+	const reelNames = [];
+	const fillerNames = candidates.filter(name => name !== selectedName);
+	const sourceNames = fillerNames.length > 0 ? fillerNames : [selectedName];
+	for (let index = 0; index < 18; index += 1) {
+		reelNames.push(sourceNames[Math.floor(Math.random() * sourceNames.length)]);
+	}
+	reelNames.push(selectedName);
+
+	_spinwheelTrack.innerHTML = '';
+	reelNames.forEach((name, index) => {
+		const item = document.createElement('div');
+		item.className = index === reelNames.length - 1 ? 'spinwheel-item spinwheel-item-selected' : 'spinwheel-item';
+		item.innerText = name;
+		_spinwheelTrack.appendChild(item);
+	});
+	_winnerName.innerText = selectedName;
+	createConfetti();
+	_spinwheelTrack.style.transition = 'none';
+	_spinwheelTrack.style.transform = 'translateY(0)';
+	_selectionEffect.setAttribute('aria-hidden', 'false');
+	_selectionEffect.classList.add('is-active', 'is-spinning');
+	void _spinwheelTrack.offsetHeight;
+
+	requestAnimationFrame(() => {
+		if (runId !== selectionEffectRun) return;
+		_selectionEffect.classList.add('is-rolling');
+		_spinwheelTrack.style.transition = 'transform 1550ms cubic-bezier(.12, .72, .16, 1)';
+		_spinwheelTrack.style.transform = `translateY(-${(reelNames.length - 1) * 4.4}rem)`;
+	});
+
+	queueSelectionEffect(() => {
+		_selectionEffect.classList.remove('is-spinning', 'is-rolling');
+		_selectionEffect.classList.add('is-celebrating');
+	}, 1580, runId);
+	queueSelectionEffect(() => {
+		_selectionEffect.classList.add('spotlights-on');
+	}, 1840, runId);
+	queueSelectionEffect(() => clearSelectionEffect(), 3750, runId);
+}
+
+function createConfetti() {
+	if (!_confettiStage) return;
+	_confettiStage.innerHTML = '';
+	const colors = ['#ffffff', '#93c5fd', '#818cf8', '#c4b5fd', '#67e8f9', '#dbeafe'];
+	for (let index = 0; index < 48; index += 1) {
+		const piece = document.createElement('i');
+		const fromLeft = index % 2 === 0;
+		const direction = fromLeft ? 1 : -1;
+		piece.className = `confetti-piece ${fromLeft ? 'confetti-left' : 'confetti-right'}`;
+		piece.style.setProperty('--confetti-color', colors[index % colors.length]);
+		piece.style.setProperty('--burst-x', `${direction * (4 + Math.random() * 27)}rem`);
+		piece.style.setProperty('--burst-y', `${-(9 + Math.random() * 19)}rem`);
+		piece.style.setProperty('--fall-x', `${direction * (8 + Math.random() * 34)}rem`);
+		piece.style.setProperty('--fall-y', `${8 + Math.random() * 17}rem`);
+		piece.style.setProperty('--confetti-rotation', `${direction * (360 + Math.random() * 900)}deg`);
+		piece.style.setProperty('--confetti-mid-rotation', `${direction * (180 + Math.random() * 360)}deg`);
+		piece.style.setProperty('--confetti-delay', `${Math.random() * 180}ms`);
+		piece.style.setProperty('--confetti-width', `${0.34 + Math.random() * 0.34}rem`);
+		piece.style.setProperty('--confetti-height', `${0.65 + Math.random() * 0.55}rem`);
+		_confettiStage.appendChild(piece);
+	}
+}
+
+function queueSelectionEffect(callback, delay, runId) {
+	const timer = setTimeout(() => {
+		if (runId === selectionEffectRun) callback();
+	}, motionDelay(delay));
+	selectionEffectTimers.push(timer);
+}
+
+function clearSelectionEffect() {
+	selectionEffectRun += 1;
+	selectionEffectTimers.splice(0).forEach(timer => clearTimeout(timer));
+	if (!_selectionEffect) return;
+	_selectionEffect.classList.remove('is-active', 'is-spinning', 'is-rolling', 'is-celebrating', 'spotlights-on');
+	_selectionEffect.setAttribute('aria-hidden', 'true');
+	if (_spinwheelTrack) {
+		_spinwheelTrack.style.transition = 'none';
+		_spinwheelTrack.style.transform = 'translateY(0)';
+	}
+}
+
+function runCompletionEffect() {
+	clearSelectionEffect();
+	clearCompletionEffect();
+	if (!visualEffectsEnabled || prefersReducedMotion.matches || !_completionEffect) return;
+	const runId = completionEffectRun;
+	_completionEffect.setAttribute('aria-hidden', 'false');
+	_completionEffect.classList.add('is-active');
+	const timer = setTimeout(() => {
+		if (runId === completionEffectRun) clearCompletionEffect();
+	}, motionDelay(1650));
+	completionEffectTimers.push(timer);
+}
+
+function clearCompletionEffect() {
+	completionEffectRun += 1;
+	completionEffectTimers.splice(0).forEach(timer => clearTimeout(timer));
+	if (!_completionEffect) return;
+	_completionEffect.classList.remove('is-active');
+	_completionEffect.setAttribute('aria-hidden', 'true');
+}
+
+function updateVisualEffects(isEnabled) {
 	const enabled = !!isEnabled;
+	visualEffectsEnabled = enabled;
 	if (_container) _container.classList.toggle('logo-animation-enabled', enabled);
 	if (_title) {
 		_title.classList.toggle('logo-animation-enabled', enabled);
@@ -2339,7 +2461,13 @@ function updateLogoAnimation(isEnabled) {
 			_title.classList.remove('logo-animation-kick');
 			void _title.offsetWidth;
 			_title.classList.add('logo-animation-kick');
+		} else {
+			_title.classList.remove('logo-animation-kick');
 		}
+	}
+	if (!enabled) {
+		clearSelectionEffect();
+		clearCompletionEffect();
 	}
 }
 

@@ -131,7 +131,7 @@ ipcMain.on('class', (event, args) => {
 ipcMain.on('start', (event, args) => {
 	const selectedPerson = getProgram().selectPerson();
 	if (selectedPerson) {
-		event.sender.send('name', selectedPerson);
+		event.sender.send('name', selectedPerson, getSelectionNames());
 	} else {
 		event.sender.send('no-person-available');
 	}
@@ -214,23 +214,29 @@ ipcMain.on('confirm-class-list-import', (event, args) => {
 ipcMain.on('select-person', (event, personId) => {
 	const result = getProgram().selectSpecificPerson(personId);
 	if (result) {
-		event.sender.send('name', result);
+		event.sender.send('name', result, getSelectionNames());
 	}
 });
+
+function getSelectionNames() {
+	return getProgram().getPersons().map(person => person.name).filter(Boolean);
+}
 
 // ok
 ipcMain.on('ok', (event, args) => {
 	getProgram().saveGrade(args, (result, backupEntry) => {
-		handleExcelBackupEntry(event, backupEntry);
+		const wasSaved = handleExcelBackupEntry(event, backupEntry);
 		event.sender.send('finished', result);
+		if (wasSaved) event.sender.send('repetition-saved');
 	});
 });
 
 // joker
 ipcMain.on('joker', (event, args) => {
     getProgram().setJoker((result, backupEntry) => {
-		handleExcelBackupEntry(event, backupEntry);
+		const wasSaved = handleExcelBackupEntry(event, backupEntry);
 		event.sender.send('finished', result);
+		if (wasSaved) event.sender.send('repetition-saved');
 	});
 });
 
@@ -381,7 +387,7 @@ ipcMain.on('cancel-joker-migration', (event, args) => {
 });
 
 function handleExcelBackupEntry(event, backupEntry) {
-	if (!backupEntry) return;
+	if (!backupEntry) return false;
 	const storedBackupEntry = addBackupEntry(backupEntry);
 	let pendingEntry;
 	logEvent('Backup erstellt', {
@@ -413,6 +419,7 @@ function handleExcelBackupEntry(event, backupEntry) {
 	event.sender.send('pending-excel-status', getPendingExcelEntries().length);
 	event.sender.send('undo-status', getUndoStatus());
 	event.sender.send('redo-status', getRedoStatus());
+	return !!(storedBackupEntry.excelWriteSucceeded || pendingEntry);
 }
 
 function getUndoStatus() {

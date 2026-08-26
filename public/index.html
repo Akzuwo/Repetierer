@@ -123,6 +123,31 @@
 				<button class="btn-1 disabled">OK</button>
 				<button class="btn-1 disabled">Joker</button>
 			</div>
+			<div class="visual-effect-layer" id="selection-effect" aria-hidden="true">
+				<div class="selection-spotlight selection-spotlight-left"></div>
+				<div class="selection-spotlight selection-spotlight-right"></div>
+				<div class="spinwheel-shell">
+					<span class="effect-kicker">Name wird gewählt</span>
+					<div class="spinwheel-window">
+						<div class="spinwheel-track" id="spinwheel-track"></div>
+						<div class="spinwheel-focus" aria-hidden="true"></div>
+					</div>
+				</div>
+				<div class="winner-reveal">
+					<span class="effect-kicker">Ausgewählt</span>
+					<strong id="winner-name"></strong>
+				</div>
+				<div class="confetti-stage" id="confetti-stage" aria-hidden="true"></div>
+			</div>
+			<div class="visual-effect-layer completion-effect" id="completion-effect" aria-hidden="true" role="status">
+				<div class="completion-ripple"></div>
+				<div class="completion-check">
+					<svg viewBox="0 0 120 120" aria-hidden="true">
+						<path d="M31 62l19 19 40-44"></path>
+					</svg>
+				</div>
+				<strong>Gespeichert</strong>
+			</div>
 		</div>
 		<div class="neum update-hidden" id="stats-view">
 			<div class="stats-header">
@@ -365,8 +390,11 @@
 					<input id="never-selected-boost-factor-setting" type="number" min="1.1" max="10" step="0.1">
 				</label>
 				<label class="setting-row setting-toggle">
-					<span class="setting-copy">Titelanimation aktivieren</span>
-					<input class="toggle-input" type="checkbox" id="logo-animation-setting" role="switch">
+					<span class="setting-copy">
+						Zusätzliche visuelle Effekte
+						<small>Aktiviert Titelanimation, Namensauswahl mit Konfetti und die Speicherbestätigung.</small>
+					</span>
+					<input class="toggle-input" type="checkbox" id="visual-effects-setting" role="switch">
 					<span class="toggle-switch" aria-hidden="true"></span>
 				</label>
 				<label class="setting-row setting-toggle">
@@ -419,6 +447,8 @@
 				<p>Wenn diese Option aktiv ist, bekommen Personen ohne Noten ein zusätzliches Gewicht. Sie werden dadurch deutlich wahrscheinlicher ausgewählt, aber andere Personen können weiterhin drankommen.</p>
 				<h3>Boost-Faktor</h3>
 				<p>Dieser Wert wird nur verwendet, wenn der Boost aktiviert ist. Je höher der Faktor, desto stärker werden Personen bevorzugt, die noch nie ausgewählt wurden.</p>
+				<h3>Zusätzliche visuelle Effekte</h3>
+				<p>Aktiviert die dunkle Titelanimation, das Namensrad mit Konfetti und Scheinwerfern sowie die große Checkmark nach einer erfolgreich gespeicherten Repetition. Standardmäßig ist diese Option deaktiviert.</p>
 				<h3>Wiggersche Regel</h3>
 				<p>Wenn eine Person ihren Joker setzt, wird ihre Auswahlwahrscheinlichkeit für eine begrenzte Zeit auf 0 gesetzt. Standardmäßig gilt die Regel 2 Stunden.</p>
 				<h3>Wiggers-Dauer</h3>

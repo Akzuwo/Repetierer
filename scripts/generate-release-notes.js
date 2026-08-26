@@ -39,7 +39,8 @@ function main() {
   const versionSource = getVersionSource();
   const version = normalizeVersion(versionSource);
   const tag = versionSource.startsWith("v") ? versionSource : `v${version}`;
-  const releaseBody = readReleaseNotesForVersion(rootDir, version);
+  const releaseNotesOverride = (process.env.RELEASE_NOTES_OVERRIDE || "").trim();
+  const releaseBody = releaseNotesOverride || readReleaseNotesForVersion(rootDir, version);
 
   if (!releaseBody) {
     throw new Error(`Keine Release Notes fuer Version ${version} in release-notes.txt gefunden.`);
@@ -48,7 +49,8 @@ function main() {
   fs.writeFileSync(generatedReleaseNotesPath, `${releaseBody}\n`, "utf8");
   writeGithubOutput({ version, tag, release_notes_path: "release_notes.md" });
 
-  console.log(`Release Notes fuer ${version} aus release-notes.txt nach release_notes.md geschrieben.`);
+  const source = releaseNotesOverride ? "workflow_dispatch-Eingabe" : "release-notes.txt";
+  console.log(`Release Notes fuer ${version} aus ${source} nach release_notes.md geschrieben.`);
 }
 
 main();
