@@ -34,6 +34,11 @@ function getEditorPersons() {
 	return read_editor_persons(cls) || [];
 }
 
+function getClassPersons(className) {
+	if (!className) return [];
+	return read_editor_persons(className) || [];
+}
+
 function getClassStatistics() {
 	return read_class_statistics() || [];
 }
@@ -440,6 +445,7 @@ module.exports = {
 	migrateExtraJokersAfterThree: migrateExtraJokersAfterThree,
 	getPersons: getPersons,
 	getEditorPersons: getEditorPersons,
+	getClassPersons: getClassPersons,
 	getClassStatistics: getClassStatistics,
 	getProbabilities: getProbabilities,
 	selectSpecificPerson: selectSpecificPerson,

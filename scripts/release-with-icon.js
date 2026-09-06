@@ -70,12 +70,10 @@ async function main() {
     "never",
   ]);
 
-  requireFile(exePath, "Entpackte Repetierer.exe");
+	requireFile(exePath, "Entpackte Repetierer.exe");
 
-  console.log(`Setze App Icon fuer ${path.relative(rootDir, exePath)}`);
-  await rcedit(exePath, {
-    icon: iconPath,
-  });
+	console.log(`Setze App Icon fuer ${path.relative(rootDir, exePath)}`);
+	await editExecutableIcon(exePath, iconPath);
 
   writeAppUpdateConfig();
   requireFile(appUpdatePath, "Update-Konfiguration");
@@ -90,6 +88,20 @@ async function main() {
     "--publish",
     publishMode,
   ]);
+}
+
+async function editExecutableIcon(executablePath, executableIconPath) {
+	let lastError;
+	for (let attempt = 1; attempt <= 3; attempt++) {
+		try {
+			await rcedit(executablePath, { icon: executableIconPath });
+			return;
+		} catch (error) {
+			lastError = error;
+			if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 750));
+		}
+	}
+	throw lastError;
 }
 
 main().catch((error) => {

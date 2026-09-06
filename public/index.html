@@ -49,6 +49,8 @@
 		</div>
 		<div class="drawer-view" id="drawer-main-view">
 			<div class="drawer-actions">
+				<button class="btn-2" id="repetition-nav-btn">Repetition</button>
+				<button class="btn-2" id="assessment-nav-btn">Mitmachnote</button>
 				<button class="btn-2" id="drawer-data-view-btn" title="Datei laden, Klassen importieren und Excel-Daten synchronisieren.">Datenverwaltung</button>
 				<button class="btn-2" id="drawer-protocol-view-btn" title="Backups, Logs und Sitzungsprotokolle ansehen oder exportieren.">Protokoll</button>
 				<button class="btn-2 disabled" id="stats-view-btn" title="Zeigt Klassenstatistiken der geladenen Datei.">Statistiken</button>
@@ -156,6 +158,19 @@
 			</div>
 			<p class="stats-empty update-hidden" id="stats-empty">Noch keine Statistikdaten vorhanden.</p>
 			<div id="stats-list"></div>
+		</div>
+		<div class="neum update-hidden" id="assessment-view">
+			<div class="assessment-header">
+				<div>
+					<span class="assessment-kicker">Mitmachnote</span>
+					<h2 id="assessment-heading">Beurteilungsrunden</h2>
+				</div>
+				<div class="assessment-header-actions">
+					<label class="assessment-class-select">Klasse <select id="assessment-class-select"><option value="">Klasse wählen</option></select></label>
+					<button class="btn-2 update-hidden" id="assessment-back-btn">Zurück</button>
+				</div>
+			</div>
+			<div id="assessment-body" class="assessment-body"></div>
 		</div>
 	</div>
 
@@ -409,6 +424,22 @@
 					<span>Wiggers-Dauer in Minuten</span>
 					<input id="wiggers-rule-duration-setting" type="number" min="1" max="480" step="1">
 				</label>
+				<div class="setting-action assessment-integration-setting">
+					<span>Mitmachnote<small id="assessment-config-status">Umfrage: Nicht eingerichtet</small><small id="assessment-api-status">API: Nicht geprüft</small></span>
+					<div class="integration-actions">
+						<button class="btn-2" id="assessment-config-import-btn">Konfiguration importieren</button>
+						<button class="btn-2 update-hidden" id="assessment-api-test-btn">Verbindung testen</button>
+						<button class="btn-2 update-hidden" id="assessment-config-remove-btn">Konfiguration entfernen</button>
+					</div>
+				</div>
+				<div class="setting-action assessment-integration-setting">
+					<span>Brevo SMTP<small id="brevo-status">Nicht eingerichtet</small></span>
+					<div class="integration-actions">
+						<button class="btn-2" id="brevo-import-btn">Konfiguration importieren</button>
+						<button class="btn-2 update-hidden" id="brevo-test-btn">Verbindung testen</button>
+						<button class="btn-2 update-hidden" id="brevo-remove-btn">Credentials entfernen</button>
+					</div>
+				</div>
 			</div>
 			<div class="modal-buttons">
 				<button class="btn-1" id="save-settings-btn">Speichern</button>
@@ -460,11 +491,36 @@
 		</div>
 	</div>
 
+	<div id="assessment-confirm-modal" class="modal">
+		<div class="modal-content conflict-content">
+			<h2>Klassensatz versenden</h2>
+			<p id="assessment-confirm-text"></p>
+			<div class="modal-buttons">
+				<button class="btn-1" id="assessment-confirm-send-btn">E-Mails senden</button>
+				<button class="btn-2" id="assessment-confirm-cancel-btn">Abbrechen</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="assessment-delete-modal" class="modal">
+		<div class="modal-content conflict-content">
+			<h2>Beurteilungsrunde löschen</h2>
+			<p id="assessment-delete-text"></p>
+			<p class="assessment-warning update-hidden" id="assessment-delete-sent-warning"></p>
+			<p>Das externe Formular, die Tabelle und das Apps Script werden nicht verändert.</p>
+			<div class="modal-buttons">
+				<button class="btn-1" id="assessment-delete-confirm-btn">Runde löschen</button>
+				<button class="btn-2" id="assessment-delete-cancel-btn">Abbrechen</button>
+			</div>
+		</div>
+	</div>
+
 </div>
 </body>
 
 <script>
 	require('./renderProcess.js');
+	require('./assessmentRenderer.js');
 </script>
 
 </html>

@@ -5,6 +5,7 @@ const os = require('os');
 const { getBackupPreview, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, clearWiggersRulePenalties, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, removeBackupEntries, logEvent, getLogs, getPaths, getLastShownUpdateVersion, saveLastShownUpdateVersion } = require('./storage.js');
 const { readReleaseNotesForVersion, stripReleaseNotesHeader } = require('./releaseNotes.js');
 const { ANALYTICS_ENDPOINT, ANALYTICS_APP_ID, getAnalyticsApiKey } = require('./analyticsConfig.js');
+const { registerAssessmentHandlers } = require('./assessment/mainAssessment.js');
 const isDebugMode = process.argv.includes('--dev-mode');
 const sessionEntries = [];
 let lastUndoEntry;
@@ -221,6 +222,8 @@ ipcMain.on('select-person', (event, personId) => {
 function getSelectionNames() {
 	return getProgram().getPersons().map(person => person.name).filter(Boolean);
 }
+
+registerAssessmentHandlers({ getProgram, getPaths });
 
 // ok
 ipcMain.on('ok', (event, args) => {

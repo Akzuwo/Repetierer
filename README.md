@@ -49,6 +49,7 @@ Gesendet wird über `POST /` mit `appId: "Repetierer"` und `type: "issue"`.
 Der benötigte App-Key wird lokal über `REPETIERER_ANALYTICS_KEY`, `ANALYTICS_KEY` oder eine nicht committete `analytics-config.local.json` mit `{ "analyticsKey": "..." }` bereitgestellt.
 
 ### Neue Funktionen
+- **Mitmachnote:** Beurteilungsrunden pro bestehender Klasse, Selbstbeurteilung über ein vorbereitetes Formular mit Apps-Script-API, lokaler Schüler-/Lehrervergleich und persönlicher Resultatversand über Brevo SMTP. Einrichtung und Datenhaltung sind in [docs/mitmachnote.md](docs/mitmachnote.md) beschrieben.
 - **Sitzungsprotokoll exportieren:** Im Menü kann die aktuelle Sitzung als CSV oder PDF exportiert werden. Das Protokoll enthält Zeitpunkt, Datum, Klasse, Person, Aktion, Note und Excel-Status.
 - **Klassenliste importieren:** Eine bestehende Excel- oder CSV-Datei kann importiert und als neue Repetierer-Datei gespeichert werden. Das Programm übernimmt bis zu 25 eindeutige Namen und legt die nötige Excel-Struktur automatisch an.
 - **Letzte Aktion rückgängig machen:** Die letzte Note oder Joker-Nutzung der aktuellen Sitzung kann rückgängig gemacht werden, solange der passende Excel-Eintrag noch unverändert ist. Falls Excel beim Speichern gesperrt war, wird der offene lokale Eintrag entfernt.

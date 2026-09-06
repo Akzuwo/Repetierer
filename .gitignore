@@ -74,6 +74,9 @@ typings/
 .env.local
 .env.*.local
 .dev.vars
+brevo-smtp.env
+repetierer.env
+mitmachnoten.json
 report-config.local.json
 analytics-config.local.json
 

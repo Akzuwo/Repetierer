@@ -7,11 +7,23 @@ $ErrorActionPreference = "Stop"
 $previousPublishMode = $env:PUBLISH_MODE
 $rootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+function Invoke-NativeCommand {
+  param(
+    [Parameter(Mandatory = $true)][scriptblock]$Command,
+    [Parameter(Mandatory = $true)][string]$Description
+  )
+
+  & $Command
+  if ($LASTEXITCODE -ne 0) {
+    throw "$Description fehlgeschlagen (Exitcode $LASTEXITCODE)."
+  }
+}
+
 Push-Location $rootDir
 try {
   if (-not (Test-Path "node_modules")) {
     Write-Host "Installiere Abhaengigkeiten mit npm ci..."
-    npm ci
+    Invoke-NativeCommand { npm ci } "npm ci"
   }
 
   if ($Clean -and (Test-Path "builds")) {
@@ -20,11 +32,11 @@ try {
   }
 
   Write-Host "Baue Tailwind CSS..."
-  npm run build:css
+  Invoke-NativeCommand { npm run build:css } "CSS-Build"
 
   $env:PUBLISH_MODE = "never"
   Write-Host "Erzeuge lokalen Windows-Build..."
-  node ".\scripts\release-with-icon.js"
+  Invoke-NativeCommand { node ".\scripts\release-with-icon.js" } "Windows-Build"
 
   Write-Host ""
   Write-Host "Fertig. Installer liegt im builds-Ordner:"

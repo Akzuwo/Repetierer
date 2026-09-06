@@ -2032,6 +2032,266 @@
 	}
 }
 
+	#assessment-view {
+		grid-area: 1 / 1 / 2 / 3;
+		min-height: 0;
+		overflow: hidden;
+		position: relative;
+	}
+
+	.assessment-header {
+		align-items: flex-start;
+		display: flex;
+		gap: 1rem;
+		justify-content: space-between;
+		margin-bottom: 1.25rem;
+	}
+
+	.assessment-header h2 {
+		font-size: 2rem;
+		margin: 0.2rem 0 0;
+	}
+
+	.assessment-kicker {
+		color: #18a890;
+		font-size: 0.78rem;
+		font-weight: 700;
+		text-transform: uppercase;
+	}
+
+	.assessment-header-actions {
+		align-items: flex-end;
+		display: flex;
+		gap: 0.75rem;
+	}
+
+	.assessment-class-select {
+		color: #bfc0c4;
+		display: flex;
+		flex-direction: column;
+		font-size: 0.78rem;
+		gap: 0.35rem;
+	}
+
+	.assessment-class-select select,
+	.assessment-create input,
+	.assessment-match-row select,
+	.teacher-criterion select,
+	.teacher-comments textarea,
+	.assessment-invitation textarea {
+		background: #202125;
+		border: 0.1rem solid rgba(255,255,255,.12);
+		border-radius: 0.65rem;
+		color: #f5f5f5;
+		font-size: 0.92rem;
+		outline: none;
+		padding: 0.72rem 0.8rem;
+	}
+
+	.assessment-class-select select:focus,
+	.assessment-create input:focus,
+	.assessment-match-row select:focus,
+	.teacher-criterion select:focus,
+	.teacher-comments textarea:focus {
+		border-color: #18a890;
+	}
+
+	.assessment-body {
+		-webkit-app-region: no-drag;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		height: calc(100% - 5.1rem);
+		overflow-y: auto;
+		padding: 0.1rem 0.45rem 0.3rem 0;
+		scrollbar-color: #18a890 #202125;
+		scrollbar-width: thin;
+	}
+
+	.assessment-body.assessment-busy {
+		opacity: 0.58;
+		pointer-events: none;
+	}
+
+	.assessment-body h3 {
+		font-size: 1rem;
+		font-weight: 700;
+		margin: 0 0 0.85rem;
+	}
+
+	.assessment-create,
+	.assessment-round-list,
+	.assessment-roster,
+	.assessment-unmatched,
+	.assessment-invitation,
+	.teacher-assessment {
+		background: rgba(32,33,37,.58);
+		border: 0.1rem solid rgba(255,255,255,.075);
+		border-radius: 0.85rem;
+		padding: 1rem;
+	}
+
+	.assessment-create-fields {
+		align-items: flex-end;
+		display: grid;
+		gap: 0.8rem;
+		grid-template-columns: minmax(12rem,1.5fr) minmax(10rem,1fr) auto;
+	}
+
+	.assessment-create-fields label,
+	.assessment-invitation label {
+		color: #bfc0c4;
+		display: flex;
+		flex-direction: column;
+		font-size: 0.82rem;
+		gap: 0.35rem;
+	}
+
+	.assessment-round-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.65rem;
+	}
+
+	.assessment-round-list h3 { margin-bottom: 0.2rem; }
+
+	.assessment-round-card {
+		align-items: center;
+		background: #27282c;
+		border: 0.1rem solid rgba(255,255,255,.08);
+		border-radius: 0.75rem;
+		cursor: pointer;
+		display: flex;
+		justify-content: space-between;
+		padding: 0.9rem 1rem;
+		text-align: left;
+		transition: border-color .2s, transform .2s;
+	}
+
+	.assessment-round-card:hover { border-color: #18a890; transform: translateY(-0.08rem); }
+	.assessment-round-card strong { color: #18a890; display: block; font-weight: 700; }
+	.assessment-round-card small { color: #777880; display: block; margin-top: 0.25rem; }
+	.assessment-round-counts { color: #bfc0c4; font-size: 0.84rem; }
+	.assessment-round-counts b { color: #f5f5f5; font-weight: 500; }
+
+	.assessment-metrics {
+		display: grid;
+		gap: 0.75rem;
+		grid-template-columns: repeat(4, minmax(0,1fr));
+	}
+
+	.assessment-metric {
+		background: rgba(32,33,37,.72);
+		border: 0.1rem solid rgba(255,255,255,.07);
+		border-radius: 0.75rem;
+		min-height: 4.2rem;
+		padding: 0.85rem;
+	}
+
+	.assessment-metric span { color: #bfc0c4; display: block; font-size: 0.76rem; margin-bottom: 0.4rem; }
+	.assessment-metric strong { color: #18a890; font-size: 1.15rem; font-weight: 700; line-height: 1.15; }
+	.assessment-metric small { color: #777880; font-size: 0.82rem; }
+
+	.assessment-toolbar,
+	.assessment-copy-actions,
+	.teacher-actions,
+	.integration-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.55rem;
+	}
+
+	.assessment-toolbar button,
+	.assessment-copy-actions button,
+	.teacher-actions button {
+		padding: 0.8rem 1rem;
+	}
+
+	.assessment-warning,
+	.assessment-notice-error,
+	.assessment-notice-warning,
+	.assessment-notice-success,
+	.assessment-floating-notice {
+		border: 0.1rem solid #d4a72c;
+		border-radius: 0.7rem;
+		color: #f0d887;
+		font-size: 0.86rem;
+		line-height: 1.35;
+		padding: 0.75rem 0.9rem;
+	}
+
+	.assessment-notice-error { border-color: #cc5555; color: #f0a0a0; }
+	.assessment-notice-success { border-color: #18a890; color: #75d7c6; }
+	.assessment-floating-notice { background: #202125; position: sticky; top: 0; z-index: 5; }
+
+	.assessment-student-row,
+	.assessment-match-row {
+		align-items: center;
+		border-top: 0.1rem solid rgba(255,255,255,.06);
+		display: grid;
+		gap: 0.75rem;
+		grid-template-columns: minmax(10rem,1fr) repeat(3, 6.5rem);
+		padding: 0.65rem 0;
+	}
+
+	.assessment-student-row strong,
+	.assessment-match-row strong { font-weight: 500; }
+	.assessment-student-row span { color: #bfc0c4; font-size: 0.84rem; }
+	.status-done { color: #18a890; font-weight: 700; }
+	.status-open { color: #777880; font-weight: 500; }
+	.status-error { color: #dd6969; font-weight: 700; }
+
+	.assessment-match-row { grid-template-columns: minmax(10rem,1fr) minmax(11rem,1fr) auto; }
+	.assessment-match-row small { color: #777880; display: block; font-size: 0.76rem; margin-top: 0.2rem; }
+	.assessment-match-row button { padding: 0.75rem 0.9rem; }
+
+	#assessment-invitation-area:not(.invitation-expanded) .invitation-collapsed { display: none; }
+	.assessment-invitation textarea { resize: vertical; user-select: text; width: calc(100% - 1.6rem); }
+	.assessment-invitation label + label { margin-top: 0.75rem; }
+	.assessment-copy-actions { margin-top: 0.8rem; }
+
+	.teacher-grid-heading,
+	.teacher-criterion {
+		align-items: center;
+		display: grid;
+		gap: 0.8rem;
+		grid-template-columns: minmax(13rem,1fr) 5rem 5rem 6rem;
+		padding: 0.65rem;
+	}
+
+	.teacher-grid-heading { color: #777880; font-size: 0.76rem; font-weight: 500; }
+	.teacher-criterion { border-top: 0.1rem solid rgba(255,255,255,.07); }
+	.teacher-criterion strong { font-weight: 500; }
+	.teacher-criterion span, .teacher-criterion b { text-align: center; }
+	.teacher-criterion b { color: #18a890; font-weight: 700; }
+	.teacher-criterion select { padding: 0.55rem; text-align: center; }
+
+	.teacher-comments {
+		display: grid;
+		gap: 1rem;
+		grid-template-columns: 1fr 1fr;
+		margin-top: 1rem;
+	}
+
+	.teacher-comments > div,
+	.teacher-comments > label { background: #27282c; border-radius: 0.7rem; padding: 0.85rem; }
+	.teacher-comments h3 { color: #18a890; }
+	.teacher-comments p { color: #bfc0c4; line-height: 1.45; white-space: pre-wrap; }
+	.teacher-comments textarea { box-sizing: border-box; resize: vertical; user-select: text; width: 100%; }
+	.teacher-actions { justify-content: flex-end; margin-top: 1rem; }
+
+	.assessment-empty,
+	.assessment-loading { color: #bfc0c4; line-height: 1.4; padding: 1rem 0; }
+
+	.assessment-integration-setting { align-items: flex-start; flex-direction: column; }
+	.integration-actions { margin-top: 0.75rem; width: 100%; }
+	.integration-actions button { flex: 1 1 10rem; padding: 0.72rem; }
+	#assessment-config-status[data-status="error"], #assessment-api-status[data-status="error"], #brevo-status[data-status="error"] { color: #e68585; }
+	.assessment-integration-setting small { display: block; margin-top: 0.2rem; }
+	.assessment-duplicates { background: rgba(32,33,37,.58); border: 0.1rem solid rgba(255,255,255,.075); border-radius: 0.85rem; padding: 1rem; }
+	.assessment-duplicate-row { align-items: center; display: grid; gap: 0.8rem; grid-template-columns: minmax(10rem,1fr) minmax(12rem,1fr); margin-top: 0.7rem; }
+	.assessment-duplicate-row select { background: #202125; border: 0.1rem solid rgba(255,255,255,.12); border-radius: 0.65rem; color: #f5f5f5; padding: 0.7rem; width: 100%; }
+
 @keyframes stats-view-enter {
 	from {
 		filter: blur(0.18rem);

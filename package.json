@@ -1,6 +1,6 @@
 {
   "name": "repetierer",
-  "version": "6.2.0",
+  "version": "7.0.0",
   "description": "(:",
   "license": "GPL-3.0",
   "repository": {
@@ -10,6 +10,7 @@
   "main": "app.js",
   "scripts": {
     "build:css": "tailwindcss -c tailwind.config.js -i ./public/tailwind.input.css -o ./public/tailwind.css --minify",
+    "test": "node --test --test-concurrency=1 test/*.test.js",
     "start": "npm run build:css && electron . ",
     "build": "electron-builder",
     "build:local": "powershell -ExecutionPolicy Bypass -File ./build-local.ps1",
@@ -29,6 +30,7 @@
       "public/splash.html",
       "public/splash.js",
       "public/renderProcess.js",
+      "public/assessmentRenderer.js",
       "public/style.css",
       "public/tailwind.css",
       "public/icons/icon.ico",
@@ -84,7 +86,8 @@
   "author": "srpnt3, Jonas-Luetolf, Akzuwo",
   "dependencies": {
     "electron-updater": "^6.8.3",
-    "exceljs": "^4.2.1"
+    "exceljs": "^4.2.1",
+    "nodemailer": "^9.1.1"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.20",
