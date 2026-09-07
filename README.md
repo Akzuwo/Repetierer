@@ -116,5 +116,6 @@ Provide the app key locally through `REPETIERER_ANALYTICS_KEY`, `ANALYTICS_KEY` 
 ![](https://raw.githubusercontent.com/srpnt3/Repetierer/master/public/images/preview.png)
 
 ## Future Development
-I do not plan to continue this project any further, since I will soon finish the school for which I developed the application.
-Of course the project is Open-Source so anyone can continue development.
+Quote by the original dev: "I do not plan to continue this project any further, since I will soon finish the school for which I developed the application.
+Of course the project is Open-Source so anyone can continue development."
+I (Akzuwo) am currently developping Repetierer 7. Repetierer 7 contains even more UI/UX upgrades, aswell as two completly new features. Im not going into that for now. Stay tuned ;-)
