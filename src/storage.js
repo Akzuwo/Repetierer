@@ -24,6 +24,7 @@ function getPaths() {
 		migrationsPath: path.join(storageDir, 'migrations.json'),
 		logPath: path.join(storageDir, 'repetierer.log'),
 		assessmentPath: path.join(storageDir, 'mitmachnoten.json'),
+		teachingSessionsPath: path.join(storageDir, 'unterrichtssessions.json'),
 		integrationEnvPath: path.join(storageDir, 'repetierer.env'),
 		brevoEnvPath: path.join(storageDir, 'brevo-smtp.env')
 	};

@@ -14,29 +14,29 @@
 <body>
 <div id="container">
 	<div id="title-bar">
-		<div class="title-actions">
-			<div class="ico" id="drawer-toggle" title="Menü">
-				<span></span>
-				<span></span>
-				<span></span>
-			</div>
+		<div class="ico" id="drawer-toggle" title="Menü">
+			<span></span>
+			<span></span>
+			<span></span>
 		</div>
-		<div class="title-actions">
-			<div class="ico" id="settings-btn" title="Einstellungen">
-				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-					<path d="M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.37-.31-.6-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98L14.5 2.42C14.47 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42L9.12 5.07c-.61.25-1.18.59-1.69.98l-2.49-1c-.23-.08-.48 0-.6.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.08.65-.08.98s.03.66.08.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.37.31.6.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.25.42.5.42h4c.25 0 .47-.18.5-.42l.38-2.65c.61-.25 1.18-.59 1.69-.98l2.49 1c.23.08.48 0 .6-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/>
-				</svg>
-			</div>
-			<div class="ico" id="minimize">
-				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 6">
-					<rect width="56" height="6" rx="3"/>
-				</svg>
-			</div>
-			<div class="ico" id="quit">
-				<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 58.72 57.8">
-					<path d="M57.86.9h0a3,3,0,0,0-4.24,0L29.36,24.69,5.1.86A3,3,0,0,0,.86.9h0a3,3,0,0,0,0,4.24L25.08,28.9.9,52.66a3,3,0,0,0,0,4.24h0a3,3,0,0,0,4.24,0L29.36,33.1,53.62,56.94a3,3,0,0,0,4.24,0h0a3,3,0,0,0,0-4.24L33.64,28.9,57.82,5.14A3,3,0,0,0,57.86.9Z"/>
-				</svg>
-			</div>
+		<h1 id="title" data-text="Repetierer">Repetierer</h1>
+		<span id="title-author">by srpnt3, Jonas-Luetolf and Akzuwo</span>
+		<span id="version"></span>
+		<span class="title-spacer"></span>
+		<div class="ico" id="settings-btn" title="Einstellungen">
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+				<path d="M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.37-.31-.6-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98L14.5 2.42C14.47 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42L9.12 5.07c-.61.25-1.18.59-1.69.98l-2.49-1c-.23-.08-.48 0-.6.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.08.65-.08.98s.03.66.08.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.37.31.6.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.25.42.5.42h4c.25 0 .47-.18.5-.42l.38-2.65c.61-.25 1.18-.59 1.69-.98l2.49 1c.23-.08.48 0 .6.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/>
+			</svg>
+		</div>
+		<div class="ico" id="minimize" title="Minimieren">
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 6">
+				<rect width="56" height="6" rx="3"/>
+			</svg>
+		</div>
+		<div class="ico" id="quit" title="Schliessen">
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 58.72 57.8">
+				<path d="M57.86.9h0a3,3,0,0,0-4.24,0L29.36,24.69,5.1.86A3,3,0,0,0,.86.9h0a3,3,0,0,0,0,4.24L25.08,28.9.9,52.66a3,3,0,0,0,0,4.24h0a3,3,0,0,0,4.24,0L29.36,33.1,53.62,56.94a3,3,0,0,0,4.24,0h0a3,3,0,0,0,0-4.24L33.64,28.9,57.82,5.14A3,3,0,0,0,57.86.9Z"/>
+			</svg>
 		</div>
 	</div>
 
@@ -81,39 +81,47 @@
 		<p id="drawer-status">Noch keine Datei ausgewählt.</p>
 	</aside>
 
-	<div id="info">
-		<p id="version"></p>
-		<p style="align-self: end">by srpnt3, Jonas-Luetolf and Akzuwo</p>
-	</div>
-
-	<h1 id="title">Repetierer</h1>
-
 	<div id="content">
 		<div class="neum" id="class">
 			<div class="panel-heading">
 				<h2>Klasse</h2>
 				<button class="help-button mini-help-button" id="class-help-btn" title="Erklärung">?</button>
 			</div>
-			<div id="class-list">
-				<div></div>
+		</div>
+		<div class="neum session-empty-view" id="session-empty-view">
+			<span class="assessment-kicker">Unterrichts-Session</span>
+			<div class="session-start-heading"><div><h2>Klasse wählen</h2><p>Mit einer Klasse beginnen, Abwesende markieren und direkt loslegen.</p></div><button class="help-button mini-help-button" id="session-start-help-btn" title="Erklärung">?</button></div>
+			<div id="class-list" class="session-class-list"><div></div></div>
+		</div>
+		<div class="session-header update-hidden" id="session-header">
+			<div class="session-meta">
+				<span class="session-live-dot"></span>
+				<strong id="session-class-name">Klasse</strong>
+				<span id="session-attendance-count">0 anwesend</span>
+			</div>
+			<div class="session-tabs">
+				<button class="btn-1" id="session-participation-tab">Mitarbeit</button>
+				<button class="btn-2" id="session-repetition-tab">Repetition</button>
+				<button class="btn-2 session-end-button" id="end-session-btn">Session beenden</button>
 			</div>
 		</div>
 		<div class="neum" id="repetition">
 			<div class="repetition-header">
-				<h2>Repetition <span id="class-name"></span></h2>
+				<h2>Repetition</h2>
+				<span class="update-hidden" id="class-name" aria-hidden="true"></span>
+				<div class="button-row">
+					<button class="btn-1 disabled" id="start-btn">Start</button>
+					<button class="btn-1 disabled" id="manual-select-btn">Freiwillig</button>
+					<button class="btn-2 disabled" id="probabilities-btn">Chancen</button>
+					<button class="btn-2 disabled update-hidden" id="absences-btn">Abwesend</button>
+				</div>
 				<div class="repetition-tools">
-					<button class="help-button mini-help-button" id="repetition-help-btn" title="Erklärung">?</button>
 					<div class="history-actions">
 						<button class="btn-2 history-btn disabled" id="undo-last-btn" title="Letzte Aktion rückgängig" aria-label="Letzte Aktion rückgängig">↶</button>
 						<button class="btn-2 history-btn disabled" id="redo-last-btn" title="Wiederholen" aria-label="Wiederholen">↷</button>
 					</div>
+					<button class="help-button mini-help-button" id="repetition-help-btn" title="Erklärung">?</button>
 				</div>
-			</div>
-			<div class="button-row">
-				<button class="btn-1 disabled" id="start-btn">Start</button>
-				<button class="btn-1 disabled" id="manual-select-btn">Freiwillig</button>
-				<button class="btn-2 disabled" id="probabilities-btn">Chancen</button>
-				<button class="btn-2 disabled" id="absences-btn">Abwesend</button>
 			</div>
 			<h1 class="disabled" id="name">Name</h1>
 			<div id="res">
@@ -149,6 +157,18 @@
 					</svg>
 				</div>
 				<strong>Gespeichert</strong>
+			</div>
+		</div>
+		<div class="neum update-hidden" id="participation-view">
+			<div class="participation-heading">
+				<div><span class="assessment-kicker">Aktive Session</span><h2>Mitarbeit</h2></div>
+				<button class="btn-2" id="participation-summary-btn">Auswertung</button>
+			</div>
+			<p class="participation-help">Schüler anklicken und direkt einen Wert von 1 bis 6 erfassen.</p>
+			<div id="participation-student-list"></div>
+			<div class="update-hidden" id="participation-summary">
+				<div class="participation-heading"><h3>Auswertung</h3><button class="btn-2" id="participation-summary-close-btn">Zurück</button></div>
+				<div id="participation-summary-list"></div>
 			</div>
 		</div>
 		<div class="neum update-hidden" id="stats-view">
@@ -497,6 +517,41 @@
 			<div class="modal-buttons info-modal-buttons">
 				<button class="btn-2" id="close-settings-help-bottom-btn">Zurück</button>
 			</div>
+		</div>
+	</div>
+
+	<div id="session-start-modal" class="modal">
+		<div class="modal-content session-start-content">
+			<h2>Abwesenheiten erfassen</h2>
+			<p class="session-start-class">Klasse <strong id="session-start-class"></strong></p>
+			<p class="excel-editor-help">Alle Schüler sind standardmässig anwesend. Klicken Sie nur abwesende Schüler an.</p>
+			<div class="session-attendance-summary"><strong id="session-present-preview">0 anwesend</strong><span id="session-absent-preview">0 abwesend</span></div>
+			<div id="session-attendance-list"></div>
+			<div class="modal-buttons">
+				<button class="btn-1" id="confirm-session-start-btn">Session starten</button>
+				<button class="btn-2" id="cancel-session-start-btn">Abbrechen</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="session-end-modal" class="modal">
+		<div class="modal-content session-end-confirm-content">
+			<div class="session-end-confirm-icon" aria-hidden="true">!</div>
+			<h2>Session beenden?</h2>
+			<p>Alle bisherigen Einträge bleiben gespeichert. Danach gelangen Sie zurück zur Klassenauswahl.</p>
+			<div class="modal-buttons">
+				<button class="btn-danger" id="confirm-session-end-btn">Session beenden</button>
+				<button class="btn-2" id="cancel-session-end-btn">Weiter unterrichten</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="participation-modal" class="modal">
+		<div class="modal-content participation-modal-content">
+			<span class="assessment-kicker">Mitarbeit erfassen</span>
+			<h2 id="participation-student-name">Schüler</h2>
+			<div class="participation-score-list" id="participation-score-list"></div>
+			<button class="btn-2 participation-cancel" id="participation-cancel-btn">Abbrechen</button>
 		</div>
 	</div>
 

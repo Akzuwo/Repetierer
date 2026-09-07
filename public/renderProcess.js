@@ -68,6 +68,34 @@ const _absenceList = document.getElementById('absence-list');
 const _saveAbsencesBtn = document.getElementById('save-absences-btn');
 const _closeAbsenceModal = document.getElementById('close-absence-modal');
 const _className = document.getElementById('class-name');
+const _sessionStartHelpBtn = document.getElementById('session-start-help-btn');
+const _sessionEmptyView = document.getElementById('session-empty-view');
+const _sessionHeader = document.getElementById('session-header');
+const _sessionClassName = document.getElementById('session-class-name');
+const _sessionAttendanceCount = document.getElementById('session-attendance-count');
+const _sessionParticipationTab = document.getElementById('session-participation-tab');
+const _sessionRepetitionTab = document.getElementById('session-repetition-tab');
+const _endSessionBtn = document.getElementById('end-session-btn');
+const _participationView = document.getElementById('participation-view');
+const _participationStudentList = document.getElementById('participation-student-list');
+const _participationSummaryBtn = document.getElementById('participation-summary-btn');
+const _participationSummary = document.getElementById('participation-summary');
+const _participationSummaryList = document.getElementById('participation-summary-list');
+const _participationSummaryCloseBtn = document.getElementById('participation-summary-close-btn');
+const _sessionStartModal = document.getElementById('session-start-modal');
+const _sessionStartClass = document.getElementById('session-start-class');
+const _sessionAttendanceList = document.getElementById('session-attendance-list');
+const _sessionPresentPreview = document.getElementById('session-present-preview');
+const _sessionAbsentPreview = document.getElementById('session-absent-preview');
+const _confirmSessionStartBtn = document.getElementById('confirm-session-start-btn');
+const _cancelSessionStartBtn = document.getElementById('cancel-session-start-btn');
+const _sessionEndModal = document.getElementById('session-end-modal');
+const _confirmSessionEndBtn = document.getElementById('confirm-session-end-btn');
+const _cancelSessionEndBtn = document.getElementById('cancel-session-end-btn');
+const _participationModal = document.getElementById('participation-modal');
+const _participationStudentName = document.getElementById('participation-student-name');
+const _participationScoreList = document.getElementById('participation-score-list');
+const _participationCancelBtn = document.getElementById('participation-cancel-btn');
 const _backupModal = document.getElementById('backup-modal');
 const _backupList = document.getElementById('backup-list');
 const _backupLocation = document.getElementById('backup-location');
@@ -150,6 +178,12 @@ const _updateSecondaryBtn = document.getElementById('update-secondary-btn');
 
 let selectedPersonIds = [];
 let absentPersonIds = [];
+let activeTeachingSession = null;
+let pendingSessionSetupClass = '';
+let sessionSetup = null;
+let sessionSetupAbsentIds = [];
+let selectedParticipationStudent = null;
+let activeSessionArea = 'participation';
 let excelEditorPersons = [];
 let pendingExcelCount = 0;
 let pendingClassImport = null;
@@ -441,6 +475,10 @@ _classHelpBtn.addEventListener('click', () => {
 	openTeacherHelp('class');
 });
 
+_sessionStartHelpBtn.addEventListener('click', () => {
+	openTeacherHelp('class');
+});
+
 _repetitionHelpBtn.addEventListener('click', () => {
 	openTeacherHelp('repetition');
 });
@@ -589,6 +627,7 @@ _debugFakeUpdateBtn.addEventListener('click', () => {
 function classEvent(e) {
 	e.addEventListener('click', () => {
 		setActiveClassButton(e);
+		if (!activeTeachingSession) pendingSessionSetupClass = e.innerText;
 		ipcRenderer.send('class', e.innerText);
 	});
 }
@@ -630,6 +669,41 @@ _manualSelectBtn.addEventListener('click', () => {
 
 _absencesBtn.addEventListener('click', () => {
 	ipcRenderer.send('get-absence-persons');
+});
+
+_cancelSessionStartBtn.addEventListener('click', () => closeModal(_sessionStartModal));
+_sessionStartModal.addEventListener('click', event => {
+	if (event.target === _sessionStartModal) closeModal(_sessionStartModal);
+});
+_confirmSessionStartBtn.addEventListener('click', () => {
+	if (!sessionSetup) return;
+	disableElement(_confirmSessionStartBtn);
+	ipcRenderer.send('start-teaching-session', { className: sessionSetup.className, absentIds: sessionSetupAbsentIds });
+});
+
+_sessionParticipationTab.addEventListener('click', () => showSessionArea('participation'));
+_sessionRepetitionTab.addEventListener('click', () => showSessionArea('repetition'));
+_endSessionBtn.addEventListener('click', () => {
+	if (activeTeachingSession) openModal(_sessionEndModal);
+});
+_cancelSessionEndBtn.addEventListener('click', () => closeModal(_sessionEndModal));
+_sessionEndModal.addEventListener('click', event => {
+	if (event.target === _sessionEndModal) closeModal(_sessionEndModal);
+});
+_confirmSessionEndBtn.addEventListener('click', () => {
+	if (!activeTeachingSession) return;
+	disableElement(_confirmSessionEndBtn);
+	ipcRenderer.send('end-teaching-session', activeTeachingSession.id);
+});
+
+_participationSummaryBtn.addEventListener('click', () => {
+	if (!activeTeachingSession) return;
+	ipcRenderer.send('get-participation-summary', activeTeachingSession.className);
+});
+_participationSummaryCloseBtn.addEventListener('click', closeParticipationSummary);
+_participationCancelBtn.addEventListener('click', () => closeModal(_participationModal));
+_participationModal.addEventListener('click', event => {
+	if (event.target === _participationModal) closeModal(_participationModal);
 });
 
 // close modal
@@ -700,6 +774,13 @@ ipcRenderer.on('classes', (event, args, filePath) => {
 			classEvent(x);
 			_classes.appendChild(x);
 		}
+		if (activeTeachingSession) {
+			const activeButton = Array.from(_classes.querySelectorAll('button')).find(button => button.innerText === activeTeachingSession.className);
+			if (activeButton) {
+				setActiveClassButton(activeButton);
+				ipcRenderer.send('class', activeTeachingSession.className);
+			}
+		}
 	} else {
 		state = 0;
 		_filePath.innerText = '';
@@ -756,7 +837,7 @@ ipcRenderer.on('joker-migration-failed', (event, result) => {
 });
 
 ipcRenderer.on('version', (event, appVersion) => {
-	document.getElementById("version").innerText = "Repetierer v" + appVersion;
+	document.getElementById("version").innerText = "v" + appVersion;
 });
 
 ipcRenderer.on('update-news-data', (event, payload) => {
@@ -1037,7 +1118,15 @@ ipcRenderer.on('ready', (event, args) => {
 		_className.innerText = `${_currentClass.innerText}`;
 		setActiveClassButton(_currentClass);
 		updateState();
+		if (!activeTeachingSession && pendingSessionSetupClass === _currentClass.innerText) {
+			pendingSessionSetupClass = '';
+			ipcRenderer.send('get-session-setup');
+		}
+		if (activeTeachingSession && _currentClass && activeTeachingSession.className === _currentClass.innerText) {
+			ipcRenderer.send('resume-teaching-session');
+		}
 	} else {
+		pendingSessionSetupClass = '';
 		state = 1;
 		_className.innerText = '';
 		clearActiveClassButton();
@@ -1141,10 +1230,11 @@ ipcRenderer.on('name', (event, args, selectionNames) => {
     
     updateState();
 	_grade.value = '';
-	_name.innerText = name;
+	const displayName = getFirstName(name);
+	_name.innerText = displayName;
 	_nameSize = 10;
 	scaleName();
-	runSelectionEffect(name, selectionNames);
+	runSelectionEffect(displayName, (selectionNames || []).map(getFirstName));
 
 })
 
@@ -1400,6 +1490,241 @@ ipcRenderer.on('editor-persons-save-failed', (event, result) => {
 });
 
     
+ipcRenderer.on('session-setup-data', (event, setup) => {
+	if (!setup || !setup.className || !Array.isArray(setup.persons) || setup.persons.length === 0) {
+		showUpdatePanel({ title: 'Session nicht möglich', detail: 'Wähle zuerst eine Klasse mit Schülern aus.', primaryVisible: false, secondaryText: 'OK', secondaryVisible: true });
+		return;
+	}
+	sessionSetup = setup;
+	sessionSetupAbsentIds = [];
+	_sessionStartClass.innerText = setup.className;
+	renderSessionAttendance();
+	enableElement(_confirmSessionStartBtn);
+	openModal(_sessionStartModal);
+});
+
+ipcRenderer.on('teaching-session-started', (event, session) => {
+	closeModal(_sessionStartModal);
+	setActiveTeachingSession(session);
+});
+
+ipcRenderer.on('teaching-session-start-failed', (event, result) => {
+	enableElement(_confirmSessionStartBtn);
+	showUpdatePanel({ title: 'Session nicht gestartet', detail: result && result.reason === 'session-already-active' ? 'Es läuft bereits eine Session.' : 'Die Session konnte nicht gestartet werden.', primaryVisible: false, secondaryText: 'OK', secondaryVisible: true });
+});
+
+ipcRenderer.on('active-teaching-session-data', (event, session) => {
+	activeTeachingSession = session || null;
+	if (!session) {
+		renderTeachingSessionView();
+		return;
+	}
+	const classButton = Array.from(_classes.querySelectorAll('button')).find(button => button.innerText === session.className);
+	if (classButton && (!_currentClass || _currentClass.innerText !== session.className)) {
+		setActiveClassButton(classButton);
+		ipcRenderer.send('class', session.className);
+		return;
+	}
+	setActiveTeachingSession(session);
+});
+
+ipcRenderer.on('teaching-session-ended', () => {
+	closeModal(_sessionEndModal);
+	enableElement(_confirmSessionEndBtn);
+	activeTeachingSession = null;
+	activeSessionArea = 'participation';
+	closeParticipationSummary();
+	renderTeachingSessionView();
+	state = _currentClass ? 2 : 1;
+	updateState();
+	showUpdatePanel({ title: 'Session beendet', detail: 'Alle Einträge wurden gespeichert.', primaryVisible: false, secondaryText: 'OK', secondaryVisible: true, placement: 'toast' });
+});
+
+ipcRenderer.on('teaching-session-end-failed', () => {
+	enableElement(_confirmSessionEndBtn);
+	closeModal(_sessionEndModal);
+	showUpdatePanel({ title: 'Session nicht beendet', detail: 'Die Session konnte nicht beendet werden. Bitte versuchen Sie es erneut.', primaryVisible: false, secondaryText: 'OK', secondaryVisible: true });
+});
+
+ipcRenderer.on('participation-entry-saved', (event, session) => {
+	setActiveTeachingSession(session);
+});
+
+ipcRenderer.on('participation-entry-failed', () => {
+	showUpdatePanel({ title: 'Nicht gespeichert', detail: 'Der Mitarbeitseintrag konnte nicht gespeichert werden.', primaryVisible: false, secondaryText: 'OK', secondaryVisible: true });
+});
+
+ipcRenderer.on('participation-summary-data', (event, rows) => renderParticipationSummary(rows || []));
+ipcRenderer.on('teaching-session-required', () => {
+	showUpdatePanel({ title: 'Session erforderlich', detail: 'Wähle eine Klasse und starte zuerst eine Unterrichts-Session.', primaryVisible: false, secondaryText: 'OK', secondaryVisible: true });
+});
+
+function renderSessionAttendance() {
+	_sessionAttendanceList.innerHTML = '';
+	(sessionSetup.persons || []).forEach(person => {
+		const label = document.createElement('label');
+		label.className = 'attendance-person';
+		const checkbox = document.createElement('input');
+		checkbox.type = 'checkbox';
+		checkbox.checked = sessionSetupAbsentIds.some(id => String(id) === String(person.id));
+		const text = document.createElement('span');
+		text.innerText = person.name;
+		checkbox.addEventListener('change', () => {
+			if (checkbox.checked) sessionSetupAbsentIds.push(person.id);
+			else sessionSetupAbsentIds = sessionSetupAbsentIds.filter(id => String(id) !== String(person.id));
+			label.classList.toggle('is-absent', checkbox.checked);
+			updateAttendancePreview();
+		});
+		label.append(checkbox, text);
+		_sessionAttendanceList.appendChild(label);
+	});
+	updateAttendancePreview();
+}
+
+function updateAttendancePreview() {
+	const total = sessionSetup && sessionSetup.persons ? sessionSetup.persons.length : 0;
+	_sessionPresentPreview.innerText = `${total - sessionSetupAbsentIds.length} anwesend`;
+	_sessionAbsentPreview.innerText = `${sessionSetupAbsentIds.length} abwesend`;
+}
+
+function setActiveTeachingSession(session) {
+	activeTeachingSession = session;
+	_sessionClassName.innerText = session.className;
+	_sessionAttendanceCount.innerText = `${session.presentStudents.length} anwesend`;
+	renderParticipationStudents();
+	renderTeachingSessionView();
+	updateState();
+}
+
+function renderTeachingSessionView() {
+	const assessmentView = document.getElementById('assessment-view');
+	if (assessmentView && !assessmentView.classList.contains('update-hidden')) return;
+	if (_statsView && !_statsView.classList.contains('update-hidden')) return;
+	const isActive = !!activeTeachingSession;
+	_contentToggleSessionClass(isActive);
+	_sessionHeader.classList.toggle('update-hidden', !isActive);
+	_classPanel.classList.add('update-hidden');
+	_sessionEmptyView.classList.toggle('update-hidden', isActive);
+	if (!isActive) {
+		_participationView.classList.add('update-hidden');
+		_repetition.classList.add('update-hidden');
+		return;
+	}
+	showSessionArea(activeSessionArea);
+}
+
+function _contentToggleSessionClass(isActive) {
+	const content = document.getElementById('content');
+	if (content) content.classList.toggle('session-active', isActive);
+}
+
+function showSessionArea(area) {
+	if (!activeTeachingSession) return;
+	activeSessionArea = area === 'repetition' ? 'repetition' : 'participation';
+	const participationActive = activeSessionArea === 'participation';
+	_participationView.classList.toggle('update-hidden', !participationActive);
+	_repetition.classList.toggle('update-hidden', participationActive);
+	_sessionParticipationTab.className = participationActive ? 'btn-1' : 'btn-2';
+	_sessionRepetitionTab.className = participationActive ? 'btn-2' : 'btn-1';
+}
+
+function renderParticipationStudents() {
+	_participationStudentList.innerHTML = '';
+	const entryCounts = new Map();
+	(activeTeachingSession.participationEntries || []).forEach(entry => {
+		const key = String(entry.studentId);
+		entryCounts.set(key, (entryCounts.get(key) || 0) + 1);
+	});
+	(activeTeachingSession.presentStudents || []).forEach(person => {
+		const button = document.createElement('button');
+		button.className = 'participation-student';
+		const name = document.createElement('strong');
+		name.innerText = person.name;
+		const count = document.createElement('span');
+		const value = entryCounts.get(String(person.id)) || 0;
+		count.innerText = `${value} ${value === 1 ? 'Eintrag' : 'Einträge'}`;
+		button.append(name, count);
+		button.addEventListener('click', () => openParticipationScore(person));
+		_participationStudentList.appendChild(button);
+	});
+}
+
+function openParticipationScore(person) {
+	selectedParticipationStudent = person;
+	_participationStudentName.innerText = person.name;
+	_participationScoreList.innerHTML = '';
+	const descriptions = [
+		'falsche Antwort',
+		'originell, aber unpassend',
+		'sachlich korrekt, aber einfach / stichwortartig',
+		'passender Beitrag mit erkennbarem Mitdenken',
+		'weiterführender Beitrag, der auf den Kern hinsteuert',
+		'diskussionsprägender Beitrag / neue Perspektive'
+	];
+	descriptions.forEach((description, index) => {
+		const button = document.createElement('button');
+		button.className = 'btn-2 participation-score';
+		const score = document.createElement('strong');
+		score.innerText = String(index + 1);
+		const text = document.createElement('span');
+		text.innerText = description;
+		button.append(score, text);
+		button.addEventListener('click', () => {
+			ipcRenderer.send('add-participation-entry', { sessionId: activeTeachingSession.id, studentId: person.id, points: index + 1 });
+			closeModal(_participationModal);
+		});
+		_participationScoreList.appendChild(button);
+	});
+	openModal(_participationModal);
+}
+
+function renderParticipationSummary(rows) {
+	_participationStudentList.classList.add('update-hidden');
+	_participationSummary.classList.remove('update-hidden');
+	_participationSummaryList.innerHTML = '';
+	if (!rows.length) {
+		const empty = document.createElement('p');
+		empty.className = 'stats-empty';
+		empty.innerText = 'Noch keine Sessiondaten vorhanden.';
+		_participationSummaryList.appendChild(empty);
+		return;
+	}
+	rows.forEach(row => {
+		const card = document.createElement('article');
+		card.className = 'participation-summary-card';
+		const heading = document.createElement('h4');
+		heading.innerText = row.studentName;
+		const details = document.createElement('dl');
+		const metrics = [
+			['Besuchte Sessions', row.visitedSessions],
+			['Sessions mit Mitarbeit', row.sessionsWithParticipation],
+			['Bewertungen', row.ratingCount],
+			['Durchschnitt', row.averagePoints == null ? '—' : row.averagePoints.toFixed(2)],
+			['Beteiligungsquote', row.participationRate == null ? '—' : `${Math.round(row.participationRate * 100)} %`]
+		];
+		metrics.forEach(([label, value]) => {
+			const dt = document.createElement('dt'); dt.innerText = label;
+			const dd = document.createElement('dd'); dd.innerText = String(value);
+			details.append(dt, dd);
+		});
+		card.append(heading, details);
+		if (!row.dataSufficient) {
+			const note = document.createElement('span');
+			note.className = 'data-insufficient';
+			note.innerText = 'Datengrundlage unzureichend';
+			card.appendChild(note);
+		}
+		_participationSummaryList.appendChild(card);
+	});
+}
+
+function closeParticipationSummary() {
+	_participationSummary.classList.add('update-hidden');
+	_participationStudentList.classList.remove('update-hidden');
+}
+
+window.restoreTeachingSessionView = renderTeachingSessionView;
+
 /*
  * other
  */
@@ -1454,7 +1779,7 @@ function updateState() {
 			disable(_absencesBtn);
 			disable(_excelEditorBtn);
 			break;
-        case 4:
+		case 4:
 			disable(_start);
 			enable(_name);
 			enable(_label);
@@ -1469,6 +1794,13 @@ function updateState() {
 			break;
 
 	}
+
+	if (state === 2 && !activeTeachingSession) {
+		disableElement(_start);
+		disableElement(_manualSelectBtn);
+		disableElement(_probabilitiesBtn);
+	}
+	disableElement(_absencesBtn);
 
 	function disable(e) {
 		disableElement(e);
@@ -1566,6 +1898,7 @@ function openStatsView() {
 		clearTimeout(statsCloseTimer);
 		statsCloseTimer = null;
 	}
+
 	if (statsReturnTimer) {
 		clearTimeout(statsReturnTimer);
 		statsReturnTimer = null;
@@ -1573,6 +1906,10 @@ function openStatsView() {
 	resetStatsScrollMotion();
 	disconnectStatsCardObserver();
 	closeDrawer();
+	document.getElementById('content').classList.remove('session-active');
+	_sessionHeader.classList.add('update-hidden');
+	_participationView.classList.add('update-hidden');
+	_sessionEmptyView.classList.add('update-hidden');
 	[_classPanel, _repetition].forEach(panel => {
 		if (!panel) return;
 		panel.classList.remove('stats-panel-return');
@@ -1591,9 +1928,14 @@ function openStatsView() {
 
 function closeStatsView() {
 	if (!_statsView) return;
+	if (activeTeachingSession && !_statsView.classList.contains('update-hidden')) {
+		_statsView.classList.add('update-hidden');
+		_statsView.classList.remove('stats-closing', 'stats-opening', 'stats-results-entering');
+		renderTeachingSessionView();
+		return;
+	}
 	if (_statsView.classList.contains('update-hidden')) {
-		if (_classPanel) _classPanel.classList.remove('update-hidden');
-		if (_repetition) _repetition.classList.remove('update-hidden');
+		renderTeachingSessionView();
 		return;
 	}
 	if (_statsView.classList.contains('stats-closing')) return;
@@ -1612,6 +1954,7 @@ function closeStatsView() {
 	statsReturnTimer = setTimeout(() => {
 		if (_classPanel) _classPanel.classList.remove('stats-panel-return');
 		if (_repetition) _repetition.classList.remove('stats-panel-return');
+		renderTeachingSessionView();
 		statsReturnTimer = null;
 	}, motionDelay(520));
 
@@ -2391,6 +2734,10 @@ function runSelectionEffect(selectedName, names) {
 	queueSelectionEffect(() => clearSelectionEffect(), 3750, runId);
 }
 
+function getFirstName(name) {
+	return String(name || '').trim().split(/\s+/)[0] || '';
+}
+
 function createConfetti() {
 	if (!_confettiStage) return;
 	_confettiStage.innerHTML = '';
@@ -2507,13 +2854,11 @@ function animateRestore() {
 
 // scale the name to fit the screen
 function scaleName() {
+	const availableWidth = Math.max(0, _repetition.clientWidth - 64);
 	_name.style.fontSize = _nameSize + 'rem';
-	let a = parseInt(window.getComputedStyle(_repetition, null).getPropertyValue("width"), 10);
-	let b = _name.clientWidth;
-	let d = b - a;
-	if (d > 0) {
-		_nameSize -= 0.1;
-		scaleName();
+	while (_name.scrollWidth > availableWidth && _nameSize > 2.4) {
+		_nameSize = Math.max(2.4, _nameSize - 0.2);
+		_name.style.fontSize = _nameSize + 'rem';
 	}
 }
 
@@ -2522,4 +2867,4 @@ Math.clamp = function(a, b, c) {
 }
 
 // automatically scale the name on load
-module.exports = [scaleName(), updateState(), version(), ipcRenderer.send('get-update-news'), ipcRenderer.send('get-debug-mode'), ipcRenderer.send('get-ui-settings'), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status'), ipcRenderer.send('get-undo-status')];
+module.exports = [scaleName(), updateState(), version(), ipcRenderer.send('get-update-news'), ipcRenderer.send('get-debug-mode'), ipcRenderer.send('get-ui-settings'), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status'), ipcRenderer.send('get-undo-status'), ipcRenderer.send('get-active-teaching-session')];

@@ -338,6 +338,10 @@ function getCurrentFilePath() {
 	return filePath;
 }
 
+function getCurrentClass() {
+	return cls;
+}
+
 function getFormattedDate() {
 	const currentDate = new Date();
 	return `${String(currentDate.getDate()).padStart(2, '0')}.${String(currentDate.getMonth() + 1).padStart(2, '0')}.${currentDate.getFullYear()}`;
@@ -439,6 +443,7 @@ module.exports = {
 	applyPendingExcelEntries: applyPendingExcelEntries,
 	reloadExcel: reloadExcel,
 	getCurrentFilePath: getCurrentFilePath,
+	getCurrentClass: getCurrentClass,
 	getJokerMigrationStatus: getJokerMigrationStatus,
 	migrateJokers: migrateJokers,
 	getExtraJokerMigrationStatus: getExtraJokerMigrationStatus,

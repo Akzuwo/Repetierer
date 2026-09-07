@@ -57,6 +57,12 @@ async function main() {
   const node = process.execPath;
   const electronBuilderCli = path.join(rootDir, "node_modules", "electron-builder", "out", "cli", "cli.js");
   const publishMode = process.env.PUBLISH_MODE || "always";
+  const localBuildNumber = /^\d+$/.test(process.env.LOCAL_BUILD_NUMBER || "")
+    ? process.env.LOCAL_BUILD_NUMBER
+    : "";
+  const localMetadataArgs = localBuildNumber
+    ? [`--config.extraMetadata.localBuildNumber=${localBuildNumber}`]
+    : [];
 
   requireFile(iconPath, "App Icon");
   requireFile(electronBuilderCli, "electron-builder CLI");
@@ -68,6 +74,7 @@ async function main() {
     "--config.win.signAndEditExecutable=false",
     "--publish",
     "never",
+    ...localMetadataArgs,
   ]);
 
 	requireFile(exePath, "Entpackte Repetierer.exe");
@@ -78,7 +85,7 @@ async function main() {
   writeAppUpdateConfig();
   requireFile(appUpdatePath, "Update-Konfiguration");
 
-  run(node, [
+  const installerArgs = [
     electronBuilderCli,
     "--prepackaged",
     unpackedDir,
@@ -87,7 +94,12 @@ async function main() {
     "--config.win.signAndEditExecutable=false",
     "--publish",
     publishMode,
-  ]);
+    ...localMetadataArgs,
+  ];
+  if (localBuildNumber) {
+    installerArgs.push(`--config.nsis.artifactName=Repetierer-\${version}-Build-${localBuildNumber}.\${ext}`);
+  }
+  run(node, installerArgs);
 }
 
 async function editExecutableIcon(executablePath, executableIconPath) {

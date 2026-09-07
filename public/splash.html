@@ -13,7 +13,7 @@
 <body>
 <div id="container" class="startup-active splash-container">
 	<div id="startup-splash">
-		<svg class="startup-loader" viewBox="0 0 760 150" role="img" aria-label="Repetierer">
+		<svg class="startup-loader" viewBox="0 0 760 150" role="img" aria-label="Repetierer 7">
 			<defs>
 				<linearGradient gradientUnits="userSpaceOnUse" y2="0" x2="760" y1="150" x1="0" id="startup-gradient">
 					<stop stop-color="#0f1113" />
@@ -21,9 +21,15 @@
 					<stop stop-color="#0f1113" offset="1" />
 					<animateTransform repeatCount="indefinite" dur="14s" values="0 380 75;-270 380 75;-270 380 75;-540 380 75;-540 380 75;-810 380 75;-810 380 75;-1080 380 75;-1080 380 75" type="rotate" attributeName="gradientTransform" />
 				</linearGradient>
+				<clipPath id="startup-word-reveal">
+					<rect class="startup-word-mask" x="70" y="20" width="580" height="110" />
+				</clipPath>
 			</defs>
-			<text class="startup-loader-text" x="50%" y="50%" dominant-baseline="middle" text-anchor="middle">Repetierer</text>
+			<text class="startup-loader-text startup-loader-outline" x="340" y="50%" dominant-baseline="middle" text-anchor="middle">Repetierer</text>
+			<text class="startup-loader-text startup-loader-word" x="340" y="50%" dominant-baseline="middle" text-anchor="middle" clip-path="url(#startup-word-reveal)">Repetierer</text>
+			<text class="startup-loader-seven" x="650" y="50%" dominant-baseline="middle" text-anchor="middle">7</text>
 		</svg>
+		<span class="startup-credit">by timolu</span>
 	</div>
 </div>
 </body>

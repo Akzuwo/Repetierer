@@ -6,12 +6,14 @@ const { getBackupPreview, getAppSettings, getPendingExcelEntries, getExcelFilePa
 const { readReleaseNotesForVersion, stripReleaseNotesHeader } = require('./releaseNotes.js');
 const { ANALYTICS_ENDPOINT, ANALYTICS_APP_ID, getAnalyticsApiKey } = require('./analyticsConfig.js');
 const { registerAssessmentHandlers } = require('./assessment/mainAssessment.js');
+const { createTeachingSessionStore } = require('./teachingSessions.js');
 const isDebugMode = process.argv.includes('--dev-mode');
 const sessionEntries = [];
 let lastUndoEntry;
 let lastRedoEntry;
 let programModule;
 let ExcelJSModule;
+let teachingSessionStore;
 const MAX_REPORT_COMMENT_LENGTH = 4000;
 const MAX_REPORT_LOG_LENGTH = 200000;
 
@@ -23,6 +25,11 @@ function getProgram() {
 function createWorkbook() {
 	if (!ExcelJSModule) ExcelJSModule = require('exceljs');
 	return new ExcelJSModule.Workbook();
+}
+
+function getTeachingSessionStore() {
+	if (!teachingSessionStore) teachingSessionStore = createTeachingSessionStore(getPaths().teachingSessionsPath);
+	return teachingSessionStore;
 }
 
 logEvent('App gestartet', { version: app.getVersion() });
@@ -43,7 +50,14 @@ ipcMain.on('quit', (event, args) => {
 
 // app version
 ipcMain.on('get-version', (event, args) => {
-	event.sender.send('version', app.getVersion());
+	let displayVersion = app.getVersion();
+	try {
+		const packageData = JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'));
+		if (packageData.localBuildNumber) displayVersion += ` (Build ${packageData.localBuildNumber})`;
+	} catch (error) {
+		// Die Versionsnummer bleibt auch ohne optionale lokale Build-Metadaten verfügbar.
+	}
+	event.sender.send('version', displayVersion);
 });
 
 ipcMain.on('get-update-news', (event, args) => {
@@ -130,6 +144,10 @@ ipcMain.on('class', (event, args) => {
 
 // start
 ipcMain.on('start', (event, args) => {
+	if (!getTeachingSessionStore().getActiveSession()) {
+		event.sender.send('teaching-session-required');
+		return;
+	}
 	const selectedPerson = getProgram().selectPerson();
 	if (selectedPerson) {
 		event.sender.send('name', selectedPerson, getSelectionNames());
@@ -138,6 +156,87 @@ ipcMain.on('start', (event, args) => {
 	}
 });
 
+
+ipcMain.on('get-session-setup', event => {
+	const className = getProgram().getCurrentClass();
+	event.sender.send('session-setup-data', {
+		className: className || '',
+		persons: className ? getProgram().getClassPersons(className) : []
+	});
+});
+
+ipcMain.on('get-active-teaching-session', event => {
+	event.sender.send('active-teaching-session-data', getTeachingSessionStore().getActiveSession());
+});
+
+ipcMain.on('resume-teaching-session', event => {
+	const active = getTeachingSessionStore().getActiveSession();
+	if (!active || getProgram().getCurrentClass() !== active.className) {
+		event.sender.send('active-teaching-session-data', active);
+		return;
+	}
+	getProgram().setAbsences((active.absentStudents || []).map(person => person.id), () => {
+		event.sender.send('active-teaching-session-data', active);
+	});
+});
+
+ipcMain.on('start-teaching-session', (event, args) => {
+	const className = getProgram().getCurrentClass();
+	const persons = className ? getProgram().getClassPersons(className) : [];
+	if (!className || !args || args.className !== className) {
+		event.sender.send('teaching-session-start-failed', { reason: 'no-class-selected' });
+		return;
+	}
+	const absentIds = Array.isArray(args.absentIds) ? args.absentIds : [];
+	getProgram().setAbsences(absentIds, absenceResult => {
+		if (!absenceResult || !absenceResult.success) {
+			event.sender.send('teaching-session-start-failed', absenceResult || { reason: 'absence-save-failed' });
+			return;
+		}
+		const result = getTeachingSessionStore().startSession(className, persons, absentIds);
+		if (result.success) {
+			logEvent('Unterrichts-Session gestartet', { sessionId: result.session.id, className, present: result.session.presentStudents.length, absent: result.session.absentStudents.length });
+			event.sender.send('teaching-session-started', result.session);
+		} else {
+			event.sender.send('teaching-session-start-failed', result);
+		}
+	});
+});
+
+ipcMain.on('end-teaching-session', (event, sessionId) => {
+	const active = getTeachingSessionStore().getActiveSession();
+	if (!active || active.id !== sessionId) {
+		event.sender.send('teaching-session-end-failed', { reason: 'no-active-session' });
+		return;
+	}
+	const result = getTeachingSessionStore().endSession(sessionId);
+	if (result.success) {
+		getProgram().setAbsences([], () => {});
+		logEvent('Unterrichts-Session beendet', { sessionId, className: active.className });
+		event.sender.send('teaching-session-ended', result.session);
+	} else {
+		event.sender.send('teaching-session-end-failed', result);
+	}
+});
+
+ipcMain.on('add-participation-entry', (event, args) => {
+	const active = getTeachingSessionStore().getActiveSession();
+	if (!active || !args || args.sessionId !== active.id) {
+		event.sender.send('participation-entry-failed', { reason: 'no-active-session' });
+		return;
+	}
+	const result = getTeachingSessionStore().addParticipation(active.id, args.studentId, args.points);
+	if (result.success) {
+		logEvent('Mitarbeit erfasst', { sessionId: active.id, studentId: args.studentId, points: args.points });
+		event.sender.send('participation-entry-saved', result.session);
+	} else {
+		event.sender.send('participation-entry-failed', result);
+	}
+});
+
+ipcMain.on('get-participation-summary', (event, className) => {
+	event.sender.send('participation-summary-data', getTeachingSessionStore().getParticipationSummary(className || ''));
+});
 
 // get persons list for manual selection
 ipcMain.on('get-persons', (event, args) => {
@@ -229,6 +328,7 @@ registerAssessmentHandlers({ getProgram, getPaths });
 ipcMain.on('ok', (event, args) => {
 	getProgram().saveGrade(args, (result, backupEntry) => {
 		const wasSaved = handleExcelBackupEntry(event, backupEntry);
+		if (wasSaved) recordActiveSessionRepetition(backupEntry);
 		event.sender.send('finished', result);
 		if (wasSaved) event.sender.send('repetition-saved');
 	});
@@ -236,12 +336,18 @@ ipcMain.on('ok', (event, args) => {
 
 // joker
 ipcMain.on('joker', (event, args) => {
-    getProgram().setJoker((result, backupEntry) => {
+	getProgram().setJoker((result, backupEntry) => {
 		const wasSaved = handleExcelBackupEntry(event, backupEntry);
+		if (wasSaved) recordActiveSessionRepetition(backupEntry);
 		event.sender.send('finished', result);
 		if (wasSaved) event.sender.send('repetition-saved');
 	});
 });
+
+function recordActiveSessionRepetition(entry) {
+	const active = getTeachingSessionStore().getActiveSession();
+	if (active) getTeachingSessionStore().addRepetition(active.id, entry);
+}
 
 // backup
 ipcMain.on('get-backup', (event, args) => {

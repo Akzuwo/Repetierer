@@ -9,6 +9,9 @@ const elements = {
 	classPanel: document.getElementById('class'),
 	repetition: document.getElementById('repetition'),
 	stats: document.getElementById('stats-view'),
+	sessionHeader: document.getElementById('session-header'),
+	participation: document.getElementById('participation-view'),
+	sessionEmpty: document.getElementById('session-empty-view'),
 	title: document.getElementById('title'),
 	drawer: document.getElementById('drawer'),
 	drawerScrim: document.getElementById('drawer-scrim'),
@@ -107,11 +110,16 @@ elements.deleteConfirm.addEventListener('click', deleteRound);
 
 async function openAssessment() {
 	closeDrawer();
+	document.getElementById('content').classList.remove('session-active');
 	elements.classPanel.classList.add('update-hidden');
 	elements.repetition.classList.add('update-hidden');
 	elements.stats.classList.add('update-hidden');
+	elements.sessionHeader.classList.add('update-hidden');
+	elements.participation.classList.add('update-hidden');
+	elements.sessionEmpty.classList.add('update-hidden');
 	elements.view.classList.remove('update-hidden');
 	elements.title.innerText = 'Mitmachnote';
+	elements.title.dataset.text = 'Mitmachnote';
 	const activeClass = document.querySelector('#class-list .class-selected');
 	if (!selectedClass && activeClass) selectedClass = activeClass.innerText;
 	renderClassOptions();
@@ -123,9 +131,13 @@ function openRepetition() {
 	closeDrawer();
 	elements.view.classList.add('update-hidden');
 	elements.stats.classList.add('update-hidden');
-	elements.classPanel.classList.remove('update-hidden');
-	elements.repetition.classList.remove('update-hidden');
+	if (typeof window.restoreTeachingSessionView === 'function') window.restoreTeachingSessionView();
+	else {
+		elements.classPanel.classList.remove('update-hidden');
+		elements.repetition.classList.remove('update-hidden');
+	}
 	elements.title.innerText = 'Repetierer';
+	elements.title.dataset.text = 'Repetierer';
 }
 
 function closeDrawer() {
