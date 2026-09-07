@@ -7,6 +7,7 @@ const RESPONSE_FIELDS = Object.freeze({
 	name: 'name',
 	email: 'email',
 	answers: 'answers',
+	additionalQuality: 'additionalQuality',
 	comment: 'comment'
 });
 const transportByEndpoint = new Map();
@@ -137,9 +138,11 @@ function validateResponse(raw, externalRoundId, criteria) {
 		if (!Number.isInteger(value) || value < 1 || value > 5) throw schemaError(`Bewertungswert für ${criterion.id} ist ungültig.`);
 		answers[criterion.id] = value;
 	}
+	const additionalQuality = raw[RESPONSE_FIELDS.additionalQuality];
+	if (additionalQuality !== undefined && additionalQuality !== null && typeof additionalQuality !== 'string') throw schemaError('Zusätzliche Qualität ist ungültig.');
 	const comment = raw[RESPONSE_FIELDS.comment];
 	if (comment !== undefined && comment !== null && typeof comment !== 'string') throw schemaError('Kommentar ist ungültig.');
-	return { externalResponseId, timestamp, externalRoundId, name, email, answers, comment: String(comment || '').trim() };
+	return { externalResponseId, timestamp, externalRoundId, name, email, answers, additionalQuality: String(additionalQuality || '').trim(), comment: String(comment || '').trim() };
 }
 
 function safeResponseId(raw) {

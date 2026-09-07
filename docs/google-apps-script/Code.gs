@@ -3,12 +3,40 @@ const HEADERS = Object.freeze({
   roundId: ['Beurteilungsrunde', 'Runden-ID'],
   name: ['Vorname, Nachname', 'Vorname/Nachname', 'Vorname und Nachname', 'Name'],
   email: ['E-Mail Adresse', 'E-Mail-Adresse', 'Email Address'],
-  comment: ['Persönliche Anmerkungen', 'Kommentar (optional)'],
+  additionalQuality: [
+    'Zusätzliche Qualität meiner Äusserungen',
+    'Ich sehe in meinen Äusserungen zusätzlich folgende Qualität, die oben nicht erfragt worden ist:'
+  ],
+  comment: [
+    'Sonstige Bemerkungen',
+    'Sonstige Bemerkungen (z.B. zum Klima/ Gruppendynamik im PH-Mündlichunterricht):'
+  ],
   criteria: Object.freeze({
-    participation: ['Aktive Beteiligung im Unterricht', 'Aktive Beteiligung'],
-    preparation: ['Vorbereitung für den Unterricht', 'Vorbereitung'],
-    quality: ['Qualität der Beiträge'],
-    reliability: ['Zuverlässigkeit']
+    participation_frequency: [
+      'Beteiligung mit Äusserungen',
+      'In den PHI-Lektionen beteiligte ich mich mit Äusserungen ...'
+    ],
+    insufficient_contributions: [
+      'Falsch, unbefriedigend oder nicht ausreichend',
+      'Falsch, unbefriedigend oder nicht ausreichend (als Antwort auf Aufträge/ gestellte Fragen)?'
+    ],
+    original_unsuitable_contributions: [
+      'Originell, aber unpassend im Lektionsverlauf',
+      'Originell, aber unpassend im Lektionsverlauf?'
+    ],
+    correct_brief_contributions: ['Korrekt, aber stichwortartig', 'Korrekt, aber stichwortartig?'],
+    advancing_contributions: [
+      'Passend und im Lektionsverlauf weiterführend',
+      'Passend und im Lektionsverlauf weiterführend?'
+    ],
+    independent_contributions: [
+      'Passend, eigenständig und in eine neue, interessante Richtung führend',
+      'Passend, eigenständig und in eine neue, interessante Richtung führend?'
+    ],
+    overall_participation: [
+      'Teilnahme insgesamt',
+      'Meine Teilnahme im letzten Semester im Fach PH schätze ich insgesamt ein als ...'
+    ]
   })
 });
 
@@ -50,6 +78,7 @@ function mapColumns(headerRow) {
     roundId: findColumn(headerRow, HEADERS.roundId),
     name: findColumn(headerRow, HEADERS.name),
     email: findColumn(headerRow, HEADERS.email),
+    additionalQuality: findColumn(headerRow, HEADERS.additionalQuality),
     comment: findColumn(headerRow, HEADERS.comment),
     criteria: {}
   };
@@ -62,7 +91,7 @@ function mapColumns(headerRow) {
 function mapResponse(row, columns) {
   const answers = {};
   Object.keys(columns.criteria).forEach(function(id) {
-    answers[id] = Number(valueAt(row, columns.criteria[id]));
+    answers[id] = parseRating(valueAt(row, columns.criteria[id]));
   });
   const timestamp = valueAt(row, columns.timestamp);
   const roundId = valueAt(row, columns.roundId);
@@ -75,6 +104,7 @@ function mapResponse(row, columns) {
     name: name,
     email: email,
     answers: answers,
+    additionalQuality: valueAt(row, columns.additionalQuality),
     comment: valueAt(row, columns.comment)
   };
 }
@@ -88,6 +118,26 @@ function findColumn(headers, acceptedNames) {
 
 function valueAt(row, index) {
   return String(row[index] === undefined || row[index] === null ? '' : row[index]).trim();
+}
+
+function parseRating(value) {
+  const text = String(value || '').trim();
+  const numeric = text.match(/^([1-5])(?:\D|$)/);
+  if (numeric) return Number(numeric[1]);
+  const labels = {
+    '(fast) nie': 1,
+    'fast nie': 1,
+    'ab und zu': 2,
+    'manchmal': 3,
+    'häufig': 4,
+    'sehr häufig': 5,
+    'mangelhaft': 1,
+    'genügend': 2,
+    'recht': 3,
+    'gut': 4,
+    'sehr gut': 5
+  };
+  return labels[text.toLowerCase()] || 0;
 }
 
 function normalize(value) {

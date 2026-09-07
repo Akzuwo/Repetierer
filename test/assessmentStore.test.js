@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { AssessmentStore, SCHEMA_VERSION } = require('../src/assessment/assessmentStore.js');
+const { AssessmentStore, DEFAULT_CRITERIA, SCHEMA_VERSION } = require('../src/assessment/assessmentStore.js');
 
 function fixture() {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'repetierer-assessment-'));
@@ -11,6 +11,7 @@ function fixture() {
 }
 
 const students = [{ id: 0, name: 'Anna Müller' }, { id: 1, name: 'Max Muster' }];
+const answers = value => Object.fromEntries(DEFAULT_CRITERIA.map(criterion => [criterion.id, value]));
 
 test('lädt fehlende Alt-Daten rückwärtskompatibel und speichert eine Runde', () => {
 	const files = fixture();
@@ -21,6 +22,9 @@ test('lädt fehlende Alt-Daten rückwärtskompatibel und speichert eine Runde', 
 	assert.equal(reloaded.data.schemaVersion, SCHEMA_VERSION);
 	assert.equal(context.rounds[0].id, round.id);
 	assert.match(context.rounds[0].externalRoundId, /^assessment-3a-hs-2026-[a-f0-9]{6}$/);
+	assert.equal(context.rounds[0].criteria.length, 7);
+	assert.deepEqual(context.rounds[0].criteria[0].scaleLabels, ['(Fast) nie', 'Ab und zu', 'Manchmal', 'Häufig', 'Sehr häufig']);
+	assert.deepEqual(context.rounds[0].criteria.at(-1).scaleLabels, ['Mangelhaft', 'Genügend', 'Recht', 'Gut', 'Sehr gut']);
 	assert.equal(context.students.length, 2);
 	fs.rmSync(files.dir, { recursive: true, force: true });
 });
@@ -42,6 +46,24 @@ test('migriert eine alte Runde ohne Formularmetadaten oder Bewertungsverlust', (
 	assert.equal(Object.hasOwn(migrated, 'form'), false);
 	assert.equal(migrated.externalResponses[0].externalResponseId, 'legacy-response');
 	assert.equal(migrated.assessments['student-1'].studentAnswers.participation, 4);
+	assert.equal(migrated.criteria.length, 1);
+	assert.equal(migrated.assessments['student-1'].studentAdditionalQuality, '');
+	fs.rmSync(files.dir, { recursive: true, force: true });
+});
+
+test('stellt nur leere Runden mit altem Standardraster auf den Originalbogen um', () => {
+	const files = fixture();
+	const assessments = { anna: { studentId: 'anna', studentAnswers: null, teacherAnswers: null } };
+	fs.writeFileSync(files.dataPath, JSON.stringify({ schemaVersion: 2, workbooks: { old: { classes: { c: {
+		id: 'class-old', name: '3a', students: [{ id: 'anna', name: 'Anna Müller', active: true }], rounds: [{
+			id: 'empty-round', title: 'FS 2027', criteria: [
+				{ id: 'participation' }, { id: 'preparation' }, { id: 'quality' }, { id: 'reliability' }
+			], assessments
+		}]
+	} } } } }));
+	const store = new AssessmentStore(files.dataPath);
+	const round = store.data.workbooks.old.classes.c.rounds[0];
+	assert.deepEqual(round.criteria.map(criterion => criterion.id), DEFAULT_CRITERIA.map(criterion => criterion.id));
 	fs.rmSync(files.dir, { recursive: true, force: true });
 });
 
@@ -51,14 +73,16 @@ test('synchronisiert Antworten lokal und speichert Lehrerwerte getrennt', () => 
 	const round = store.createRound(files.workbook, '3a', students, { title: 'HS 2026' });
 	store.applyResponses(files.workbook, '3a', students, round.id, [{
 		responseId: 'r1', name: 'Anna Müller', email: 'anna@example.ch', lastSubmittedTime: '2026-09-01T12:00:00Z',
-		answers: { participation: 4, preparation: 3, quality: 4, reliability: 5 }, comment: 'Selbstkommentar'
+		answers: answers(4), additionalQuality: 'Spezifisches Fachwissen', comment: 'Selbstkommentar'
 	}]);
 	const context = store.getClassContext(files.workbook, '3a', students);
 	const anna = context.students.find(student => student.name === 'Anna Müller');
-	store.saveTeacherAssessment(files.workbook, '3a', students, round.id, anna.id, { participation: 3, preparation: 3, quality: 4, reliability: 4 }, 'Lehrerkommentar');
-	const stored = store.getRound(files.workbook, '3a', students, round.id).round.assessments[anna.id];
-	assert.equal(stored.studentAnswers.participation, 4);
-	assert.equal(stored.teacherAnswers.participation, 3);
+	store.saveTeacherAssessment(files.workbook, '3a', students, round.id, anna.id, answers(3), 'Lehrerkommentar');
+	const reloaded = new AssessmentStore(files.dataPath);
+	const stored = reloaded.getRound(files.workbook, '3a', students, round.id).round.assessments[anna.id];
+	assert.equal(stored.studentAnswers.participation_frequency, 4);
+	assert.equal(stored.teacherAnswers.participation_frequency, 3);
+	assert.equal(stored.studentAdditionalQuality, 'Spezifisches Fachwissen');
 	assert.equal(stored.studentEmail, 'anna@example.ch');
 	fs.rmSync(files.dir, { recursive: true, force: true });
 });
@@ -67,7 +91,6 @@ test('importiert Antwort-IDs nur einmal und erlaubt die Auswahl einer älteren M
 	const files = fixture();
 	const store = new AssessmentStore(files.dataPath);
 	const round = store.createRound(files.workbook, '3a', students, { title: 'FS 2027' });
-	const answers = value => ({ participation: value, preparation: value, quality: value, reliability: value });
 	store.applyResponses(files.workbook, '3a', students, round.id, [
 		{ externalResponseId: 'old', timestamp: '2026-09-01T10:00:00Z', name: 'Anna Müller', email: 'anna@example.ch', answers: answers(2) },
 		{ externalResponseId: 'new', timestamp: '2026-09-02T10:00:00Z', name: 'Anna Müller', email: 'anna@example.ch', answers: answers(4) }
@@ -78,10 +101,10 @@ test('importiert Antwort-IDs nur einmal und erlaubt die Auswahl einer älteren M
 	let current = store.getRound(files.workbook, '3a', students, round.id);
 	const anna = current.classRecord.students.find(student => student.name === 'Anna Müller');
 	assert.equal(current.round.externalResponses.length, 2);
-	assert.equal(current.round.assessments[anna.id].studentAnswers.participation, 4);
+	assert.equal(current.round.assessments[anna.id].studentAnswers.participation_frequency, 4);
 	store.selectResponse(files.workbook, '3a', students, round.id, 'old');
 	current = store.getRound(files.workbook, '3a', students, round.id);
-	assert.equal(current.round.assessments[anna.id].studentAnswers.participation, 2);
+	assert.equal(current.round.assessments[anna.id].studentAnswers.participation_frequency, 2);
 	fs.rmSync(files.dir, { recursive: true, force: true });
 });
 

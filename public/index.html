@@ -1,6 +1,6 @@
 <!doctype html>
 
-<html lang="de">
+<html lang="de" data-theme="midnight">
 
 <head>
 	<meta charset="utf-8">
@@ -379,6 +379,13 @@
 			</div>
 			<div class="settings-scroll-area">
 				<p id="settings-location"></p>
+				<label class="setting-field">
+					<span>Design</span>
+					<select id="theme-setting">
+						<option value="midnight">Mitternacht – Schwarz &amp; Blau</option>
+						<option value="classic">Klassisch – Grau &amp; Grün</option>
+					</select>
+				</label>
 				<label class="setting-row setting-toggle">
 					<span class="setting-copy">Extra Joker ab 3 Noten</span>
 					<input class="toggle-input" type="checkbox" id="extra-joker-setting" role="switch">
@@ -468,6 +475,8 @@
 				<h2>Anleitung</h2>
 			</div>
 			<div class="settings-guide settings-scroll-area">
+				<h3>Design</h3>
+				<p>Mitternacht ist das neue Standarddesign in Schwarz, Blau und Weiß. Das bisherige grüne Design bleibt als „Klassisch“ verfügbar.</p>
 				<h3>Extra Joker ab 3 Noten</h3>
 				<p>Wenn diese Option aktiv ist, dürfen Personen, die bereits mindestens 3 Noten haben, einen zusätzlichen Joker erhalten. Standardmäßig ist das deaktiviert.</p>
 				<h3>Extra-Joker f&uuml;r bestehende Daten</h3>
@@ -479,7 +488,7 @@
 				<h3>Boost-Faktor</h3>
 				<p>Dieser Wert wird nur verwendet, wenn der Boost aktiviert ist. Je höher der Faktor, desto stärker werden Personen bevorzugt, die noch nie ausgewählt wurden.</p>
 				<h3>Zusätzliche visuelle Effekte</h3>
-				<p>Aktiviert die dunkle Titelanimation, das Namensrad mit Konfetti und Scheinwerfern sowie die große Checkmark nach einer erfolgreich gespeicherten Repetition. Standardmäßig ist diese Option deaktiviert.</p>
+				<p>Aktiviert die dunkle Titelanimation, das Namensrad mit Konfetti und Scheinwerfern sowie die große Checkmark direkt beim Bestätigen einer Repetition. Standardmäßig ist diese Option deaktiviert.</p>
 				<h3>Wiggersche Regel</h3>
 				<p>Wenn eine Person ihren Joker setzt, wird ihre Auswahlwahrscheinlichkeit für eine begrenzte Zeit auf 0 gesetzt. Standardmäßig gilt die Regel 2 Stunden.</p>
 				<h3>Wiggers-Dauer</h3>

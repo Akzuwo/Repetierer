@@ -3,12 +3,18 @@ const fs = require('fs');
 const path = require('path');
 const { matchResponse, normalizeEmail, normalizeName, selectLatestResponses } = require('./matching.js');
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
+const FREQUENCY_SCALE = ['(Fast) nie', 'Ab und zu', 'Manchmal', 'Häufig', 'Sehr häufig'];
+const OVERALL_SCALE = ['Mangelhaft', 'Genügend', 'Recht', 'Gut', 'Sehr gut'];
+const LEGACY_DEFAULT_CRITERIA_IDS = ['participation', 'preparation', 'quality', 'reliability'];
 const DEFAULT_CRITERIA = [
-	{ id: 'participation', label: 'Aktive Beteiligung' },
-	{ id: 'preparation', label: 'Vorbereitung' },
-	{ id: 'quality', label: 'Qualität der Beiträge' },
-	{ id: 'reliability', label: 'Zuverlässigkeit' }
+	{ id: 'participation_frequency', label: 'Beteiligung mit Äusserungen', scaleLabels: FREQUENCY_SCALE },
+	{ id: 'insufficient_contributions', label: 'Falsch, unbefriedigend oder nicht ausreichend', scaleLabels: FREQUENCY_SCALE },
+	{ id: 'original_unsuitable_contributions', label: 'Originell, aber unpassend im Lektionsverlauf', scaleLabels: FREQUENCY_SCALE },
+	{ id: 'correct_brief_contributions', label: 'Korrekt, aber stichwortartig', scaleLabels: FREQUENCY_SCALE },
+	{ id: 'advancing_contributions', label: 'Passend und im Lektionsverlauf weiterführend', scaleLabels: FREQUENCY_SCALE },
+	{ id: 'independent_contributions', label: 'Passend, eigenständig und in eine neue, interessante Richtung führend', scaleLabels: FREQUENCY_SCALE },
+	{ id: 'overall_participation', label: 'Teilnahme insgesamt', scaleLabels: OVERALL_SCALE }
 ];
 
 class AssessmentStore {
@@ -201,6 +207,7 @@ function applyStudentResponse(classRecord, round, studentId, response, method) {
 	const assessment = round.assessments[studentId] || emptyAssessment(studentId);
 	assessment.studentEmail = normalizeEmail(response.email);
 	assessment.studentAnswers = clone(response.answers || {});
+	assessment.studentAdditionalQuality = String(response.additionalQuality || '').trim();
 	assessment.studentComment = String(response.comment || '').trim();
 	assessment.submittedAt = response.timestamp || response.lastSubmittedTime || response.submittedAt || response.createTime || null;
 	assessment.externalResponseId = getResponseId(response) || null;
@@ -261,6 +268,7 @@ function emptyAssessment(studentId) {
 		studentEmail: '',
 		studentAnswers: null,
 		teacherAnswers: null,
+		studentAdditionalQuality: '',
 		studentComment: '',
 		teacherComment: '',
 		submittedAt: null,
@@ -291,6 +299,7 @@ function migrate(input) {
 				round.externalRoundId = round.externalRoundId || createExternalRoundId(classRecord.name, round.title, round.id);
 				if (!round.criteria) round.criteria = clone(DEFAULT_CRITERIA);
 				if (!round.assessments) round.assessments = {};
+				if (shouldUpgradeEmptyLegacyRound(round)) round.criteria = clone(DEFAULT_CRITERIA);
 				if (!Array.isArray(round.externalResponses)) round.externalResponses = migrateResponses(round, classRecord);
 				if (!round.responseAssignments || typeof round.responseAssignments !== 'object') round.responseAssignments = {};
 				if (!round.preferredResponseIds || typeof round.preferredResponseIds !== 'object') round.preferredResponseIds = {};
@@ -298,6 +307,7 @@ function migrate(input) {
 				if (!Array.isArray(round.duplicates)) round.duplicates = [];
 				delete round.form;
 				for (const assessment of Object.values(round.assessments)) {
+					if (typeof assessment.studentAdditionalQuality !== 'string') assessment.studentAdditionalQuality = '';
 					if (assessment.mailStatus === 'sending') {
 						assessment.mailStatus = 'failed';
 						assessment.lastMailError = 'Der vorherige Versand wurde unterbrochen.';
@@ -308,6 +318,13 @@ function migrate(input) {
 	}
 	input.schemaVersion = SCHEMA_VERSION;
 	return input;
+}
+
+function shouldUpgradeEmptyLegacyRound(round) {
+	const ids = Array.isArray(round.criteria) ? round.criteria.map(criterion => criterion.id) : [];
+	if (ids.length !== LEGACY_DEFAULT_CRITERIA_IDS.length || ids.some((id, index) => id !== LEGACY_DEFAULT_CRITERIA_IDS[index])) return false;
+	if (Array.isArray(round.externalResponses) && round.externalResponses.length) return false;
+	return !Object.values(round.assessments || {}).some(assessment => assessment.studentAnswers || assessment.teacherAnswers);
 }
 
 function migrateResponses(round, classRecord) {
@@ -323,6 +340,7 @@ function migrateResponses(round, classRecord) {
 			name: student ? student.name : '',
 			email: assessment.studentEmail || '',
 			answers: clone(assessment.studentAnswers),
+			additionalQuality: assessment.studentAdditionalQuality || '',
 			comment: assessment.studentComment || ''
 		});
 		assessment.externalResponseId = String(responseId);
@@ -339,6 +357,7 @@ function normalizeStoredResponse(response, externalRoundId) {
 		name: String(response.name || '').trim(),
 		email: normalizeEmail(response.email),
 		answers: clone(response.answers || {}),
+		additionalQuality: String(response.additionalQuality || '').trim(),
 		comment: String(response.comment || '').trim()
 	};
 }

@@ -330,19 +330,26 @@ function openTeacher(index) {
 	const criteriaRows = roundView.round.criteria.map(criterion => {
 		const self = assessment.studentAnswers && assessment.studentAnswers[criterion.id];
 		const teacher = assessment.teacherAnswers && assessment.teacherAnswers[criterion.id];
-		return `<div class="teacher-criterion"><strong>${escapeHtml(criterion.label)}</strong><span>${self || '–'}</span><select data-teacher-criterion="${escapeAttribute(criterion.id)}"><option value="">–</option>${[1,2,3,4,5].map(value => `<option value="${value}"${teacher === value ? ' selected' : ''}>${value}</option>`).join('')}</select><b data-difference="${escapeAttribute(criterion.id)}">${self && teacher ? signed(teacher - self) : '–'}</b></div>`;
+		return `<div class="teacher-criterion"><strong>${escapeHtml(criterion.label)}</strong><span>${escapeHtml(formatCriterionValue(criterion, self))}</span><select data-teacher-criterion="${escapeAttribute(criterion.id)}"><option value="">–</option>${[1,2,3,4,5].map(value => `<option value="${value}"${teacher === value ? ' selected' : ''}>${escapeHtml(formatCriterionValue(criterion, value))}</option>`).join('')}</select><b data-difference="${escapeAttribute(criterion.id)}">${self && teacher ? signed(teacher - self) : '–'}</b></div>`;
 	}).join('');
 	elements.body.innerHTML = `
 		<section class="teacher-assessment">
 			<div class="teacher-grid-heading"><span>Kriterium</span><span>Schüler</span><span>Lehrer</span><span>Differenz</span></div>
 			${criteriaRows}
-			<div class="teacher-comments"><div><h3>Kommentar Schüler</h3><p>${escapeHtml(assessment.studentComment || 'Noch keine Selbstbeurteilung.')}</p></div><label><h3>Kommentar Lehrer</h3><textarea id="teacher-comment" rows="5" maxlength="4000">${escapeHtml(assessment.teacherComment || '')}</textarea></label></div>
+			<div class="teacher-comments"><div><h3>Zusätzliche Qualität</h3><p>${escapeHtml(assessment.studentAdditionalQuality || 'Keine Angabe.')}</p></div><div><h3>Sonstige Bemerkungen</h3><p>${escapeHtml(assessment.studentComment || 'Keine Angabe.')}</p></div><label><h3>Kommentar Lehrer</h3><textarea id="teacher-comment" rows="5" maxlength="4000">${escapeHtml(assessment.teacherComment || '')}</textarea></label></div>
 			<div class="teacher-actions"><button class="btn-2${teacherIndex === 0 ? ' disabled' : ''}" id="teacher-previous-btn">Vorheriger</button><button class="btn-1" id="teacher-save-btn">Speichern</button><button class="btn-1" id="teacher-next-btn">Speichern & nächster</button></div>
 		</section>`;
 	elements.body.querySelectorAll('[data-teacher-criterion]').forEach(select => select.addEventListener('change', updateDifferences));
 	document.getElementById('teacher-previous-btn').addEventListener('click', () => openTeacher(teacherIndex - 1));
 	document.getElementById('teacher-save-btn').addEventListener('click', () => saveTeacher(false));
 	document.getElementById('teacher-next-btn').addEventListener('click', () => saveTeacher(true));
+}
+
+function formatCriterionValue(criterion, value) {
+	const numeric = Number(value);
+	if (!Number.isInteger(numeric) || numeric < 1 || numeric > 5) return '–';
+	const label = Array.isArray(criterion.scaleLabels) ? criterion.scaleLabels[numeric - 1] : '';
+	return label ? `${numeric} · ${label}` : String(numeric);
 }
 
 function updateDifferences() {

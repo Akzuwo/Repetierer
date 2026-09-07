@@ -4,8 +4,15 @@ const { AssessmentApiClient, validateResponse } = require('../src/assessment/ass
 
 const config = { apiUrl: 'https://script.google.com/macros/s/test/exec', apiKey: 'super-secret-key' };
 const criteria = [
-	{ id: 'participation' }, { id: 'preparation' }, { id: 'quality' }, { id: 'reliability' }
+	{ id: 'participation_frequency' },
+	{ id: 'insufficient_contributions' },
+	{ id: 'original_unsuitable_contributions' },
+	{ id: 'correct_brief_contributions' },
+	{ id: 'advancing_contributions' },
+	{ id: 'independent_contributions' },
+	{ id: 'overall_participation' }
 ];
+const answers = value => Object.fromEntries(criteria.map(criterion => [criterion.id, value]));
 
 function validResponse(overrides = {}) {
 	return Object.assign({
@@ -14,7 +21,8 @@ function validResponse(overrides = {}) {
 		roundId: 'assessment-3a-hs-abc123',
 		name: 'Anna Müller',
 		email: 'anna@example.ch',
-		answers: { participation: 4, preparation: 3, quality: 5, reliability: 4 },
+		answers: answers(4),
+		additionalQuality: 'Spezifisches Fachwissen',
 		comment: 'Kommentar'
 	}, overrides);
 }
@@ -71,6 +79,8 @@ test('fällt bei einer bestehenden doGet-API kontrolliert auf GET zurück', asyn
 });
 
 test('validiert Pflichtfelder und Bewertungswerte', () => {
-	assert.equal(validateResponse(validResponse(), 'assessment-3a-hs-abc123', criteria).answers.quality, 5);
-	assert.throws(() => validateResponse(validResponse({ answers: { participation: 6 } }), 'assessment-3a-hs-abc123', criteria), /Bewertungswert/);
+	const response = validateResponse(validResponse(), 'assessment-3a-hs-abc123', criteria);
+	assert.equal(response.answers.overall_participation, 4);
+	assert.equal(response.additionalQuality, 'Spezifisches Fachwissen');
+	assert.throws(() => validateResponse(validResponse({ answers: { participation_frequency: 6 } }), 'assessment-3a-hs-abc123', criteria), /Bewertungswert/);
 });

@@ -2,7 +2,7 @@
 
 ## Architektur und Datenhaltung
 
-Die Excel-Arbeitsmappe bleibt die Quelle für Klassen, Schüler und sämtliche Repetitionsdaten. Mitmachnoten werden getrennt in `mitmachnoten.json` unter Electrons persistentem `userData`-Ordner gespeichert. Schema 2 ergänzt stabile externe Runden-IDs und eine lokale Historie aller importierten Umfrageantworten. Alte Schema-1-Daten werden beim Laden migriert; bestehende Selbst- und Lehrerbeurteilungen bleiben erhalten.
+Die Excel-Arbeitsmappe bleibt die Quelle für Klassen, Schüler und sämtliche Repetitionsdaten. Mitmachnoten werden getrennt in `mitmachnoten.json` unter Electrons persistentem `userData`-Ordner gespeichert. Schema 3 ergänzt das Raster des ursprünglichen Selbstbeurteilungsbogens und ein separates Freitextfeld für zusätzliche Qualitäten. Alte Daten werden beim Laden migriert; bestehende Runden behalten ihr jeweiliges Raster und alle Selbst- und Lehrerbeurteilungen.
 
 Die Selbstbeurteilung verwendet ein dauerhaftes, außerhalb von Repetierer vorbereitetes Google Form mit verknüpfter Antworttabelle. Ein dazugehöriges Google Apps Script liest die Tabelle und stellt die Antworten als kleine HTTPS-JSON-API bereit. Repetierer benötigt weder Google-OAuth-Client noch Google-Anmeldung und erstellt keine Formulare. Die Arbeitskopie bleibt lokal; ohne Internet können bereits synchronisierte Antworten und Lehrerbewertungen weiter bearbeitet werden.
 
@@ -13,13 +13,19 @@ Das Formular muss folgende Fragen enthalten. Die Titel müssen mit der mitgelief
 - `Beurteilungsrunde` als Pflicht-Kurzantwort
 - `Vorname, Nachname` als Pflicht-Kurzantwort
 - `E-Mail Adresse` als Pflicht-Kurzantwort
-- `Aktive Beteiligung im Unterricht` mit Werten 1 bis 5
-- `Vorbereitung für den Unterricht` mit Werten 1 bis 5
-- `Qualität der Beiträge` mit Werten 1 bis 5
-- `Zuverlässigkeit` mit Werten 1 bis 5
-- `Persönliche Anmerkungen` als Absatz
+- `Beteiligung mit Äusserungen`
+- `Falsch, unbefriedigend oder nicht ausreichend`
+- `Originell, aber unpassend im Lektionsverlauf`
+- `Korrekt, aber stichwortartig`
+- `Passend und im Lektionsverlauf weiterführend`
+- `Passend, eigenständig und in eine neue, interessante Richtung führend`
+- `Zusätzliche Qualität meiner Äusserungen` als Absatz
+- `Teilnahme insgesamt`
+- `Sonstige Bemerkungen` als Absatz
 
-Über **Mehr > Link zum vorausgefüllten Formular abrufen** lässt sich für `Runden-ID` ein Beispielwert einsetzen. Aus dem erzeugten Link wird der Parametername `entry.123456...` für `ASSESSMENT_ROUND_FIELD_ID` übernommen. Repetierer setzt dessen Wert pro Runde automatisch; die technische ID erscheint nicht in der Oberfläche.
+Für die ersten sechs Bewertungsfragen gilt die Skala `1 – (Fast) nie`, `2 – Ab und zu`, `3 – Manchmal`, `4 – Häufig`, `5 – Sehr häufig`. Für `Teilnahme insgesamt` gilt `1 – Mangelhaft`, `2 – Genügend`, `3 – Recht`, `4 – Gut`, `5 – Sehr gut`. Das Script akzeptiert sowohl diese ausgeschriebenen Optionen als auch reine Zahlen von 1 bis 5.
+
+Über **Mehr > Link zum vorausgefüllten Formular abrufen** lässt sich für `Beurteilungsrunde` ein Beispielwert einsetzen. Aus dem erzeugten Link wird der Parametername `entry.123456...` für `ASSESSMENT_ROUND_FIELD_ID` übernommen. Repetierer setzt dessen Wert pro Runde automatisch; die technische ID erscheint nicht in der Oberfläche.
 
 ## Apps Script bereitstellen
 

@@ -698,7 +698,7 @@ function buildProtocolHtml(entries) {
 			p { color: #555; margin: 0 0 20px; }
 			table { border-collapse: collapse; width: 100%; }
 			th, td { border: 1px solid #d9d9d9; font-size: 11px; padding: 8px; text-align: left; }
-			th { background: #18a890; color: white; font-weight: 700; }
+			th { background: #2563eb; color: white; font-weight: 700; }
 			tr:nth-child(even) td { background: #f5f7f7; }
 		</style>
 	</head>

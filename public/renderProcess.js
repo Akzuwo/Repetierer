@@ -124,6 +124,7 @@ const _settingsHelpModal = document.getElementById('settings-help-modal');
 const _closeSettingsHelpBtn = document.getElementById('close-settings-help-btn');
 const _closeSettingsHelpBottomBtn = document.getElementById('close-settings-help-bottom-btn');
 const _settingsLocation = document.getElementById('settings-location');
+const _themeSetting = document.getElementById('theme-setting');
 const _updateNewsModal = document.getElementById('update-news-modal');
 const _updateNewsTitle = document.getElementById('update-news-title');
 const _updateNewsBody = document.getElementById('update-news-body');
@@ -470,6 +471,7 @@ _saveSettingsBtn.addEventListener('click', () => {
 	}
 
 	ipcRenderer.send('save-settings', {
+		theme: _themeSetting.value,
 		extraJokerAfterThreeGrades: _extraJokerSetting.checked,
 		probabilityDecreaseFactor: probabilityDecreaseFactor,
 		boostNeverSelected: _boostNeverSelectedSetting.checked,
@@ -606,6 +608,7 @@ _cancel.addEventListener('click', () => {
 _ok.addEventListener('click', () => {
 	let v = parseGradeInput(_grade.value);
 	if (isValidGrade(v)) {
+		runCompletionEffect();
 		ipcRenderer.send('ok', v);
 	} else {
 		error(_ok);
@@ -614,6 +617,7 @@ _ok.addEventListener('click', () => {
 
 });
 _joker.addEventListener('click', () => {
+	runCompletionEffect();
 	ipcRenderer.send('joker');
 
 });
@@ -770,6 +774,7 @@ ipcRenderer.on('debug-mode', (event, isDebugMode) => {
 });
 
 ipcRenderer.on('settings-data', (event, settings, paths, migrationStatus) => {
+	_themeSetting.value = settings.theme === 'classic' ? 'classic' : 'midnight';
 	_extraJokerSetting.checked = !!settings.extraJokerAfterThreeGrades;
 	_probabilityFactorSetting.value = settings.probabilityDecreaseFactor;
 	_boostNeverSelectedSetting.checked = !!settings.boostNeverSelected;
@@ -815,10 +820,12 @@ ipcRenderer.on('window-restored', () => {
 });
 
 ipcRenderer.on('settings-saved', (event, settings) => {
+	applyTheme(settings && settings.theme);
 	updateVisualEffects(settings && settings.visualEffectsEnabled);
 });
 
 ipcRenderer.on('ui-settings', (event, settings) => {
+	applyTheme(settings && settings.theme);
 	updateVisualEffects(settings && settings.visualEffectsEnabled);
 });
 
@@ -1048,10 +1055,6 @@ ipcRenderer.on('finished', (event, args) => {
 		error(_ok);
 
 })
-
-ipcRenderer.on('repetition-saved', () => {
-	runCompletionEffect();
-});
 
 ipcRenderer.on('excel-write-pending', (event, entry) => {
 	showUpdatePanel({
@@ -2441,6 +2444,10 @@ function runCompletionEffect() {
 		if (runId === completionEffectRun) clearCompletionEffect();
 	}, motionDelay(1650));
 	completionEffectTimers.push(timer);
+}
+
+function applyTheme(theme) {
+	document.documentElement.dataset.theme = theme === 'classic' ? 'classic' : 'midnight';
 }
 
 function clearCompletionEffect() {

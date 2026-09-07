@@ -36,7 +36,62 @@ async function main() {
 		check();
 	})`);
 	const className = classes[0];
-	if (mode === 'create') {
+	if (mode === 'raster-create') {
+		const result = await evaluate(`(async () => {
+			const { ipcRenderer } = require('electron');
+			const created = await ipcRenderer.invoke('assessment:create-round', { className: ${JSON.stringify(className)}, title: 'Raster Smoke ' + Date.now() });
+			if (!created.ok) return { ok: false, stage: 'create', error: created.error };
+			const round = created.data.rounds[0];
+			const view = await ipcRenderer.invoke('assessment:get-round', { className: ${JSON.stringify(className)}, roundId: round.id });
+			if (!view.ok) return { ok: false, stage: 'round', error: view.error };
+			const answers = Object.fromEntries(view.data.round.criteria.map(criterion => [criterion.id, 4]));
+			const student = view.data.students[0];
+			const saved = await ipcRenderer.invoke('assessment:save-teacher', { className: ${JSON.stringify(className)}, roundId: round.id, studentId: student.id, answers, comment: 'Release-Rastertest' });
+			return { ok: saved.ok && view.data.round.criteria.length === 7 && view.data.round.criteria[0].scaleLabels.length === 5, stage: saved.ok ? 'complete' : 'save', error: saved.error, className: ${JSON.stringify(className)}, roundId: round.id, studentId: student.id, criteriaIds: view.data.round.criteria.map(criterion => criterion.id) };
+		})()`);
+		if (!result.ok) throw new Error(JSON.stringify(result));
+		fs.writeFileSync(statePath, JSON.stringify(result), 'utf8');
+		console.log(JSON.stringify(result));
+	} else if (mode === 'raster-verify') {
+		const previous = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+		const result = await evaluate(`(async () => {
+			const { ipcRenderer } = require('electron');
+			const view = await ipcRenderer.invoke('assessment:get-round', { className: ${JSON.stringify(previous.className)}, roundId: ${JSON.stringify(previous.roundId)} });
+			if (!view.ok) return { ok: false, stage: 'reload', error: view.error };
+			const assessment = view.data.round.assessments[${JSON.stringify(previous.studentId)}];
+			return { ok: view.data.round.criteria.length === 7 && assessment.teacherComment === 'Release-Rastertest' && Object.keys(assessment.teacherAnswers || {}).length === 7, criteriaCount: view.data.round.criteria.length, teacherValues: Object.keys(assessment.teacherAnswers || {}).length, teacherComment: assessment.teacherComment };
+		})()`);
+		if (!result.ok) throw new Error(JSON.stringify(result));
+		console.log(JSON.stringify(result));
+	} else if (mode === 'raster-ui') {
+		const previous = JSON.parse(fs.readFileSync(statePath, 'utf8'));
+		const result = await evaluate(`new Promise((resolve, reject) => {
+			document.getElementById('assessment-nav-btn').click();
+			const select = document.getElementById('assessment-class-select');
+			select.value = ${JSON.stringify(previous.className)};
+			select.dispatchEvent(new Event('change'));
+			const deadline = Date.now() + 15000;
+			const waitFor = (predicate, next) => {
+				const value = predicate();
+				if (value) return next(value);
+				if (Date.now() > deadline) return reject(new Error('Raster-UI nicht geladen'));
+				setTimeout(() => waitFor(predicate, next), 100);
+			};
+			waitFor(() => document.querySelector('[data-round-id="${previous.roundId}"]'), card => {
+				card.click();
+				waitFor(() => document.getElementById('assessment-teacher-btn'), button => {
+					button.click();
+					waitFor(() => document.querySelector('.teacher-assessment'), panel => {
+						const rows = Array.from(panel.querySelectorAll('.teacher-criterion'));
+						const commentHeadings = Array.from(panel.querySelectorAll('.teacher-comments h3')).map(item => item.innerText);
+						resolve({ ok: rows.length === 7 && panel.scrollWidth <= panel.clientWidth && commentHeadings.includes('Zusätzliche Qualität') && commentHeadings.includes('Sonstige Bemerkungen'), rowCount: rows.length, firstOptions: Array.from(rows[0].querySelectorAll('option')).map(option => option.innerText), horizontalOverflow: panel.scrollWidth - panel.clientWidth, commentHeadings });
+					});
+				});
+			});
+		})`);
+		if (!result.ok) throw new Error(JSON.stringify(result));
+		console.log(JSON.stringify(result));
+	} else if (mode === 'create') {
 		const result = await evaluate(`(async () => {
 			const { ipcRenderer } = require('electron');
 			const api = await ipcRenderer.invoke('assessment:api-test');

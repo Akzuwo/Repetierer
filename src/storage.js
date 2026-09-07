@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const defaultAppSettings = {
+	theme: 'midnight',
 	extraJokerAfterThreeGrades: false,
 	probabilityDecreaseFactor: 3,
 	boostNeverSelected: false,
@@ -140,6 +141,7 @@ function getFileIdentifier(filePath) {
 function getAppSettings() {
 	const settings = getSettings();
 	return Object.assign({}, defaultAppSettings, {
+		theme: normalizeTheme(settings.theme),
 		extraJokerAfterThreeGrades: !!settings.extraJokerAfterThreeGrades,
 		probabilityDecreaseFactor: normalizeFactor(settings.probabilityDecreaseFactor, defaultAppSettings.probabilityDecreaseFactor),
 		boostNeverSelected: !!settings.boostNeverSelected,
@@ -153,6 +155,7 @@ function getAppSettings() {
 function saveAppSettings(settings) {
 	const wiggersRuleEnabled = settings.wiggersRuleEnabled !== false;
 	saveSettings({
+		theme: normalizeTheme(settings.theme),
 		extraJokerAfterThreeGrades: !!settings.extraJokerAfterThreeGrades,
 		probabilityDecreaseFactor: normalizeFactor(settings.probabilityDecreaseFactor, defaultAppSettings.probabilityDecreaseFactor),
 		boostNeverSelected: !!settings.boostNeverSelected,
@@ -162,6 +165,10 @@ function saveAppSettings(settings) {
 		wiggersRuleDurationMinutes: normalizeDuration(settings.wiggersRuleDurationMinutes, defaultAppSettings.wiggersRuleDurationMinutes),
 		...(wiggersRuleEnabled ? {} : { wiggersRulePenalties: {} })
 	});
+}
+
+function normalizeTheme(value) {
+	return value === 'classic' ? 'classic' : defaultAppSettings.theme;
 }
 
 function normalizeFactor(value, fallback) {

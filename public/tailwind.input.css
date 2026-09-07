@@ -7,14 +7,14 @@
   }
 
   #container {
-    @apply bg-ink shadow-glow;
     border-radius: 2rem;
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.2), 0 24px 70px rgba(0, 0, 0, 0.5);
     clip-path: inset(0 round 2rem);
     background:
       linear-gradient(135deg, rgba(255, 255, 255, 0.055), transparent 34%),
-      radial-gradient(circle at 22% 0%, rgba(24, 168, 144, 0.16), transparent 20rem),
-      radial-gradient(circle at 92% 88%, rgba(240, 196, 76, 0.11), transparent 24rem),
-      #1f222a;
+      radial-gradient(circle at 22% 0%, rgba(var(--accent-rgb), 0.16), transparent 20rem),
+      radial-gradient(circle at 92% 88%, rgba(var(--accent-rgb), 0.08), transparent 24rem),
+      var(--app-bg);
   }
 
   #title {
@@ -29,12 +29,15 @@
   }
 
   .neum {
-    @apply border border-white/10 bg-panel/80 shadow-soft backdrop-blur-xl;
+    @apply border border-white/10 backdrop-blur-xl;
+    background-color: var(--surface-1);
+    box-shadow: var(--shadow-soft);
     border-radius: 1.45rem;
   }
 
   .neum:hover {
-    @apply border-mint/40 shadow-glow;
+    border-color: rgba(var(--accent-rgb), 0.4);
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.2), 0 24px 70px rgba(0, 0, 0, 0.5);
   }
 
   #drawer {
@@ -50,7 +53,10 @@
 
   .drawer-actions button:hover,
   #drawer-file-btn:hover {
-    @apply -translate-y-0.5 border-mint/40 bg-mint/80 text-white shadow-glow;
+    @apply -translate-y-0.5 text-white;
+    background-color: rgba(var(--accent-rgb), 0.8);
+    border-color: rgba(var(--accent-rgb), 0.4);
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.2), 0 24px 70px rgba(0, 0, 0, 0.5);
   }
 
   .btn-1,
@@ -61,7 +67,8 @@
   }
 
   .btn-1 {
-    @apply border-mint/80 bg-white/5 shadow-lg;
+    @apply bg-white/5 shadow-lg;
+    border-color: rgba(var(--accent-rgb), 0.8);
   }
 
   .btn-2 {
@@ -71,7 +78,8 @@
   .btn-1:hover,
   .btn-2:hover,
   .help-button:hover {
-    @apply -translate-y-0.5 shadow-glow;
+    @apply -translate-y-0.5;
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.2), 0 24px 70px rgba(0, 0, 0, 0.5);
   }
 
   .history-btn {
@@ -84,14 +92,15 @@
   }
 
   .modal-content {
-    @apply border border-white/10 bg-zinc-950/90 shadow-glow backdrop-blur-2xl;
+    @apply border border-white/10 bg-zinc-950/90 backdrop-blur-2xl;
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.2), 0 24px 70px rgba(0, 0, 0, 0.5);
   }
 
   .settings-content {
-    @apply border-mint/25;
+    border-color: rgba(var(--accent-rgb), 0.25);
     background:
-      linear-gradient(145deg, rgba(32, 35, 42, 0.96), rgba(16, 18, 22, 0.96)),
-      radial-gradient(circle at 86% 12%, rgba(24, 168, 144, 0.16), transparent 18rem);
+      linear-gradient(145deg, var(--surface-1), var(--surface-3)),
+      radial-gradient(circle at 86% 12%, rgba(var(--accent-rgb), 0.16), transparent 18rem);
   }
 
   .setting-row,
@@ -109,7 +118,9 @@
   .backup-item:hover,
   .probability-item:hover,
   .excel-editor-item:hover {
-    @apply border-mint/30 bg-white/20 shadow-glow;
+    @apply bg-white/20;
+    border-color: rgba(var(--accent-rgb), 0.3);
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.2), 0 24px 70px rgba(0, 0, 0, 0.5);
   }
 
   #probability-list,
@@ -124,11 +135,13 @@
   }
 
   #update-panel {
-    @apply border-mint/40 bg-zinc-950/90 shadow-glow backdrop-blur-2xl;
+    @apply bg-zinc-950/90 backdrop-blur-2xl;
+    border-color: rgba(var(--accent-rgb), 0.4);
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.2), 0 24px 70px rgba(0, 0, 0, 0.5);
   }
 
   .class-selected {
-    @apply ring-2 ring-mint/50;
+    box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.5);
   }
 }
 

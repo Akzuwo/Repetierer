@@ -6,7 +6,7 @@ const { createSmtpMailer } = require('../src/assessment/smtpMailer.js');
 
 function data() {
 	const students = [{ id: 'a', name: 'Anna <Müller>' }, { id: 'b', name: 'Max Muster' }];
-	const base = email => ({ studentEmail: email, studentAnswers: { c: 4 }, teacherAnswers: { c: 3 }, studentComment: '<script>', teacherComment: '& gut', mailStatus: 'not_sent' });
+	const base = email => ({ studentEmail: email, studentAnswers: { c: 4 }, teacherAnswers: { c: 3 }, studentAdditionalQuality: '<b>Fachwissen</b>', studentComment: '<script>', teacherComment: '& gut', mailStatus: 'not_sent' });
 	return {
 		classRecord: { students },
 		round: { id: 'r', title: 'HS 2026', criteria: [{ id: 'c', label: 'Qualität' }], assessments: { a: base('anna@example.ch'), b: base('max@example.ch') } }
@@ -17,6 +17,7 @@ test('escaped HTML enthält keine ungefilterten Schülerdaten', () => {
 	const { classRecord, round } = data();
 	const message = buildResultMessage({ student: classRecord.students[0], assessment: round.assessments.a, round, sender: { fromName: 'Lehrer', fromEmail: 'lehrer@example.ch' } });
 	assert.match(message.html, /Anna &lt;Müller&gt;/);
+	assert.match(message.html, /&lt;b&gt;Fachwissen&lt;\/b&gt;/);
 	assert.doesNotMatch(message.html, /<script>/);
 	assert.equal(escapeHtml('A&B'), 'A&amp;B');
 	assert.throws(() => buildResultMessage({ student: classRecord.students[0], assessment: { studentEmail: 'x' }, round, sender: {} }), /ungültig/);
