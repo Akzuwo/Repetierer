@@ -4,11 +4,10 @@ const startupSplash = document.getElementById('startup-splash');
 let startupFinished = false;
 
 const startupTiming = {
-	lineAnimation: 2600,
-	dimPause: 320,
-	wordReveal: 720,
-	sevenArrival: 520,
-	logoHold: 900,
+	lineStart: 140,
+	lineComplete: 3640,
+	fillComplete: 4840,
+	logoComplete: 6390,
 	fadeOut: 500
 };
 
@@ -26,22 +25,19 @@ function finishStartupSplash() {
 }
 
 setTimeout(() => {
-	if (startupSplash) startupSplash.classList.add('startup-lines-complete');
-}, startupTiming.lineAnimation);
+	if (!startupSplash) return;
+	startupSplash.classList.add('startup-line-drawing');
+	startupSplash.querySelectorAll('.startup-line-reveal-motion').forEach(animation => animation.beginElement());
+}, startupTiming.lineStart);
 
 setTimeout(() => {
-	if (startupSplash) startupSplash.classList.add('startup-word-visible');
-}, startupTiming.lineAnimation + startupTiming.dimPause);
+	if (!startupSplash) return;
+	startupSplash.classList.add('startup-lines-complete');
+	startupSplash.querySelectorAll('.startup-fill-motion').forEach(animation => animation.beginElement());
+}, startupTiming.lineComplete);
 
 setTimeout(() => {
-	if (startupSplash) startupSplash.classList.add('startup-seven-visible');
-}, startupTiming.lineAnimation + startupTiming.dimPause + startupTiming.wordReveal);
+	if (startupSplash) startupSplash.classList.add('startup-word-filled', 'startup-seven-visible');
+}, startupTiming.fillComplete);
 
-setTimeout(
-	finishStartupSplash,
-	startupTiming.lineAnimation
-		+ startupTiming.dimPause
-		+ startupTiming.wordReveal
-		+ startupTiming.sevenArrival
-		+ startupTiming.logoHold
-);
+setTimeout(finishStartupSplash, startupTiming.logoComplete);

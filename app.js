@@ -20,6 +20,10 @@ const updateFeed = {
 	releaseType: 'release'
 };
 
+if (process.platform === 'win32') {
+	app.setAppUserModelId('net.srpnt3.repetierer');
+}
+
 function getWindowPreferences() {
 	return {
 		nodeIntegration: true,

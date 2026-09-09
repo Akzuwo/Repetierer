@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="de">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Repetierer – Intro-Tester</title>
+	<link rel="stylesheet" href="intro-tester.css">
+</head>
+<body>
+	<main class="tester-shell">
+		<section class="intro-stage" aria-label="Vorschau der Intro-Animation">
+			<div id="intro-mount"></div>
+			<span class="intro-credit">by timolu</span>
+		</section>
+
+		<div class="tester-controls">
+			<div class="variant-buttons" role="group" aria-label="Intro-Variante wählen">
+				<button type="button" data-variant="1">Variante 1</button>
+				<button type="button" data-variant="2">Variante 2</button>
+				<button type="button" data-variant="2.5">Variante 2 v2</button>
+				<button type="button" data-variant="3">Variante 3</button>
+			</div>
+			<button type="button" class="replay-button" id="replay-button">Nochmal abspielen</button>
+			<p class="tester-status" id="tester-status" aria-live="polite"></p>
+		</div>
+	</main>
+
+	<script src="intro-player.js"></script>
+</body>
+</html>

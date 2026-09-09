@@ -5,11 +5,12 @@ const path = require('path');
 app.commandLine.appendSwitch('force-prefers-reduced-motion', 'no-preference');
 
 const captureMoments = [
-	{ name: '01-lines', at: 1800 },
-	{ name: '02-word-reveal', at: 3250 },
-	{ name: '03-seven-arrival', at: 3800 },
-	{ name: '04-logo-hold', at: 4450 },
-	{ name: '05-before-fade', at: 5000 }
+	{ name: '01-initial', at: 60 },
+	{ name: '02-lines', at: 1800 },
+	{ name: '03-lines-complete', at: 3700 },
+	{ name: '04-word-fill', at: 4300 },
+	{ name: '05-seven-arrival', at: 5100 },
+	{ name: '06-logo-hold', at: 6100 }
 ];
 
 app.whenReady().then(async () => {
@@ -50,6 +51,8 @@ app.whenReady().then(async () => {
 			return {
 				classes: splash.className,
 				wordBounds: word.getBoundingClientRect().toJSON(),
+				wordFill: getComputedStyle(word).fill,
+				wordStrokeOpacity: getComputedStyle(word).strokeOpacity,
 				sevenBounds: seven.getBoundingClientRect().toJSON(),
 				sevenOpacity: getComputedStyle(seven).opacity
 			};
@@ -69,7 +72,7 @@ app.whenReady().then(async () => {
 	})`);
 	await new Promise(resolve => setTimeout(resolve, 300));
 	fs.writeFileSync(
-		path.join(outputDirectory, '06-main-title-static.png'),
+		path.join(outputDirectory, '07-main-title-static.png'),
 		(await window.webContents.capturePage()).toPNG()
 	);
 
@@ -83,7 +86,7 @@ app.whenReady().then(async () => {
 	})()`);
 	await new Promise(resolve => setTimeout(resolve, 1500));
 	fs.writeFileSync(
-		path.join(outputDirectory, '07-main-title-effect.png'),
+		path.join(outputDirectory, '08-main-title-effect.png'),
 		(await window.webContents.capturePage()).toPNG()
 	);
 	results.push(await window.webContents.executeJavaScript(`(() => {
