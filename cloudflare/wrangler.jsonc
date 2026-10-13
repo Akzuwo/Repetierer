@@ -1,0 +1,27 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "repetierer-assessment",
+  "main": "src/worker.js",
+  "account_id": "b28433d3be7f249de5b132c4ac59d351",
+  "compatibility_date": "2026-10-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {"pattern": "timolu.ch/app/services/repetierer/*", "zone_name": "timolu.ch"},
+    {"pattern": "akzuwo.ch/app/services/repetierer/*", "zone_name": "akzuwo.ch"}
+  ],
+  "d1_databases": [{"binding": "DB", "database_name": "repetierer-assessment", "database_id": "f891e94d-70cf-49f7-883f-4571693afd3e", "migrations_dir": "migrations"}],
+  "assets": {"directory": "assets", "binding": "ASSETS", "run_worker_first": true},
+  "rules": [{"type": "Text", "globs": ["**/*.html", "**/*.css", "**/survey.js"], "fallthrough": true}],
+  "triggers": {"crons": ["17 2 * * *"]},
+  "observability": {"enabled": true, "head_sampling_rate": 0.1, "logs": {"enabled": true, "invocation_logs": false, "persist": false}},
+  "env": {
+    "staging": {
+      "name": "repetierer-assessment-staging",
+      "workers_dev": true,
+      "routes": [],
+      "d1_databases": [{"binding": "DB", "database_name": "repetierer-assessment-staging", "database_id": "aa6e995f-d679-4cd4-b94e-06926fa0742e", "migrations_dir": "migrations"}]
+    }
+  }
+}

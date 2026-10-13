@@ -7,6 +7,9 @@ const { readReleaseNotesForVersion, stripReleaseNotesHeader } = require('./relea
 const { ANALYTICS_ENDPOINT, ANALYTICS_APP_ID, getAnalyticsApiKey } = require('./analyticsConfig.js');
 const { registerAssessmentHandlers } = require('./assessment/mainAssessment.js');
 const { createTeachingSessionStore } = require('./teachingSessions.js');
+const { createOllamaService } = require('./ai/ollamaService.js');
+const { createAiToolRegistry } = require('./ai/toolRegistry.js');
+const { createAiAssistantService } = require('./ai/assistantService.js');
 const isDebugMode = process.argv.includes('--dev-mode');
 const sessionEntries = [];
 let lastUndoEntry;
@@ -14,6 +17,8 @@ let lastRedoEntry;
 let programModule;
 let ExcelJSModule;
 let teachingSessionStore;
+const ollamaService = createOllamaService();
+const aiAssistants = new WeakMap();
 const MAX_REPORT_COMMENT_LENGTH = 4000;
 const MAX_REPORT_LOG_LENGTH = 200000;
 
@@ -31,6 +36,66 @@ function getTeachingSessionStore() {
 	if (!teachingSessionStore) teachingSessionStore = createTeachingSessionStore(getPaths().teachingSessionsPath);
 	return teachingSessionStore;
 }
+
+function getAiAssistant(sender) {
+	const existing = aiAssistants.get(sender);
+	if (existing) return existing;
+	let uiContext = {};
+	const assistant = createAiAssistantService({
+		ollama: ollamaService,
+		onActivity: activity => sender.send('ai-activity', activity),
+		makeRegistry: () => createAiToolRegistry({
+			program: getProgram(), sessions: getTeachingSessionStore(),
+			getUiContext: () => uiContext,
+			notifyNavigation: command => sender.send('ai-navigate', command),
+			notifyWrite: (type, session) => {
+			if (type === 'participation') {
+				logEvent('Mitarbeit per lokaler KI erfasst', { sessionId: session.id });
+				sender.send('participation-entry-saved', session);
+			}
+			},
+			commitGrade: (classId, studentId, grade) => new Promise((resolve, reject) => {
+				const selected = getProgram().selectSpecificPerson(studentId);
+				if (!selected) return reject(new Error('Person kann nicht für eine Repetition ausgewählt werden.'));
+				getProgram().saveGrade(grade, (error, entry) => {
+					if (error || !entry) return reject(new Error('Repetitionsnote konnte nicht gespeichert werden.'));
+					const saved = handleExcelBackupEntry({ sender }, entry);
+					if (!saved) return reject(new Error('Repetitionsnote konnte nicht gespeichert werden.'));
+					recordActiveSessionRepetition(entry);
+					sender.send('finished', undefined);
+					sender.send('repetition-saved');
+					resolve({ saved: true, pendingExcel: !entry.excelWriteSucceeded, classId, studentId, grade });
+				});
+			})
+		})
+	});
+	const holder = { assistant, setContext: value => { uiContext = sanitizeAiContext(value); } };
+	aiAssistants.set(sender, holder);
+	return holder;
+}
+
+function sanitizeAiContext(value) {
+	if (!value || typeof value !== 'object') return {};
+	return {
+		page: ['repetition', 'participation', 'evaluation', 'statistics', 'student'].includes(value.page) ? value.page : 'repetition',
+		classId: typeof value.classId === 'string' ? value.classId.slice(0, 80) : null,
+		studentId: Number.isInteger(value.studentId) ? value.studentId : null,
+		sessionId: typeof value.sessionId === 'string' ? value.sessionId.slice(0, 100) : null
+	};
+}
+
+ipcMain.handle('ai:status', () => ollamaService.status());
+ipcMain.handle('ai:setup', async event => {
+	try { return await ollamaService.setup(progress => event.sender.send('ai-setup-progress', progress)); }
+	catch (error) { return { state: 'error', message: error.message }; }
+});
+ipcMain.handle('ai:ask', async (event, payload) => {
+	const holder = getAiAssistant(event.sender);
+	holder.setContext(payload && payload.context);
+	return holder.assistant.ask(payload && payload.text);
+});
+ipcMain.handle('ai:confirm', (event, payload) => getAiAssistant(event.sender).assistant.decide(payload && payload.token, !!(payload && payload.approved)));
+ipcMain.handle('ai:reset', event => { getAiAssistant(event.sender).assistant.reset(); return { ok: true }; });
 
 logEvent('App gestartet', { version: app.getVersion() });
 
@@ -150,7 +215,7 @@ ipcMain.on('start', (event, args) => {
 	}
 	const selectedPerson = getProgram().selectPerson();
 	if (selectedPerson) {
-		event.sender.send('name', selectedPerson, getSelectionNames());
+		event.sender.send('name', selectedPerson, getSelectionNames(), getProgram().getSelectedPerson());
 	} else {
 		event.sender.send('no-person-available');
 	}
@@ -314,7 +379,7 @@ ipcMain.on('confirm-class-list-import', (event, args) => {
 ipcMain.on('select-person', (event, personId) => {
 	const result = getProgram().selectSpecificPerson(personId);
 	if (result) {
-		event.sender.send('name', result, getSelectionNames());
+		event.sender.send('name', result, getSelectionNames(), getProgram().getSelectedPerson());
 	}
 });
 

@@ -13,16 +13,17 @@ const {
 	validateBrevoConfig
 } = require('../src/assessment/integrationConfig.js');
 
-const assessmentEnv = `ASSESSMENT_FORM_URL=https://docs.google.com/forms/d/e/example/viewform\nASSESSMENT_API_URL=https://script.google.com/macros/s/example/exec\nASSESSMENT_API_KEY=long-secret-key\nASSESSMENT_ROUND_FIELD_ID=entry.123456\n`;
+const teacherToken = 'rt_' + 'a'.repeat(43);
+const assessmentEnv = `ASSESSMENT_API_URL=https://timolu.ch/app/services/repetierer/api\nASSESSMENT_TEACHER_TOKEN=${teacherToken}\n`;
 const brevoEnv = `BREVO_SMTP_HOST=smtp-relay.brevo.com\nBREVO_SMTP_PORT=587\nBREVO_SMTP_USER=user@example.ch\nBREVO_SMTP_PASSWORD="secret value"\nBREVO_FROM_EMAIL=teacher@example.ch\nBREVO_FROM_NAME=Herr Schaufelberger\n`;
 
 test('parst nur Key/Value, validiert beide Gruppen und baut einen vorbefüllten Rundenlink', () => {
-	assert.equal(validateAssessmentConfig(parseEnv(assessmentEnv)).roundFieldId, 'entry.123456');
+	assert.equal(validateAssessmentConfig(parseEnv(assessmentEnv)).fallbackApiUrl, 'https://akzuwo.ch/app/services/repetierer/api');
 	assert.equal(validateBrevoConfig(parseEnv(brevoEnv)).port, 587);
 	assert.throws(() => validateAssessmentConfig(parseEnv('ASSESSMENT_API_URL=https://example.ch')), /Fehlende/);
 	assert.throws(() => parseEnv('require("child_process")'), /Ungültige Zeile/);
 	const url = buildRoundFormUrl(validateAssessmentConfig(parseEnv(assessmentEnv)), 'assessment-3a-hs-a8f2d1');
-	assert.equal(new URL(url).searchParams.get('entry.123456'), 'assessment-3a-hs-a8f2d1');
+	assert.equal(new URL(url).searchParams.get('round'), 'assessment-3a-hs-a8f2d1');
 });
 
 test('führt Teilkonfigurationen zusammen und löscht das Original erst nach Verifikation', async () => {
@@ -36,7 +37,7 @@ test('führt Teilkonfigurationen zusammen und löscht das Original erst nach Ver
 	const result = await importIntegrationEnv(second, destination);
 	assert.equal(result.originalDeleted, true);
 	assert.equal(fs.existsSync(second), false);
-	assert.equal(readAssessmentConfig(destination).apiKey, 'long-secret-key');
+	assert.equal(readAssessmentConfig(destination).teacherToken, teacherToken);
 	assert.equal(readBrevoConfig(destination).fromEmail, 'teacher@example.ch');
 	fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -47,7 +48,7 @@ test('liest alte Brevo-Dateien weiter und behält Originale bei Importfehlern', 
 	fs.writeFileSync(legacy, brevoEnv);
 	assert.equal(readBrevoConfig(path.join(dir, 'missing.env'), legacy).fromEmail, 'teacher@example.ch');
 	const invalid = path.join(dir, 'invalid.env');
-	fs.writeFileSync(invalid, 'ASSESSMENT_FORM_URL=http://unsafe.example');
+	fs.writeFileSync(invalid, 'ASSESSMENT_API_URL=http://unsafe.example');
 	await assert.rejects(importIntegrationEnv(invalid, path.join(dir, 'repetierer.env')));
 	assert.equal(fs.existsSync(invalid), true);
 	fs.rmSync(dir, { recursive: true, force: true });

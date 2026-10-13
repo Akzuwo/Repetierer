@@ -1,66 +1,60 @@
 # Mitmachnote
 
-## Architektur und Datenhaltung
+Excel bleibt die Quelle für Klassen und Schüler. Selbstbeurteilungen, Lehrerbewertungen, Eigenkorrektur, Zuordnungen und Versandstatus liegen in `mitmachnoten.json` unter Electrons `userData`. Bestehende Bewertungen und synchronisierte Antworten bleiben erhalten und offline bearbeitbar.
 
-Die Excel-Arbeitsmappe bleibt die Quelle für Klassen, Schüler und sämtliche Repetitionsdaten. Mitmachnoten werden getrennt in `mitmachnoten.json` unter Electrons persistentem `userData`-Ordner gespeichert. Schema 3 ergänzt das Raster des ursprünglichen Selbstbeurteilungsbogens und ein separates Freitextfeld für zusätzliche Qualitäten. Alte Daten werden beim Laden migriert; bestehende Runden behalten ihr jeweiliges Raster und alle Selbst- und Lehrerbeurteilungen.
+## Ablauf
 
-Die Selbstbeurteilung verwendet ein dauerhaftes, außerhalb von Repetierer vorbereitetes Google Form mit verknüpfter Antworttabelle. Ein dazugehöriges Google Apps Script liest die Tabelle und stellt die Antworten als kleine HTTPS-JSON-API bereit. Repetierer benötigt weder Google-OAuth-Client noch Google-Anmeldung und erstellt keine Formulare. Die Arbeitskopie bleibt lokal; ohne Internet können bereits synchronisierte Antworten und Lehrerbewertungen weiter bearbeitet werden.
+1. In den Einstellungen den individuellen Lehrerzugang importieren und die API-Verbindung prüfen.
+2. Klasse wählen und eine Runde erstellen. Electron speichert lokal eine zufällige UUID und erstellt damit die Online-Runde. Die Klassenliste wird nicht hochgeladen.
+3. **Einladung kopieren** liefert `https://timolu.ch/app/services/repetierer/?round=<UUID>`. Bei Netzwerksperren verwendet Electron automatisch `https://akzuwo.ch/app/services/repetierer/?round=<UUID>`.
+4. Schüler antworten ohne Anmeldung. Das bestehende Raster mit sieben Kriterien, fünf Skalenwerten, zusätzlicher Qualität und Bemerkungen bleibt erhalten.
+5. **Antworten aktualisieren** übernimmt Antworten über stabile IDs. Wiederholte Synchronisierung verändert bestehende Antworten und Lehrerbewertungen nicht.
+6. **Runde schliessen** verhindert weitere Abgaben auf beiden Domains. Die Frist gilt bis 23:59:59 Uhr in `Europe/Zurich`; ohne Frist ist die Runde 30 Tage offen.
+7. Bewertung, Eigenkorrektur und Brevo-Versand erfolgen lokal wie bisher. Eine Schülerabgabe verschickt keine automatische Mail.
 
-## Formular vorbereiten
+Unter jedem Kriterium erscheint nach Auswahl der Lehrerbewertung automatisch ein optionales Kommentarfeld. Beim erneuten Öffnen bleiben Bewertung und Kommentar erhalten. Diese Kommentare werden zusätzlich zum allgemeinen Lehrerkommentar in der persönlichen Auswertung angezeigt. Sie werden nicht an die öffentliche Webumfrage oder D1 hochgeladen.
 
-Das Formular muss folgende Fragen enthalten. Die Titel müssen mit der mitgelieferten Script-Vorlage übereinstimmen:
+Bei fehlgeschlagener Online-Erstellung bleibt die lokale Runde `pending`. Öffnen oder Aktualisieren wiederholt denselben idempotenten Auftrag. Einladungen werden erst nach erfolgreicher Veröffentlichung angeboten. Alte lokale Runden bleiben Archive und werden nicht ungefragt hochgeladen; für neue Abgaben eine neue Runde erstellen.
 
-- `Beurteilungsrunde` als Pflicht-Kurzantwort
-- `Vorname, Nachname` als Pflicht-Kurzantwort
-- `E-Mail Adresse` als Pflicht-Kurzantwort
-- `Beteiligung mit Äusserungen`
-- `Falsch, unbefriedigend oder nicht ausreichend`
-- `Originell, aber unpassend im Lektionsverlauf`
-- `Korrekt, aber stichwortartig`
-- `Passend und im Lektionsverlauf weiterführend`
-- `Passend, eigenständig und in eine neue, interessante Richtung führend`
-- `Zusätzliche Qualität meiner Äusserungen` als Absatz
-- `Teilnahme insgesamt`
-- `Sonstige Bemerkungen` als Absatz
+## Konfiguration
 
-Für die ersten sechs Bewertungsfragen gilt die Skala `1 – (Fast) nie`, `2 – Ab und zu`, `3 – Manchmal`, `4 – Häufig`, `5 – Sehr häufig`. Für `Teilnahme insgesamt` gilt `1 – Mangelhaft`, `2 – Genügend`, `3 – Recht`, `4 – Gut`, `5 – Sehr gut`. Das Script akzeptiert sowohl diese ausgeschriebenen Optionen als auch reine Zahlen von 1 bis 5.
-
-Über **Mehr > Link zum vorausgefüllten Formular abrufen** lässt sich für `Beurteilungsrunde` ein Beispielwert einsetzen. Aus dem erzeugten Link wird der Parametername `entry.123456...` für `ASSESSMENT_ROUND_FIELD_ID` übernommen. Repetierer setzt dessen Wert pro Runde automatisch; die technische ID erscheint nicht in der Oberfläche.
-
-## Apps Script bereitstellen
-
-1. Das Formular mit einer Google-Tabelle für Antworten verknüpfen und in dieser Tabelle über **Erweiterungen > Apps Script** ein gebundenes Script-Projekt öffnen.
-2. Den Inhalt aus [`google-apps-script/Code.gs`](google-apps-script/Code.gs) in `Code.gs` einsetzen.
-3. Unter **Projekteinstellungen > Script Properties** `ASSESSMENT_API_KEY` mit einem langen zufälligen Wert hinterlegen. Optional können `SPREADSHEET_ID` und `RESPONSES_SHEET_NAME` gesetzt werden; im gebundenen Script werden sonst die aktive Tabelle und ihr erstes Blatt verwendet.
-4. **Bereitstellen > Neue Bereitstellung > Web-App** wählen, Ausführung als Eigentümer festlegen und den Zugriff so konfigurieren, dass Repetierer die URL ohne Google-Anmeldung aufrufen kann.
-5. Die `/exec`-URL als `ASSESSMENT_API_URL` verwenden. Bei Scriptänderungen eine neue Version der Bereitstellung veröffentlichen.
-
-Der aktuelle Script-Vertrag akzeptiert `GET` mit `apiKey` und `roundId`. Repetierer unterstützt zusätzlich den früher dokumentierten JSON-POST-Vertrag und erkennt die Variante automatisch. Der API-Schlüssel erscheint niemals im Einladungslink oder in Repetierer-Protokollen. Die API und der Client filtern exakt nach `roundId`; Antwort-IDs verhindern lokale Doppelimporte.
-
-## Gemeinsame Konfiguration importieren
-
-Die importierte Datei kann Mitmachnote, Brevo oder beide vollständigen Gruppen enthalten:
+Der Betreiber provisioniert pro Lehrer ein widerrufbares Anwendungstoken, keinen Cloudflare-Verwaltungsschlüssel:
 
 ```dotenv
-ASSESSMENT_FORM_URL=https://docs.google.com/forms/d/e/.../viewform?usp=pp_url
-ASSESSMENT_API_URL=https://script.google.com/macros/s/.../exec
-ASSESSMENT_API_KEY=
-ASSESSMENT_ROUND_FIELD_ID=entry.123456789
+ASSESSMENT_API_URL=https://timolu.ch/app/services/repetierer/api
+ASSESSMENT_FALLBACK_API_URL=https://akzuwo.ch/app/services/repetierer/api
+ASSESSMENT_TEACHER_TOKEN=<individuelles rt_-Token>
+```
 
+Der Fallback ist für diese Hauptadresse bereits voreingestellt; sein Konfigurationswert ist optional. Bei Netzwerkfehlern, Timeouts, Filterseiten oder Serverausfällen wird die zweite Domain verwendet. Ein gültiger Authentifizierungsfehler löst keinen Domainwechsel aus. Beide Domains teilen dieselben Daten. Die erfolgreiche Domainauswahl bleibt zehn Minuten im Main-Prozess gespeichert; Einladungen folgen ihr.
+
+Die zuletzt erfolgreich verwendete Umfragedomain wird zusätzlich pro Runde lokal gespeichert. Damit behalten Einladungen auch nach einem App-Neustart oder offline den erreichbaren Fallback-Link.
+
+Der Import prüft den Zugang online, verschlüsselt ihn mit Electron `safeStorage` und schreibt `repetierer.env` atomar. Unter Windows bindet DPAPI die Entschlüsselung an das Benutzerkonto. Ohne sicheren Schlüsselspeicher wird unverschlüsseltes Speichern abgelehnt. Token gelangen nicht zum Renderer, in Einladungen oder Protokolle. Für andere Benutzerkonten eine eigene ursprüngliche Zugangsdatei verwenden.
+
+Die importierte Datei darf zusätzlich die unveränderten Brevo-Werte enthalten:
+
+```dotenv
 BREVO_SMTP_HOST=smtp-relay.brevo.com
 BREVO_SMTP_PORT=587
 BREVO_SMTP_USER=
 BREVO_SMTP_PASSWORD=
 BREVO_FROM_EMAIL=
-BREVO_FROM_NAME=Herr Schaufelberger
+BREVO_FROM_NAME=
 ```
 
-`ASSESSMENT_ROUND_FIELD_ID` ist optional. Fehlt der Wert, erkennt Repetierer das Kurzantwortfeld `Beurteilungsrunde` beim ersten Onlinezugriff und speichert seine `entry...`-ID intern. Danach kann der Einladungslink auch offline erzeugt werden.
+Die App parst nur Key/Value-Zeilen, validiert vollständige Gruppen und prüft die gespeicherte Kopie vor dem Entfernen der importierten Datei. Bei Fehlern bleibt die Quelle erhalten. `brevo-smtp.env` wird weiterhin gelesen. Nicht mehr unterstützte Umfrage-Einstellungen werden beim Start entfernt; Brevo und lokale Beurteilungen bleiben erhalten.
 
-Repetierer parst die Datei ausschließlich als Key/Value-Konfiguration. Vorhandene Gruppen werden zusammengeführt, vollständig validiert und atomar als `repetierer.env` im persistenten `userData`-Ordner geschrieben. Nach erfolgreicher Rückleseprüfung wird erst dann die ausgewählte Originaldatei gelöscht. Bei Lese-, Validierungs-, Schreib- oder Verifikationsfehlern bleibt das Original erhalten. Eine bestehende `brevo-smtp.env` wird weiterhin gelesen und kann beim nächsten Import ohne Datenverlust in die gemeinsame Konfiguration übernommen werden.
+## Duplikate und Datenschutz
 
-## Synchronisation und Versand
+D1 erzwingt `UNIQUE(round_id, name_key)` und ergänzend `UNIQUE(round_id, browser_hash)`. Namen werden Unicode-normalisiert, unsichtbare Formatzeichen entfernt, Leerzeichen vereinheitlicht und kleingeschrieben. Die Einfügung prüft Offenheit, Frist und Antwortlimit in derselben SQL-Anweisung. Gleichzeitige Abgaben umgehen die Sperre nicht. Es gibt keine IP-Sperre. Bei gemeinsam verwendeten Geräten separate Browserprofile verwenden, da auch der Browser-Code nur eine Abgabe pro Runde erlaubt.
 
-Neue Runden erhalten eine ID wie `assessment-3a-hs-2026-a8f2d1`. Der Einladungslink enthält diese ID als vorausgefüllten Formularwert. Beim Aktualisieren sendet Repetierer die Runden-ID und bereits bekannte Antwort-IDs an die API. Fremde Runden und ungültige Datensätze werden ignoriert und gezählt. Alle gültigen Antworten werden lokal aufbewahrt; bei gleicher E-Mail wird standardmäßig die neueste verwendet, eine ältere Abgabe kann in der Rundenansicht ausgewählt werden.
+Ohne Anmeldung wird die Identität eines Namens nicht bewiesen. Einen weitergegebenen Link können auch andere Personen benutzen. Die Lehrperson prüft falsche Zuordnungen lokal. Öffentliche Endpunkte liefern keine Antworten oder Schülerlisten.
 
-Der Brevo-Verbindungstest und Klassenversand verwenden die importierten SMTP-Werte. Jede Person erhält eine getrennte HTML- und Text-Mail. Status und Versuchszahl werden nach jedem Empfänger gespeichert; **Fehlgeschlagene erneut senden** berücksichtigt nur fehlgeschlagene Mails. Passwörter, API-Schlüssel und vollständige Antworten werden nicht protokolliert oder exportiert.
+Gespeichert werden Name, E-Mail für den persönlichen Resultatversand, Bewertungswerte, freiwillige Texte, Antwort-ID und Abgabezeit. Browser-Codes werden rundenspezifisch gehasht. Keine Anwendungsspeicherung von IP-Adressen, User-Agent oder Geräteprofilen. Keine Inhalts-/Tokenlogs; persistente Invocation-Logs sind ausgeschaltet. Anbieter-Infrastrukturlogs unterliegen dessen eigenen Richtlinien.
+
+Online-Runden laufen spätestens nach 90 Tagen ab, nach Schliessung innerhalb von höchstens 30 Tagen. Danach sind sie sofort unzugänglich; ein täglicher Cron entfernt sie samt Antworten physisch. Cloudflares technische Wiederherstellungskopien können während der tarifabhängigen Time-Travel-Frist weiterexistieren. **Runde lokal und online löschen** entfernt die aktive Onlinekopie sofort und danach die lokale Runde. Bei Netzwerkfehlern bleibt die lokale Runde bis zur bestätigten Online-Löschung erhalten.
+
+Vor Ablauf synchronisieren und lokale Kopien nach schulischen Aufbewahrungsregeln löschen. E-Mails bei Empfängern und persönliche Backups werden nicht automatisch entfernt. D1 wurde mit EU-Jurisdiktion erstellt; Worker-Anfragen werden im Cloudflare-Netz verarbeitet. Der verantwortliche Betreiber prüft die schulisch geltenden Vorgaben für Auftragsverarbeitung und Aufbewahrung.
+
+Deployment, Infrastruktur, Zugangswiderruf und Tests: [cloudflare-deployment.md](cloudflare-deployment.md).

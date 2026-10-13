@@ -1,4 +1,11 @@
 # Logs
+.wrangler/
+.cloudflare-private/
+.cloudflare-test/
+.smoke-user-data/
+docs/ui-audit/
+docs/ui-audit.zip
+*.cpuprofile
 logs
 *.log
 npm-debug.log*
@@ -118,6 +125,8 @@ dist
 builds
 .local-build-number
 .session-smoke/
+.ui-polish-smoke/
+.ai-prototype-profile/
 release_notes.md
 
 # Local importer test files

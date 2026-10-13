@@ -1,4 +1,5 @@
 const { ipcRenderer, clipboard } = require('electron');
+const assessmentMotion = require('./uiMotion.js');
 
 const elements = {
 	view: document.getElementById('assessment-view'),
@@ -6,6 +7,7 @@ const elements = {
 	heading: document.getElementById('assessment-heading'),
 	classSelect: document.getElementById('assessment-class-select'),
 	back: document.getElementById('assessment-back-btn'),
+	operationStatus: document.getElementById('assessment-operation-status'),
 	classPanel: document.getElementById('class'),
 	repetition: document.getElementById('repetition'),
 	stats: document.getElementById('stats-view'),
@@ -80,8 +82,8 @@ elements.assessmentConfigImport.addEventListener('click', () => integrationActio
 }));
 elements.assessmentApiTest.addEventListener('click', async () => {
 	try {
-		await invoke('assessment:api-test');
-		setIntegrationMessage(elements.assessmentApiStatus, 'API: Erreichbar', 'success');
+		const status = await invoke('assessment:api-test');
+		setIntegrationMessage(elements.assessmentApiStatus, status.fallback ? 'API: Erreichbar über akzuwo.ch (Fallback)' : 'API: Erreichbar', 'success');
 	} catch (error) {
 		setIntegrationMessage(elements.assessmentApiStatus, `API: ${error.message}`, 'error');
 	}
@@ -109,7 +111,11 @@ elements.deleteModal.addEventListener('click', event => { if (event.target === e
 elements.deleteConfirm.addEventListener('click', deleteRound);
 
 async function openAssessment() {
+	if (busy) return;
 	closeDrawer();
+	elements.repetitionNav.removeAttribute('aria-current');
+	elements.assessmentNav.setAttribute('aria-current', 'page');
+	document.getElementById('stats-view-btn').removeAttribute('aria-current');
 	document.getElementById('content').classList.remove('session-active');
 	elements.classPanel.classList.add('update-hidden');
 	elements.repetition.classList.add('update-hidden');
@@ -118,8 +124,9 @@ async function openAssessment() {
 	elements.participation.classList.add('update-hidden');
 	elements.sessionEmpty.classList.add('update-hidden');
 	elements.view.classList.remove('update-hidden');
-	elements.title.innerText = 'Mitmachnote';
-	elements.title.dataset.text = 'Mitmachnote';
+	assessmentMotion.revealView(elements.view);
+	elements.title.innerText = 'Repetierer';
+	elements.title.dataset.text = 'Repetierer';
 	const activeClass = document.querySelector('#class-list .class-selected');
 	if (!selectedClass && activeClass) selectedClass = activeClass.innerText;
 	renderClassOptions();
@@ -129,6 +136,9 @@ async function openAssessment() {
 
 function openRepetition() {
 	closeDrawer();
+	elements.assessmentNav.removeAttribute('aria-current');
+	elements.repetitionNav.setAttribute('aria-current', 'page');
+	document.getElementById('stats-view-btn').removeAttribute('aria-current');
 	elements.view.classList.add('update-hidden');
 	elements.stats.classList.add('update-hidden');
 	if (typeof window.restoreTeachingSessionView === 'function') window.restoreTeachingSessionView();
@@ -140,10 +150,10 @@ function openRepetition() {
 	elements.title.dataset.text = 'Repetierer';
 }
 
+window.openRepetiererRepetition = openRepetition;
+
 function closeDrawer() {
-	elements.drawer.classList.remove('drawer-open');
-	elements.drawerScrim.classList.remove('scrim-visible');
-	elements.drawerToggle.classList.remove('drawer-toggle-open');
+	assessmentMotion.setDrawerOpen(false);
 }
 
 function renderClassOptions() {
@@ -159,7 +169,8 @@ function renderClassOptions() {
 }
 
 async function loadOverview() {
-	setBusy(true, 'Beurteilungsrunden werden geladen …');
+	if (busy) return;
+	setBusy(true, 'Beurteilungsrunden werden geladen …', true, 'overview');
 	try {
 		overview = await invoke('assessment:get-overview', { className: selectedClass });
 		renderOverview();
@@ -197,6 +208,7 @@ function renderOverview() {
 }
 
 async function createRound() {
+	if (busy) return;
 	const title = document.getElementById('assessment-round-title').value;
 	const deadline = document.getElementById('assessment-round-deadline').value;
 	try {
@@ -211,8 +223,9 @@ async function createRound() {
 }
 
 async function openRound(roundId) {
+	if (busy) return;
 	try {
-		setBusy(true, 'Runde wird geladen …');
+		setBusy(true, 'Beurteilungsrunde wird geladen …', true);
 		roundView = await invoke('assessment:get-round', { className: selectedClass, roundId });
 		await refreshBrevoState();
 		renderRound();
@@ -224,7 +237,8 @@ async function openRound(roundId) {
 }
 
 function renderRound() {
-	const { round, summary, students, invitation, invitationError, assessmentConfigured, deliveryValidation } = roundView;
+	const { round, summary, students, invitation, invitationError, deliveryValidation } = roundView;
+	const assessmentConfigured = roundView.assessmentConfigured && !!round.cloudStatus;
 	elements.heading.innerText = `${selectedClass} · ${round.title}`;
 	elements.back.classList.remove('update-hidden');
 	const syncLabel = summary.lastSyncAt ? `Zuletzt ${formatDateTime(summary.lastSyncAt)}` : 'Noch nicht synchronisiert';
@@ -254,16 +268,18 @@ function renderRound() {
 		<div class="assessment-toolbar">
 			<button class="btn-1${assessmentConfigured ? '' : ' disabled'}" id="assessment-sync-btn" title="${assessmentConfigured ? '' : 'Mitmachnoten-Konfiguration fehlt'}">Antworten aktualisieren</button>
 			<button class="btn-2${invitation ? '' : ' disabled'}" id="assessment-invitation-btn">Einladung kopieren</button>
-			<button class="btn-2" id="assessment-teacher-btn">Beurteilungen öffnen</button>
-			<button class="btn-1${deliveryValidation.valid && brevoState.configured ? '' : ' disabled'}" id="assessment-send-btn" title="${escapeAttribute(invalidHint)}">Klassensatz versenden</button>
+			<button class="btn-1" id="assessment-teacher-btn">Beurteilungen öffnen</button>
+			<button class="btn-2${deliveryValidation.valid && brevoState.configured ? '' : ' disabled'}" id="assessment-send-btn" title="${escapeAttribute(invalidHint)}">Klassensatz versenden</button>
 			${summary.failedCount ? '<button class="btn-2" id="assessment-retry-btn">Fehlgeschlagene erneut senden</button>' : ''}
-			<button class="btn-2" id="assessment-delete-round-btn">Runde löschen</button>
 		</div>
-		${!assessmentConfigured ? '<div class="assessment-warning">Die Umfrage ist noch nicht eingerichtet. Importiere die Mitmachnoten-Konfiguration in den Einstellungen.</div>' : ''}
-		${invitationError ? `<div class="assessment-warning">${escapeHtml(invitationError)}</div>` : ''}
-		${summary.lastSyncResult && summary.lastSyncResult.invalid ? `<div class="assessment-warning">${summary.lastSyncResult.invalid} ungültige Antwort${summary.lastSyncResult.invalid === 1 ? '' : 'en'} wurde beim letzten Abruf ignoriert.</div>` : ''}
-		${summary.lastSyncResult && summary.lastSyncResult.ignoredRound ? `<div class="assessment-warning">${summary.lastSyncResult.ignoredRound} Antwort${summary.lastSyncResult.ignoredRound === 1 ? '' : 'en'} aus einer anderen Runde wurde ignoriert.</div>` : ''}
-		${summary.duplicateCount ? `<section class="assessment-duplicates"><h3>Mehrfachantworten</h3><p class="assessment-warning">Standardmäßig wird die neueste Antwort verwendet. Hier kann eine frühere Abgabe gewählt werden.</p>${duplicates}</section>` : ''}
+		${round.cloudStatus === 'open' ? '<button class="btn-2" id="assessment-close-round-btn">Runde schliessen</button>' : ''}
+		${round.cloudStatus === 'closed' ? '<p class="assessment-warning">Runde geschlossen. Gespeicherte Antworten können weiterhin aktualisiert werden.</p>' : ''}
+		<details class="assessment-danger-zone"><summary>Weitere Aktionen</summary><button class="btn-danger" id="assessment-delete-round-btn">Runde lokal und online löschen</button></details>
+		${!assessmentConfigured ? '<div class="ui-alert ui-alert-warning assessment-warning">Die Umfrage ist noch nicht eingerichtet. Importiere die Mitmachnoten-Konfiguration in den Einstellungen.</div>' : ''}
+		${invitationError ? `<div class="ui-alert ui-alert-warning assessment-warning">${escapeHtml(invitationError)}</div>` : ''}
+		${summary.lastSyncResult && summary.lastSyncResult.invalid ? `<div class="ui-alert ui-alert-warning assessment-warning">${summary.lastSyncResult.invalid} ungültige Antwort${summary.lastSyncResult.invalid === 1 ? '' : 'en'} wurde beim letzten Abruf ignoriert.</div>` : ''}
+		${summary.lastSyncResult && summary.lastSyncResult.ignoredRound ? `<div class="ui-alert ui-alert-warning assessment-warning">${summary.lastSyncResult.ignoredRound} Antwort${summary.lastSyncResult.ignoredRound === 1 ? '' : 'en'} aus einer anderen Runde wurde ignoriert.</div>` : ''}
+		${summary.duplicateCount ? `<section class="assessment-duplicates"><h3>Mehrfachantworten</h3><p class="ui-alert ui-alert-warning assessment-warning">Standardmäßig wird die neueste Antwort verwendet. Hier kann eine frühere Abgabe gewählt werden.</p>${duplicates}</section>` : ''}
 		${unmatched ? `<section class="assessment-unmatched"><h3>Manuelle Zuordnung erforderlich</h3>${unmatched}</section>` : ''}
 		<section class="assessment-roster"><h3>Klassenübersicht</h3>${studentRows}</section>
 		<div id="assessment-invitation-area">${invitation ? renderInvitation(invitation, true) : ''}</div>`;
@@ -281,6 +297,7 @@ function renderRound() {
 	const retry = document.getElementById('assessment-retry-btn');
 	if (retry) retry.addEventListener('click', () => openSendConfirm('failed_only'));
 	document.getElementById('assessment-delete-round-btn').addEventListener('click', openDeleteConfirm);
+	document.getElementById('assessment-close-round-btn')?.addEventListener('click', () => runRoundAction('assessment:close-round'));
 	elements.body.querySelectorAll('[data-assign-response]').forEach(button => button.addEventListener('click', () => assignResponse(button.dataset.assignResponse)));
 	elements.body.querySelectorAll('[data-select-response]').forEach(select => select.addEventListener('change', () => selectResponse(select.value)));
 	bindCopyButtons();
@@ -342,7 +359,7 @@ function openTeacher(index) {
 	const criteriaRows = roundView.round.criteria.map(criterion => {
 		const self = assessment.studentAnswers && assessment.studentAnswers[criterion.id];
 		const teacher = assessment.teacherAnswers && assessment.teacherAnswers[criterion.id];
-		return `<div class="teacher-criterion"><strong>${escapeHtml(criterion.label)}</strong><span>${escapeHtml(formatCriterionValue(criterion, self))}</span><select data-teacher-criterion="${escapeAttribute(criterion.id)}"><option value="">–</option>${[1,2,3,4,5].map(value => `<option value="${value}"${teacher === value ? ' selected' : ''}>${escapeHtml(formatCriterionValue(criterion, value))}</option>`).join('')}</select><b data-difference="${escapeAttribute(criterion.id)}">${self && teacher ? signed(teacher - self) : '–'}</b></div>`;
+		return `<div class="teacher-criterion-block"><div class="teacher-criterion"><strong>${escapeHtml(criterion.label)}</strong><span>${escapeHtml(formatCriterionValue(criterion, self))}</span><select data-teacher-criterion="${escapeAttribute(criterion.id)}" aria-label="Lehrerbewertung: ${escapeAttribute(criterion.label)}"><option value="">–</option>${[1,2,3,4,5].map(value => `<option value="${value}"${teacher === value ? ' selected' : ''}>${escapeHtml(formatCriterionValue(criterion, value))}</option>`).join('')}</select><b data-difference="${escapeAttribute(criterion.id)}">${self && teacher ? signed(teacher - self) : '–'}</b></div><label class="teacher-criterion-comment"${teacher ? '' : ' hidden'}>Kommentar zu diesem Kriterium (optional)<textarea data-teacher-comment="${escapeAttribute(criterion.id)}" aria-label="Kommentar: ${escapeAttribute(criterion.label)}" rows="2" maxlength="2000">${escapeHtml(assessment.teacherCriterionComments?.[criterion.id] || '')}</textarea></label></div>`;
 	}).join('');
 	elements.body.innerHTML = `
 		<section class="teacher-assessment">
@@ -370,15 +387,18 @@ function updateDifferences() {
 		const self = assessment.studentAnswers && assessment.studentAnswers[select.dataset.teacherCriterion];
 		const difference = elements.body.querySelector(`[data-difference="${cssEscape(select.dataset.teacherCriterion)}"]`);
 		difference.innerText = self && select.value ? signed(Number(select.value) - self) : '–';
+		select.closest('.teacher-criterion-block').querySelector('.teacher-criterion-comment').hidden = !select.value;
 	});
 }
 
 async function saveTeacher(moveNext) {
 	const student = roundView.students[teacherIndex];
 	const answers = {};
+	const criterionComments = {};
 	elements.body.querySelectorAll('[data-teacher-criterion]').forEach(select => { answers[select.dataset.teacherCriterion] = Number(select.value); });
+	elements.body.querySelectorAll('[data-teacher-comment]').forEach(field => { criterionComments[field.dataset.teacherComment] = field.value; });
 	try {
-		const updated = await invoke('assessment:save-teacher', { className: selectedClass, roundId: roundView.round.id, studentId: student.id, answers, comment: document.getElementById('teacher-comment').value });
+		const updated = await invoke('assessment:save-teacher', { className: selectedClass, roundId: roundView.round.id, studentId: student.id, answers, criterionComments, comment: document.getElementById('teacher-comment').value });
 		roundView = updated;
 		if (moveNext && teacherIndex < roundView.students.length - 1) openTeacher(teacherIndex + 1);
 		else openTeacher(teacherIndex);
@@ -392,13 +412,11 @@ function openSendConfirm(mode) {
 	const count = mode === 'failed_only' ? roundView.summary.failedCount : roundView.summary.studentCount - roundView.summary.sentCount;
 	elements.confirmText.innerText = `${count} E-Mail${count === 1 ? '' : 's'} werden über Brevo versendet. Bereits erfolgreich versendete Resultate werden nicht erneut verschickt.`;
 	elements.confirmSend.innerText = `${count} E-Mail${count === 1 ? '' : 's'} senden`;
-	elements.confirmModal.style.display = 'block';
-	elements.confirmModal.classList.add('modal-open');
+	assessmentMotion.openDialog(elements.confirmModal);
 }
 
 function closeConfirm() {
-	elements.confirmModal.classList.remove('modal-open');
-	elements.confirmModal.style.display = 'none';
+	assessmentMotion.closeDialog(elements.confirmModal);
 }
 
 function openDeleteConfirm() {
@@ -406,13 +424,11 @@ function openDeleteConfirm() {
 	elements.deleteText.innerText = `Die Beurteilungsrunde „${roundView.round.title}“ und alle lokal gespeicherten Antworten und Bewertungen dieser Runde werden gelöscht.`;
 	elements.deleteSentWarning.innerText = sentCount ? `Achtung: Für ${sentCount} bereits versendete${sentCount === 1 ? 's Resultat' : ' Resultate'} gehen die lokalen Versanddaten verloren.` : '';
 	elements.deleteSentWarning.classList.toggle('update-hidden', sentCount === 0);
-	elements.deleteModal.style.display = 'block';
-	elements.deleteModal.classList.add('modal-open');
+	assessmentMotion.openDialog(elements.deleteModal);
 }
 
 function closeDeleteConfirm() {
-	elements.deleteModal.classList.remove('modal-open');
-	elements.deleteModal.style.display = 'none';
+	assessmentMotion.closeDialog(elements.deleteModal);
 }
 
 async function deleteRound() {
@@ -488,11 +504,17 @@ async function invoke(channel, args) {
 	return response.data;
 }
 
-function setBusy(active, message) {
+function setBusy(active, message, replaceContent = false, layout = 'assessment') {
 	busy = active;
 	elements.body.classList.toggle('assessment-busy', active);
-	elements.body.dataset.busyLabel = message || 'Wird geladen …';
-	if (active && !elements.body.innerHTML.trim()) elements.body.innerHTML = `<div class="assessment-loading">${escapeHtml(message || 'Wird geladen …')}</div>`;
+	elements.body.classList.toggle('assessment-loading-content', active && replaceContent);
+	elements.body.setAttribute('aria-busy', String(active));
+	elements.body.inert = active && !replaceContent;
+	elements.classSelect.disabled = active;
+	elements.back.disabled = active;
+	elements.operationStatus.textContent = active && !replaceContent ? message || 'Wird geladen …' : '';
+	elements.operationStatus.classList.toggle('update-hidden', !active || replaceContent);
+	if (active && replaceContent) elements.body.replaceChildren(window.createRepetiererLoadingState(message, layout));
 }
 
 function renderEmpty(message) {
@@ -502,7 +524,8 @@ function renderEmpty(message) {
 }
 
 function renderError(message) {
-	elements.body.innerHTML = `<div class="assessment-notice assessment-notice-error">${escapeHtml(message)}</div>`;
+	elements.body.innerHTML = `<div class="ui-alert ui-alert-error assessment-notice assessment-notice-error" role="alert">${escapeHtml(message)}</div><div><button class="btn-2" id="assessment-retry-btn">Erneut laden</button></div>`;
+	document.getElementById('assessment-retry-btn').addEventListener('click', loadOverview);
 }
 
 function showNotice(message, type) {
@@ -512,7 +535,7 @@ function showNotice(message, type) {
 		notice.className = 'assessment-floating-notice';
 		elements.body.prepend(notice);
 	}
-	notice.className = `assessment-floating-notice assessment-notice-${type}`;
+	notice.className = `ui-alert ui-alert-${type} assessment-floating-notice assessment-notice-${type}`;
 	notice.innerText = message;
 	setTimeout(() => notice.remove(), 5500);
 }

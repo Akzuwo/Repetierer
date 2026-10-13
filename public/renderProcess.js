@@ -1,4 +1,5 @@
 const {ipcRenderer, clipboard} = require('electron');
+const uiMotion = require('./uiMotion.js');
 let state = 0; // 0: select file, 1: select class, 2: click start, 3: set grade
 
 // elements
@@ -179,6 +180,7 @@ const _updateSecondaryBtn = document.getElementById('update-secondary-btn');
 let selectedPersonIds = [];
 let absentPersonIds = [];
 let activeTeachingSession = null;
+let aiSelectedStudentId = null;
 let pendingSessionSetupClass = '';
 let sessionSetup = null;
 let sessionSetupAbsentIds = [];
@@ -191,13 +193,10 @@ let extraJokerMigrationStatus = { hasFile: false, completed: false };
 let _currentClass;
 let _nameSize;
 let updatePrimaryAction = requestUpdateDownload;
-let restoreAnimationActive = false;
 let drawerView = 'main';
 let updateNewsVersion = '';
 let problemReportPreview = null;
 let problemReportSending = false;
-let statsCloseTimer = null;
-let statsReturnTimer = null;
 let statsResultsTimer = null;
 let statsScrollFrame = null;
 let statsScrollIdleTimer = null;
@@ -208,7 +207,6 @@ let selectionEffectRun = 0;
 let completionEffectRun = 0;
 const selectionEffectTimers = [];
 const completionEffectTimers = [];
-const modalCloseTimers = new WeakMap();
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 /*
@@ -229,6 +227,10 @@ _quit.addEventListener('click', () => {
 _file.addEventListener('click', () => {
 	ipcRenderer.send('file');
 });
+document.getElementById('session-open-file-btn').addEventListener('click', () => _file.click());
+document.getElementById('session-change-file-btn').addEventListener('click', () => _file.click());
+document.getElementById('session-import-btn').addEventListener('click', () => _importClassListBtn.click());
+document.getElementById('session-data-btn').addEventListener('click', () => { if (!_drawer.classList.contains('drawer-open')) toggleDrawer(); setDrawerView('data'); });
 
 _drawerToggle.addEventListener('click', () => {
 	toggleDrawer();
@@ -626,10 +628,17 @@ _debugFakeUpdateBtn.addEventListener('click', () => {
 // class
 function classEvent(e) {
 	e.addEventListener('click', () => {
-		setActiveClassButton(e);
-		if (!activeTeachingSession) pendingSessionSetupClass = e.innerText;
-		ipcRenderer.send('class', e.innerText);
+		selectClassForNavigation(e.innerText);
 	});
+}
+
+function selectClassForNavigation(className) {
+	const button = Array.from(_classes.querySelectorAll('button')).find(item => item.innerText === className);
+	if (!button) return false;
+	setActiveClassButton(button);
+	if (!activeTeachingSession) pendingSessionSetupClass = className;
+	ipcRenderer.send('class', className);
+	return true;
 }
 
 // start
@@ -781,6 +790,7 @@ ipcRenderer.on('classes', (event, args, filePath) => {
 				ipcRenderer.send('class', activeTeachingSession.className);
 			}
 		}
+		renderSessionStartState(args.length ? '' : 'In dieser Datei wurden keine Repetierer-Klassen gefunden.');
 	} else {
 		state = 0;
 		_filePath.innerText = '';
@@ -788,6 +798,7 @@ ipcRenderer.on('classes', (event, args, filePath) => {
 		closeStatsView();
 		disableElement(_statsViewBtn);
 		updateState();
+		renderSessionStartState('Die Datei konnte nicht gelesen werden. Öffne eine gültige Repetierer-Datei.');
 		error(_file);
 	}
 })
@@ -797,6 +808,7 @@ ipcRenderer.on('saved-file-missing', (event, filePath) => {
 	_drawerStatus.innerText = 'Die zuletzt gespeicherte Datei wurde nicht gefunden.';
 	closeStatsView();
 	disableElement(_statsViewBtn);
+	renderSessionStartState(filePath ? 'Die zuletzt verwendete Datei wurde nicht gefunden. Öffne sie erneut oder wähle eine andere Datei.' : '');
 });
 
 ipcRenderer.on('joker-migration-required', (event, status, filePath) => {
@@ -869,6 +881,7 @@ ipcRenderer.on('settings-data', (event, settings, paths, migrationStatus) => {
 	updateExtraJokerMigrationStatus(migrationStatus);
 	_settingsLocation.innerText = paths ? paths.settingsPath : '';
 	openModal(_settingsModal);
+	_closeSettingsModal.focus();
 });
 
 ipcRenderer.on('extra-joker-migration-done', (event, result) => {
@@ -1217,7 +1230,8 @@ ipcRenderer.on('excel-reload-failed', (event, result) => {
 });
 
 // name
-ipcRenderer.on('name', (event, args, selectionNames) => {
+ipcRenderer.on('name', (event, args, selectionNames, selectedPerson) => {
+	aiSelectedStudentId = selectedPerson && selectedPerson.id;
 	
 	const [name, joker] = args
     
@@ -1232,8 +1246,9 @@ ipcRenderer.on('name', (event, args, selectionNames) => {
 	_grade.value = '';
 	const displayName = getFirstName(name);
 	_name.innerText = displayName;
-	_nameSize = 10;
+	_nameSize = 5.5;
 	scaleName();
+	uiMotion.revealStudent(_name);
 	runSelectionEffect(displayName, (selectionNames || []).map(getFirstName));
 
 })
@@ -1601,17 +1616,58 @@ function renderTeachingSessionView() {
 	if (assessmentView && !assessmentView.classList.contains('update-hidden')) return;
 	if (_statsView && !_statsView.classList.contains('update-hidden')) return;
 	const isActive = !!activeTeachingSession;
+	const homeWasHidden = _sessionEmptyView.classList.contains('update-hidden');
 	_contentToggleSessionClass(isActive);
 	_sessionHeader.classList.toggle('update-hidden', !isActive);
-	_classPanel.classList.add('update-hidden');
+	_classPanel.classList.toggle('update-hidden', !isActive);
+	const classList = document.getElementById('class-list');
+	if (isActive) document.getElementById('session-class-slot').appendChild(classList);
+	else _sessionEmptyView.insertBefore(classList, document.getElementById('session-class-home-slot'));
 	_sessionEmptyView.classList.toggle('update-hidden', isActive);
 	if (!isActive) {
 		_participationView.classList.add('update-hidden');
 		_repetition.classList.add('update-hidden');
+		renderSessionStartState();
+		if (homeWasHidden) uiMotion.revealView(_sessionEmptyView);
 		return;
 	}
 	showSessionArea(activeSessionArea);
 }
+
+function renderSessionStartState(message = '') {
+	const count = _classes.querySelectorAll('button').length;
+	const hasClasses = count > 0;
+	document.getElementById('session-file-empty').classList.toggle('update-hidden', hasClasses);
+	document.getElementById('class-list').classList.toggle('update-hidden', !hasClasses);
+	document.getElementById('session-source').classList.toggle('update-hidden', !hasClasses);
+	document.getElementById('session-start-description').textContent = hasClasses
+		? 'Wähle eine Klasse und erfasse die heutigen Abwesenheiten.'
+		: 'Lade deine Klassen, um eine Unterrichtssession zu beginnen.';
+	document.getElementById('session-start-heading').textContent = hasClasses ? 'Klasse wählen' : 'Unterricht starten';
+	document.getElementById('session-file-heading').textContent = 'Excel-Datei auswählen';
+	document.getElementById('session-file-description').textContent = message || 'Öffne eine Repetierer-Datei oder importiere eine Klassenliste.';
+	const fileName = _filePath.textContent.split(/[\\/]/).pop();
+	document.getElementById('session-source-label').textContent = `${count} ${count === 1 ? 'Klasse' : 'Klassen'}${fileName ? ` · ${fileName}` : ''}`;
+	document.getElementById('session-workbook-name').textContent = fileName || 'Repetierer-Datei';
+	document.getElementById('session-workbook-name').title = _filePath.textContent;
+	_classes.querySelectorAll('button').forEach(button => { button.disabled = !!activeTeachingSession && button.innerText !== activeTeachingSession.className; });
+}
+
+// Shared placeholders for actual IPC reads; decoration is hidden from assistive technology.
+window.createRepetiererLoadingState = (label, layout = 'list') => {
+	const state = document.createElement('div');
+	state.className = `ui-skeleton-state ui-skeleton-${layout}`;
+	state.setAttribute('role', 'status');
+	const status = document.createElement('p');
+	status.className = 'ui-loading-status';
+	status.textContent = label;
+	const shapes = document.createElement('div');
+	shapes.className = 'ui-skeleton-shapes';
+	shapes.setAttribute('aria-hidden', 'true');
+	shapes.innerHTML = '<div class="skeleton-block skeleton-title"></div><div class="skeleton-metrics"><div class="skeleton-block"></div><div class="skeleton-block"></div><div class="skeleton-block"></div><div class="skeleton-block"></div></div><div class="skeleton-block skeleton-row"></div><div class="skeleton-block skeleton-row"></div><div class="skeleton-block skeleton-row"></div>';
+	state.append(status, shapes);
+	return state;
+};
 
 function _contentToggleSessionClass(isActive) {
 	const content = document.getElementById('content');
@@ -1622,10 +1678,15 @@ function showSessionArea(area) {
 	if (!activeTeachingSession) return;
 	activeSessionArea = area === 'repetition' ? 'repetition' : 'participation';
 	const participationActive = activeSessionArea === 'participation';
+	const nextView = participationActive ? _participationView : _repetition;
+	const viewWasHidden = nextView.classList.contains('update-hidden');
 	_participationView.classList.toggle('update-hidden', !participationActive);
 	_repetition.classList.toggle('update-hidden', participationActive);
 	_sessionParticipationTab.className = participationActive ? 'btn-1' : 'btn-2';
 	_sessionRepetitionTab.className = participationActive ? 'btn-2' : 'btn-1';
+	_sessionParticipationTab.setAttribute('aria-pressed', String(participationActive));
+	_sessionRepetitionTab.setAttribute('aria-pressed', String(!participationActive));
+	if (viewWasHidden) uiMotion.revealView(nextView);
 }
 
 function renderParticipationStudents() {
@@ -1724,6 +1785,21 @@ function closeParticipationSummary() {
 }
 
 window.restoreTeachingSessionView = renderTeachingSessionView;
+window.closeRepetiererSettings = afterClose => closeModal(_settingsModal, afterClose);
+window.navigateRepetiererAi = command => {
+	if (!selectClassForNavigation(command.classId)) return false;
+	if (typeof window.openRepetiererRepetition === 'function') window.openRepetiererRepetition();
+	else renderTeachingSessionView();
+	if (command.page === 'evaluation') openStatsView();
+	return true;
+};
+window.getRepetiererAiContext = () => ({
+	page: document.getElementById('assessment-view').classList.contains('update-hidden') ?
+		(document.getElementById('stats-view').classList.contains('update-hidden') ? activeSessionArea : 'statistics') : 'evaluation',
+	classId: _currentClass ? _currentClass.innerText : null,
+	studentId: (state === 3 || state === 4) && Number.isInteger(aiSelectedStudentId) ? aiSelectedStudentId : null,
+	sessionId: activeTeachingSession ? activeTeachingSession.id : null
+});
 
 /*
  * other
@@ -1801,6 +1877,9 @@ function updateState() {
 		disableElement(_probabilitiesBtn);
 	}
 	disableElement(_absencesBtn);
+	renderSessionStartState();
+	document.getElementById('res').classList.toggle('update-hidden', state !== 3 && state !== 4);
+	document.getElementById('repetition-idle-hint').classList.toggle('update-hidden', state === 3 || state === 4);
 
 	function disable(e) {
 		disableElement(e);
@@ -1812,8 +1891,8 @@ function updateState() {
 
 	function text() {
 		_grade.value = '';
-		_name.innerText = 'name';
-		_nameSize = 10;
+		_name.innerText = 'Bereit für die nächste Auswahl';
+		_nameSize = 5.5;
 		scaleName();
 	}
 }
@@ -1894,19 +1973,15 @@ function renderAbsencePersons(persons) {
 
 function openStatsView() {
 	if (_statsViewBtn.classList.contains('disabled')) return;
-	if (statsCloseTimer) {
-		clearTimeout(statsCloseTimer);
-		statsCloseTimer = null;
-	}
-
-	if (statsReturnTimer) {
-		clearTimeout(statsReturnTimer);
-		statsReturnTimer = null;
-	}
+	uiMotion.cancel(_statsView);
 	resetStatsScrollMotion();
 	disconnectStatsCardObserver();
 	closeDrawer();
 	document.getElementById('content').classList.remove('session-active');
+	_statsViewBtn.setAttribute('aria-current', 'page');
+	document.getElementById('repetition-nav-btn').removeAttribute('aria-current');
+	document.getElementById('assessment-nav-btn').removeAttribute('aria-current');
+	document.getElementById('assessment-view').classList.add('update-hidden');
 	_sessionHeader.classList.add('update-hidden');
 	_participationView.classList.add('update-hidden');
 	_sessionEmptyView.classList.add('update-hidden');
@@ -1917,10 +1992,10 @@ function openStatsView() {
 	});
 	_statsView.classList.remove('stats-closing', 'stats-opening', 'stats-results-entering');
 	_statsView.classList.remove('update-hidden');
-	void _statsView.offsetWidth;
-	_statsView.classList.add('stats-opening');
+	uiMotion.revealView(_statsView);
 	_statsEmpty.classList.add('update-hidden');
-	_statsList.innerHTML = '';
+	_statsList.replaceChildren(window.createRepetiererLoadingState('Statistiken werden geladen …', 'stats'));
+	_statsList.setAttribute('aria-busy', 'true');
 	_statsList.scrollTop = 0;
 	statsLastScrollTop = 0;
 	ipcRenderer.send('get-class-statistics');
@@ -1928,6 +2003,8 @@ function openStatsView() {
 
 function closeStatsView() {
 	if (!_statsView) return;
+	_statsViewBtn.removeAttribute('aria-current');
+	document.getElementById('repetition-nav-btn').setAttribute('aria-current', 'page');
 	if (activeTeachingSession && !_statsView.classList.contains('update-hidden')) {
 		_statsView.classList.add('update-hidden');
 		_statsView.classList.remove('stats-closing', 'stats-opening', 'stats-results-entering');
@@ -1945,28 +2022,15 @@ function closeStatsView() {
 	clearTimeout(statsResultsTimer);
 	_statsView.classList.remove('stats-opening', 'stats-results-entering');
 	_statsView.classList.add('stats-closing');
-	[_classPanel, _repetition].forEach(panel => {
-		if (!panel) return;
-		panel.classList.remove('update-hidden', 'stats-panel-return');
-		void panel.offsetWidth;
-		panel.classList.add('stats-panel-return');
-	});
-	statsReturnTimer = setTimeout(() => {
-		if (_classPanel) _classPanel.classList.remove('stats-panel-return');
-		if (_repetition) _repetition.classList.remove('stats-panel-return');
-		renderTeachingSessionView();
-		statsReturnTimer = null;
-	}, motionDelay(520));
-
-	statsCloseTimer = setTimeout(() => {
-		_statsView.classList.add('update-hidden');
+	uiMotion.exitView(_statsView, () => {
 		_statsView.classList.remove('stats-closing', 'stats-scrolling-up', 'stats-scrolling-down', 'stats-is-scrolling');
-		statsCloseTimer = null;
-	}, motionDelay(340));
+		renderTeachingSessionView();
+	});
 }
 
 function renderClassStatistics(stats) {
 	_statsList.innerHTML = '';
+	_statsList.setAttribute('aria-busy', 'false');
 
 	if (!stats || stats.length === 0) {
 		_statsEmpty.classList.remove('update-hidden');
@@ -2298,21 +2362,17 @@ function toggleDrawer() {
 		closeDrawer();
 	} else {
 		setDrawerView('main');
-		_drawer.classList.add('drawer-open');
-		_drawerScrim.classList.add('scrim-visible');
-		_drawerToggle.classList.add('drawer-toggle-open');
+		uiMotion.setDrawerOpen(true);
 	}
 }
 
 function closeDrawer() {
-	_drawer.classList.remove('drawer-open');
-	_drawerScrim.classList.remove('scrim-visible');
-	_drawerToggle.classList.remove('drawer-toggle-open');
+	uiMotion.setDrawerOpen(false);
 }
 
 function setDrawerView(view) {
 	drawerView = view;
-	_drawerTitle.innerText = view === 'data' ? 'Datenverwaltung' : view === 'protocol' ? 'Protokoll' : 'Dateien';
+	_drawerTitle.innerText = view === 'data' ? 'Datenverwaltung' : view === 'protocol' ? 'Protokoll' : 'Navigation';
 
 	[_drawerMainView, _drawerDataView, _drawerProtocolView].forEach(drawerViewElement => {
 		drawerViewElement.classList.add('update-hidden');
@@ -2328,6 +2388,7 @@ function setDrawerView(view) {
 		_drawerMainView.classList.remove('update-hidden');
 		_drawerBackBtn.classList.add('update-hidden');
 	}
+	uiMotion.revealView(view === 'data' ? _drawerDataView : view === 'protocol' ? _drawerProtocolView : _drawerMainView);
 }
 
 function setActiveClassButton(button) {
@@ -2431,6 +2492,9 @@ function handleUpdateStatus(payload) {
 
 function showUpdatePanel(options) {
 	updatePrimaryAction = options.primaryAction || requestUpdateDownload;
+	const alertTone = options.tone || (/(nicht|Fehler|fehlgeschlagen|ungültig)/i.test(options.title || '') ? 'error' : /(gespeichert|erfolgreich|exportiert|gesendet|aktualisiert|beendet)/i.test(options.title || '') ? 'success' : 'info');
+	_updatePanel.classList.remove('ui-alert-info', 'ui-alert-success', 'ui-alert-warning', 'ui-alert-error');
+	_updatePanel.classList.add(`ui-alert-${alertTone}`);
 	_updateTitle.innerText = options.title || 'Update';
 	_updateDetail.innerText = options.detail || '';
 
@@ -2603,31 +2667,11 @@ function setProblemReportStatus(message, type) {
 }
 
 function openModal(modal) {
-	if (modal == null) return;
-	const pendingClose = modalCloseTimers.get(modal);
-	if (pendingClose) {
-		clearTimeout(pendingClose);
-		modalCloseTimers.delete(modal);
-	}
-	modal.classList.remove('modal-open', 'modal-closing');
-	modal.style.display = 'block';
-	modal.setAttribute('aria-hidden', 'false');
-	void modal.offsetWidth;
-	modal.classList.add('modal-open');
+	uiMotion.openDialog(modal);
 }
 
 function closeModal(modal, afterClose) {
-	if (modal == null || modal.classList.contains('modal-closing')) return;
-	modal.classList.remove('modal-open');
-	modal.classList.add('modal-closing');
-	modal.setAttribute('aria-hidden', 'true');
-	const closeTimer = setTimeout(() => {
-		modal.style.display = 'none';
-		modal.classList.remove('modal-closing');
-		modalCloseTimers.delete(modal);
-		if (afterClose) afterClose();
-	}, motionDelay(340));
-	modalCloseTimers.set(modal, closeTimer);
+	uiMotion.closeDialog(modal, afterClose);
 }
 
 function motionDelay(duration) {
@@ -2831,30 +2875,19 @@ function animateMinimize() {
 		return;
 	}
 
-	_container.classList.remove('window-restoring');
-	_container.classList.add('window-minimizing');
-	setTimeout(() => {
-		ipcRenderer.send('minimize');
-	}, 180);
+	uiMotion.minimizeWindow(_container, () => ipcRenderer.send('minimize'));
 }
 
 function animateRestore() {
 	if (!_container) return;
-	if (restoreAnimationActive) return;
-	restoreAnimationActive = true;
-	_container.classList.remove('window-minimizing');
-	_container.classList.remove('window-restoring');
-	void _container.offsetWidth;
-	_container.classList.add('window-restoring');
-	setTimeout(() => {
-		_container.classList.remove('window-restoring');
-		restoreAnimationActive = false;
-	}, 260);
+	uiMotion.restoreWindow(_container);
 }
 
 // scale the name to fit the screen
 function scaleName() {
-	const availableWidth = Math.max(0, _repetition.clientWidth - 64);
+	const availableWidth = _name.parentElement.clientWidth;
+	if (!availableWidth) return;
+	_nameSize = 5.5;
 	_name.style.fontSize = _nameSize + 'rem';
 	while (_name.scrollWidth > availableWidth && _nameSize > 2.4) {
 		_nameSize = Math.max(2.4, _nameSize - 0.2);
@@ -2862,9 +2895,22 @@ function scaleName() {
 	}
 }
 
+const nameStageObserver = new ResizeObserver(entries => {
+	if (entries[0].contentRect.width > 0) scaleName();
+});
+nameStageObserver.observe(_name.parentElement);
+
 Math.clamp = function(a, b, c) {
 	return Math.max(b, Math.min(c, a));
 }
+
+document.querySelectorAll('#title-bar .ico').forEach(control => {
+	control.addEventListener('keydown', event => {
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		event.preventDefault();
+		control.click();
+	});
+});
 
 // automatically scale the name on load
 module.exports = [scaleName(), updateState(), version(), ipcRenderer.send('get-update-news'), ipcRenderer.send('get-debug-mode'), ipcRenderer.send('get-ui-settings'), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status'), ipcRenderer.send('get-undo-status'), ipcRenderer.send('get-active-teaching-session')];

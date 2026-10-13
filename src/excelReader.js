@@ -85,6 +85,26 @@ function read_editor_persons(clss) {
 	return persons;
 }
 
+function read_grade_history(clss, personId) {
+	if (!wb || !Number.isInteger(personId) || personId < 0 || personId > 24) return null;
+	const worksheet = wb.getWorksheet(clss);
+	if (!worksheet || worksheet.getCell('A1').value !== 'repetierer') return null;
+	const row = personId + 6;
+	const name = worksheet.getCell(row, 1).value;
+	if (!name) return null;
+	const grades = [];
+	for (let index = 0; index < 6; index++) {
+		const grade = worksheet.getCell(row, index + 2).value;
+		if (grade === null || grade === undefined || grade === '') continue;
+		grades.push({ grade: Number(grade), date: worksheet.getCell(row, index + 11).value || null, position: index + 1 });
+	}
+	return { studentId: personId, studentName: String(name), classId: clss, grades };
+}
+
+function get_class_names() {
+	return wb ? wb.worksheets.filter(sheet => sheet.getCell('A1').value === 'repetierer').map(sheet => sheet.name) : [];
+}
+
 function read_class_statistics() {
 	return buildClassStatistics(wb);
 }
@@ -630,6 +650,8 @@ module.exports = {
 	init: init,
 	read: read,
 	read_editor_persons: read_editor_persons,
+	read_grade_history: read_grade_history,
+	get_class_names: get_class_names,
 	read_class_statistics: read_class_statistics,
 	write_grade: write_grade,
     write_joker: write_joker,

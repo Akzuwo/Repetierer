@@ -1,6 +1,11 @@
 const {BrowserWindow, app, ipcMain} = require('electron');
 const fs = require('fs');
 const path = require('path');
+if (!app.isPackaged && process.env.REPETIERER_DEV_USER_DATA) {
+	const devUserData = path.resolve(process.env.REPETIERER_DEV_USER_DATA);
+	fs.mkdirSync(devUserData, { recursive: true });
+	app.setPath('userData', devUserData);
+}
 require('./src/mainProcess.js');
 
 let mainWindow;

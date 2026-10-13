@@ -1,6 +1,6 @@
-const { BrowserWindow, dialog, ipcMain, net } = require('electron');
+const { BrowserWindow, dialog, ipcMain, net, safeStorage } = require('electron');
 const { AssessmentApiClient } = require('./assessmentApiClient.js');
-const { discoverRoundFieldId } = require('./assessmentForm.js');
+const { protectTeacherToken, revealTeacherToken } = require('./teacherCredentials.js');
 const { AssessmentStore } = require('./assessmentStore.js');
 const { deliverRound, sanitizeMailError, validateRoundForDelivery } = require('./assessmentDelivery.js');
 const {
@@ -11,13 +11,14 @@ const {
 	readAssessmentConfig,
 	readBrevoConfig,
 	removeConfigGroup,
-	saveAssessmentRoundFieldId
+	cleanIntegrationConfig
 } = require('./integrationConfig.js');
 const { buildInvitation, buildResultMessage } = require('./mailTemplates.js');
 const { createSmtpMailer } = require('./smtpMailer.js');
 
 function registerAssessmentHandlers({ getProgram, getPaths }) {
 	const paths = getPaths();
+	cleanIntegrationConfig(paths.integrationEnvPath, paths.brevoEnvPath);
 	let storeInstance;
 	const store = new Proxy({}, {
 		get(target, property) {
@@ -33,7 +34,9 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 	});
 	register('assessment:create-round', async (event, args) => {
 		const context = getContext(getProgram, args);
-		store.createRound(context.filePath, context.className, context.students, args);
+		await requireAssessmentConfig(paths);
+		const round = store.createRound(context.filePath, context.className, context.students, args);
+		await publishRound(context, store, round, paths);
 		return presentClass(store.getClassContext(context.filePath, context.className, context.students));
 	});
 	register('assessment:get-round', async (event, args) => {
@@ -43,9 +46,12 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 	register('assessment:sync-responses', async (event, args) => {
 		const context = getContext(getProgram, args);
 		const { round } = store.getRound(context.filePath, context.className, context.students, args.roundId);
+		if (!round.cloudStatus) throw contextError('Diese archivierte Runde bleibt lokal verfügbar. Erstelle für neue Abgaben eine neue Runde.');
+		await publishRound(context, store, round, paths);
 		const config = await requireAssessmentConfig(paths);
 		try {
-			const result = await createAssessmentApiClient(config).fetchResponses({
+			const client = createAssessmentApiClient(config);
+			const result = await client.fetchResponses({
 				externalRoundId: round.externalRoundId,
 				criteria: round.criteria,
 				knownResponseIds: round.externalResponses.map(response => response.externalResponseId)
@@ -54,6 +60,7 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 				invalid: result.invalidResponses.length,
 				ignoredRound: result.ignoredRoundCount
 			});
+			store.setCloudStatus(context.filePath, context.className, context.students, round.id, result.closed ? 'closed' : round.cloudStatus, client.getFormUrl());
 		} catch (error) {
 			store.markSyncFailed(context.filePath, context.className, context.students, round.id);
 			throw error;
@@ -72,13 +79,24 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 	});
 	register('assessment:save-teacher', async (event, args) => {
 		const context = getContext(getProgram, args);
-		store.saveTeacherAssessment(context.filePath, context.className, context.students, args.roundId, args.studentId, args.answers, args.comment);
+		store.saveTeacherAssessment(context.filePath, context.className, context.students, args.roundId, args.studentId, args.answers, args.comment, args.criterionComments);
 		return presentRound(context, store, args.roundId, paths);
 	});
 	register('assessment:delete-round', async (event, args) => {
 		const context = getContext(getProgram, args);
+		const { round } = store.getRound(context.filePath, context.className, context.students, args.roundId);
+		if (round.cloudStatus) await createAssessmentApiClient(await requireAssessmentConfig(paths)).deleteRound(round.externalRoundId);
 		store.deleteRound(context.filePath, context.className, context.students, args.roundId);
 		return presentClass(store.getClassContext(context.filePath, context.className, context.students));
+	});
+	register('assessment:close-round', async (event, args) => {
+		const context = getContext(getProgram, args);
+		const { round } = store.getRound(context.filePath, context.className, context.students, args.roundId);
+		if (!round.cloudStatus) throw contextError('Diese Runde ist bereits lokal archiviert.');
+		await publishRound(context, store, round, paths);
+		await createAssessmentApiClient(await requireAssessmentConfig(paths)).closeRound(round.externalRoundId);
+		store.setCloudStatus(context.filePath, context.className, context.students, round.id, 'closed');
+		return presentRound(context, store, round.id, paths);
 	});
 
 	register('assessment:config-status', async () => getAssessmentStatus(paths));
@@ -88,12 +106,16 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 			filters: [{ name: 'Repetierer-Konfiguration', extensions: ['env'] }]
 		});
 		if (!selected) return { cancelled: true };
-		const result = await importIntegrationEnv(selected[0], paths.integrationEnvPath, { legacyBrevoPath: paths.brevoEnvPath });
-		try {
-			await requireAssessmentConfig(paths, true);
-		} catch (error) {
-			result.formWarning = error.message;
-		}
+		const result = await importIntegrationEnv(selected[0], paths.integrationEnvPath, {
+			legacyBrevoPath: paths.brevoEnvPath,
+			protectTeacherToken: token => protectTeacherToken(token, safeStorage),
+			verify: async ({ assessment }) => {
+				if (assessment) {
+					if (assessment.teacherToken.startsWith('encrypted:')) assessment.teacherToken = revealTeacherToken(assessment.teacherToken, safeStorage);
+					await createAssessmentApiClient(assessment).checkStatus();
+				}
+			}
+		});
 		return result;
 	});
 	register('assessment:api-test', async () => {
@@ -178,9 +200,11 @@ async function presentRound(context, store, roundId, paths) {
 	let assessmentConfigured = false;
 	let invitationError = '';
 	try {
-		const config = await requireAssessmentConfig(paths, true);
+		if (round.cloudStatus === 'pending') await publishRound(context, store, round, paths);
+		if (!round.cloudStatus) throw contextError('Archivierte Runde: Bewertungen und synchronisierte Antworten bleiben lokal erhalten.');
+		const config = await requireAssessmentConfig(paths);
 		assessmentConfigured = !!config;
-		if (config) invitation = buildInvitation(round, buildRoundFormUrl(config, round.externalRoundId));
+		if (config) invitation = buildInvitation(round, buildRoundFormUrl({...config, formUrl: round.cloudFormUrl || createAssessmentApiClient(config).getFormUrl()}, round.externalRoundId));
 	} catch (error) {
 		try { assessmentConfigured = !!readAssessmentConfig(paths.integrationEnvPath, paths.brevoEnvPath); }
 		catch (configError) { assessmentConfigured = false; }
@@ -203,6 +227,7 @@ function summarizeRound(round, students) {
 	const assessments = active.map(student => round.assessments[student.id]).filter(Boolean);
 	return {
 		id: round.id,
+		cloudStatus: round.cloudStatus || 'archived',
 		externalRoundId: round.externalRoundId,
 		title: round.title,
 		deadline: round.deadline,
@@ -230,15 +255,20 @@ function getBrevoStatus(paths) {
 	catch (error) { return { configured: false, invalid: true, error: error.message }; }
 }
 
-async function requireAssessmentConfig(paths, resolveFormField = false) {
+async function requireAssessmentConfig(paths) {
 	const config = readAssessmentConfig(paths.integrationEnvPath, paths.brevoEnvPath);
 	if (!config) throw contextError('Die Mitmachnoten-Konfiguration ist noch nicht eingerichtet.');
-	if (resolveFormField && !config.roundFieldId) {
-		const roundFieldId = await discoverRoundFieldId(config.formUrl, { fetch: net.fetch });
-		saveAssessmentRoundFieldId(paths.integrationEnvPath, paths.brevoEnvPath, roundFieldId);
-		config.roundFieldId = roundFieldId;
-	}
+	config.teacherToken = revealTeacherToken(config.teacherToken, safeStorage);
 	return config;
+}
+
+async function publishRound(context, store, round, paths) {
+	if (round.cloudStatus !== 'pending') return;
+	const client = createAssessmentApiClient(await requireAssessmentConfig(paths));
+	await client.createRound(round, round.cloudMaxResponses);
+	store.setCloudStatus(context.filePath, context.className, context.students, round.id, 'open', client.getFormUrl());
+	round.cloudStatus = 'open';
+	round.cloudFormUrl = client.getFormUrl();
 }
 
 function createAssessmentApiClient(config) {

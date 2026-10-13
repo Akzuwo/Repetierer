@@ -15,10 +15,13 @@ function data() {
 
 test('escaped HTML enthält keine ungefilterten Schülerdaten', () => {
 	const { classRecord, round } = data();
+	round.assessments.a.teacherCriterionComments = { c: 'Gut <script>alert(1)</script> & weiter so' };
 	const message = buildResultMessage({ student: classRecord.students[0], assessment: round.assessments.a, round, sender: { fromName: 'Lehrer', fromEmail: 'lehrer@example.ch' } });
 	assert.match(message.html, /Anna &lt;Müller&gt;/);
 	assert.match(message.html, /&lt;b&gt;Fachwissen&lt;\/b&gt;/);
 	assert.doesNotMatch(message.html, /<script>/);
+	assert.match(message.text, /Kommentar Lehrer: Gut <script>alert\(1\)<\/script> & weiter so/);
+	assert.match(message.html, /Gut &lt;script&gt;alert\(1\)&lt;\/script&gt; &amp; weiter so/);
 	assert.equal(escapeHtml('A&B'), 'A&amp;B');
 	assert.throws(() => buildResultMessage({ student: classRecord.students[0], assessment: { studentEmail: 'x' }, round, sender: {} }), /ungültig/);
 });

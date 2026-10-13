@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { AssessmentApiClient, validateResponse } = require('../src/assessment/assessmentApiClient.js');
 
-const config = { apiUrl: 'https://script.google.com/macros/s/test/exec', apiKey: 'super-secret-key' };
+const config = { apiUrl: 'https://assessment.example.ch/api', teacherToken: 'rt_' + 'a'.repeat(43) };
 const criteria = [
 	{ id: 'participation_frequency' },
 	{ id: 'insufficient_contributions' },
@@ -27,18 +27,18 @@ function validResponse(overrides = {}) {
 	}, overrides);
 }
 
-test('ruft die API per POST auf und überträgt den Schlüssel nicht in der URL', async () => {
+test('ruft die API mit Bearer-Token auf und überträgt ihn nicht in URL oder Body', async () => {
 	let call;
 	const client = new AssessmentApiClient(config, { fetch: async (url, options) => {
 		call = { url, options };
 		return new Response(JSON.stringify({ success: true, responses: [validResponse()] }), { status: 200 });
 	} });
 	const result = await client.fetchResponses({ externalRoundId: 'assessment-3a-hs-abc123', criteria, knownResponseIds: ['old'] });
-	const body = JSON.parse(call.options.body);
-	assert.equal(call.options.method, 'POST');
-	assert.equal(call.url.includes(config.apiKey), false);
-	assert.equal(body.apiKey, config.apiKey);
-	assert.deepEqual(body.knownResponseIds, ['old']);
+	assert.equal(call.options.method, 'GET');
+	assert.equal(call.url.includes(config.teacherToken), false);
+	assert.equal(call.options.headers.Authorization, `Bearer ${config.teacherToken}`);
+	assert.equal(call.options.body, undefined);
+	assert.equal(call.options.redirect, 'error');
 	assert.equal(result.responses[0].externalResponseId, 'response-1');
 });
 
@@ -63,19 +63,34 @@ test('normalisiert Authentifizierungs-, Netzwerk- und JSON-Fehler', async () => 
 	await assert.rejects(invalidJson.checkStatus(), error => error.code === 'ASSESSMENT_API_INVALID_JSON');
 });
 
-test('fällt bei einer bestehenden doGet-API kontrolliert auf GET zurück', async () => {
+test('fällt bei einer blockierten Hauptdomain auf die zweite Domain zurück und verwendet deren Einladungslink', async () => {
 	const calls = [];
-	const client = new AssessmentApiClient(config, { fetch: async (url, options) => {
+	const dual = {...config, apiUrl:'https://primary.example.ch/api', fallbackApiUrl:'https://secondary.example.ch/api'};
+	const client = new AssessmentApiClient(dual, { fetch: async (url, options) => {
 		calls.push({ url: String(url), options });
-		if (options.method === 'POST') return new Response('<title>Fehler</title>Script-Funktion nicht gefunden: doPost', { status: 200 });
+		if (String(url).startsWith(dual.apiUrl)) return new Response('<html>Network filter</html>', { status: 403 });
 		return new Response(JSON.stringify({ success: true, roundId: 'assessment-3a-hs-abc123', count: 0, responses: [] }), { status: 200 });
 	} });
 	const result = await client.fetchResponses({ externalRoundId: 'assessment-3a-hs-abc123', criteria });
 	assert.equal(result.responses.length, 0);
-	assert.deepEqual(calls.map(call => call.options.method), ['POST', 'GET']);
-	const fallbackUrl = new URL(calls[1].url);
-	assert.equal(fallbackUrl.searchParams.get('apiKey'), config.apiKey);
-	assert.equal(fallbackUrl.searchParams.get('roundId'), 'assessment-3a-hs-abc123');
+	assert.deepEqual(calls.map(call => call.options.method), ['GET', 'GET']);
+	assert.equal(client.getFormUrl(), 'https://secondary.example.ch/');
+	assert.equal(calls[1].url.startsWith(dual.fallbackApiUrl), true);
+	assert.equal(calls[1].url.includes(config.teacherToken), false);
+});
+
+test('ein abgelehnter Lehrerzugang löst keinen Domain-Fallback aus', async () => {
+	let calls = 0;
+	const client = new AssessmentApiClient({...config,apiUrl:'https://auth.example.ch/api',fallbackApiUrl:'https://unused.example.ch/api'}, {fetch:async()=>{calls++;return new Response('{"success":false,"error":"unauthorized"}',{status:401});}});
+	await assert.rejects(client.checkStatus(), e=>e.code==='ASSESSMENT_API_UNAUTHORIZED');
+	assert.equal(calls,1);
+});
+
+test('liest mehrere Antwortseiten und filtert lokal bekannte IDs', async () => {
+	let calls=0;
+	const client=new AssessmentApiClient({...config,apiUrl:'https://pages.example.ch/api'}, {fetch:async()=>new Response(JSON.stringify(++calls===1 ? {success:true,responses:[validResponse()],nextCursor:100} : {success:true,responses:[validResponse({responseId:'response-2'})],nextCursor:null}))});
+	const result=await client.fetchResponses({externalRoundId:'assessment-3a-hs-abc123',criteria,knownResponseIds:['response-1']});
+	assert.equal(calls,2);assert.deepEqual(result.responses.map(r=>r.externalResponseId),['response-2']);
 });
 
 test('validiert Pflichtfelder und Bewertungswerte', () => {

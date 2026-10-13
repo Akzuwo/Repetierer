@@ -77,7 +77,9 @@ class AssessmentStore {
 		const round = {
 			id: crypto.randomUUID(),
 			classId: classRecord.id,
-			externalRoundId: createExternalRoundId(className, title),
+			externalRoundId: crypto.randomUUID(),
+			cloudStatus: 'pending',
+			cloudMaxResponses: Math.min(200, classRecord.students.filter(s => s.active !== false).length),
 			title,
 			createdAt: new Date().toISOString(),
 			deadline,
@@ -104,6 +106,13 @@ class AssessmentStore {
 		if (!round) throw notFoundError('Beurteilungsrunde nicht gefunden.');
 		ensureRoundStudents(round, classRecord.students);
 		return { classRecord, round };
+	}
+
+	setCloudStatus(workbookPath, className, sourceStudents, roundId, status, formUrl) {
+		const { round } = this.getRound(workbookPath, className, sourceStudents, roundId);
+		round.cloudStatus = status;
+		if (formUrl) round.cloudFormUrl = formUrl;
+		this.save();
 	}
 
 	deleteRound(workbookPath, className, sourceStudents, roundId) {
@@ -171,7 +180,7 @@ class AssessmentStore {
 		return clone(round);
 	}
 
-	saveTeacherAssessment(workbookPath, className, sourceStudents, roundId, studentId, answers, comment) {
+	saveTeacherAssessment(workbookPath, className, sourceStudents, roundId, studentId, answers, comment, criterionComments) {
 		const { round } = this.getRound(workbookPath, className, sourceStudents, roundId);
 		const assessment = round.assessments[studentId];
 		if (!assessment) throw notFoundError('Schüler nicht gefunden.');
@@ -183,7 +192,16 @@ class AssessmentStore {
 			}
 			normalizedAnswers[criterion.id] = value;
 		}
+		const normalizedComments = {};
+		const sourceComments = criterionComments === undefined ? assessment.teacherCriterionComments || {} : criterionComments;
+		if (!sourceComments || typeof sourceComments !== 'object' || Array.isArray(sourceComments)) throw validationError('Die Kriteriumskommentare sind ungültig.');
+		for (const criterion of round.criteria) {
+			const value = sourceComments[criterion.id] ?? '';
+			if (typeof value !== 'string' || value.length > 2000) throw validationError(`Der Kommentar für „${criterion.label}“ darf höchstens 2000 Zeichen enthalten.`);
+			if (value.trim()) normalizedComments[criterion.id] = value.trim();
+		}
 		assessment.teacherAnswers = normalizedAnswers;
+		assessment.teacherCriterionComments = normalizedComments;
 		assessment.teacherComment = String(comment || '').trim();
 		assessment.teacherCompletedAt = new Date().toISOString();
 		this.save();
@@ -271,6 +289,7 @@ function emptyAssessment(studentId) {
 		studentAdditionalQuality: '',
 		studentComment: '',
 		teacherComment: '',
+		teacherCriterionComments: {},
 		submittedAt: null,
 		teacherCompletedAt: null,
 		mailStatus: 'not_sent',
@@ -307,6 +326,7 @@ function migrate(input) {
 				if (!Array.isArray(round.duplicates)) round.duplicates = [];
 				delete round.form;
 				for (const assessment of Object.values(round.assessments)) {
+					if (!assessment.teacherCriterionComments || typeof assessment.teacherCriterionComments !== 'object' || Array.isArray(assessment.teacherCriterionComments)) assessment.teacherCriterionComments = {};
 					if (typeof assessment.studentAdditionalQuality !== 'string') assessment.studentAdditionalQuality = '';
 					if (assessment.mailStatus === 'sending') {
 						assessment.mailStatus = 'failed';

@@ -1,4 +1,4 @@
-const { init, read, read_editor_persons, read_class_statistics, write_grade, write_joker, edit_persons, apply_entries, undo_entry, getJokerMigrationStatus, migrate_jokers, award_extra_jokers_after_three } = require('./excelReader.js');
+const { init, read, read_editor_persons, read_grade_history, get_class_names, read_class_statistics, write_grade, write_joker, edit_persons, apply_entries, undo_entry, getJokerMigrationStatus, migrate_jokers, award_extra_jokers_after_three } = require('./excelReader.js');
 const { getAppSettings, getFileMigrationStatus, getWiggersRulePenalties, markFileMigrationCompleted, saveWiggersRulePenalty, removeWiggersRulePenalty } = require('./storage.js');
 let cls;
 let persons;
@@ -29,6 +29,10 @@ function getPersons() {
 	return filterAbsentPersons(persons);
 }
 
+function getSelectedPerson() {
+	return person ? { id: person.id, name: person.name } : null;
+}
+
 function getEditorPersons() {
 	if (!cls) return [];
 	return read_editor_persons(cls) || [];
@@ -37,6 +41,14 @@ function getEditorPersons() {
 function getClassPersons(className) {
 	if (!className) return [];
 	return read_editor_persons(className) || [];
+}
+
+function getClasses() {
+	return get_class_names();
+}
+
+function getStudentGradeHistory(className, studentId) {
+	return read_grade_history(className, studentId);
 }
 
 function getClassStatistics() {
@@ -434,6 +446,8 @@ function getWiggersRuleKey(personId) {
 }
 
 module.exports = {
+	getClasses,
+	getStudentGradeHistory,
 	setFile: setFile,
 	setClass: setClass,
 	selectPerson: selectPerson,
@@ -449,6 +463,7 @@ module.exports = {
 	getExtraJokerMigrationStatus: getExtraJokerMigrationStatus,
 	migrateExtraJokersAfterThree: migrateExtraJokersAfterThree,
 	getPersons: getPersons,
+	getSelectedPerson: getSelectedPerson,
 	getEditorPersons: getEditorPersons,
 	getClassPersons: getClassPersons,
 	getClassStatistics: getClassStatistics,

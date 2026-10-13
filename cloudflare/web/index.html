@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Selbstbeurteilung · Repetierer</title>
+  <link rel="stylesheet" href="./survey.css">
+  <script src="./survey.js" defer></script>
+</head>
+<body>
+  <header><a href="./">Repetierer</a><span>Mitmachnote</span></header>
+  <main>
+    <h1>Deine Selbstbeurteilung</h1>
+    <p id="round-title">Die Runde wird geladen …</p>
+    <p id="status" role="status" aria-live="polite"></p>
+    <button id="retry" type="button" hidden>Erneut laden</button>
+    <form id="survey" hidden>
+      <section aria-labelledby="person-heading">
+        <h2 id="person-heading">Über dich</h2>
+        <p>Verwende deinen Namen aus der Klassenliste. Du kannst einmal pro Runde antworten.</p>
+        <label>Vorname und Nachname<input name="name" autocomplete="name" maxlength="200" required></label>
+        <label>E-Mail-Adresse<input name="email" type="email" autocomplete="email" maxlength="254" required><small>Du darfst auch deine private E-Mail-Adresse verwenden. Deine Lehrperson verwendet sie für deine persönliche Auswertung.</small></label>
+      </section>
+      <section aria-labelledby="criteria-heading">
+        <h2 id="criteria-heading">Deine Mitarbeit</h2>
+        <p>Wähle für jede Aussage die Antwort, die am besten zu dir passt.</p>
+        <div id="criteria"></div>
+      </section>
+      <section aria-labelledby="comment-heading">
+        <h2 id="comment-heading">Was möchtest du ergänzen?</h2>
+        <label>Zusätzliche Qualität meiner Äusserungen <small>Optional</small><textarea name="additionalQuality" rows="3" maxlength="2000"></textarea></label>
+        <label>Sonstige Bemerkungen <small>Optional</small><textarea name="comment" rows="3" maxlength="2000"></textarea></label>
+      </section>
+      <p id="privacy">Dein Name, deine E-Mail und deine Antworten sind nur für deine Lehrperson zugänglich. Auf dem Server werden sie spätestens nach 90 Tagen gelöscht, nach Rundenschluss innerhalb von 30 Tagen. Die Lehrperson verwaltet ihre lokale Kopie. Ein zufälliger Browser-Code hilft, doppelte Abgaben in dieser Runde zu verhindern. Es gibt keine IP-Sperre.</p>
+      <div class="submit-actions"><button id="submit" type="submit">Selbstbeurteilung abgeben</button></div>
+      <p id="submit-status" role="status" aria-live="polite"></p>
+    </form>
+  </main>
+  <footer>Repetierer · Selbstbeurteilung ohne Anmeldung</footer>
+</body>
+</html>

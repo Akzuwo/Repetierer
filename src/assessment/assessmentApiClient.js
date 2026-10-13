@@ -10,7 +10,7 @@ const RESPONSE_FIELDS = Object.freeze({
 	additionalQuality: 'additionalQuality',
 	comment: 'comment'
 });
-const transportByEndpoint = new Map();
+const reachableEndpoints = new Map();
 
 class AssessmentApiClient {
 	constructor(config, options = {}) {
@@ -20,16 +20,43 @@ class AssessmentApiClient {
 	}
 
 	async checkStatus() {
-		await this.request({ action: 'responses', roundId: '__repetierer_connection_test__', knownResponseIds: [] });
-		return { reachable: true };
+		await this.request('GET', 'me');
+		return { reachable: true, apiUrl: this.getApiUrl(), fallback: this.getApiUrl() !== this.config.apiUrl };
+	}
+
+	getApiUrl() {
+		const preference = reachableEndpoints.get(this.config.apiUrl);
+		return preference && preference.until > Date.now() ? preference.url : this.config.apiUrl;
+	}
+	getFormUrl() { return this.getApiUrl().replace(/api$/, ''); }
+
+	async createRound(round, maxResponses) {
+		return this.request('PUT', `rounds/${round.externalRoundId}`, {
+			title: round.title,
+			criteria: round.criteria,
+			deadline: round.deadline ? deadlineEndZurich(round.deadline) : null,
+			maxResponses
+		});
+	}
+
+	async closeRound(id) { return this.request('POST', `rounds/${id}/close`); }
+	async deleteRound(id) {
+		try { return await this.request('DELETE', `rounds/${id}`); }
+		catch (error) { if (error.code === 'ASSESSMENT_ROUND_NOT_FOUND') return { deleted: true }; throw error; }
 	}
 
 	async fetchResponses({ externalRoundId, criteria, knownResponseIds = [] }) {
-		const body = await this.request({
-			action: 'responses',
-			roundId: externalRoundId,
-			knownResponseIds: Array.from(new Set(knownResponseIds.map(String))).slice(-5000)
-		});
+		const body = { responses: [] };
+		let cursor = 0;
+		for (let page = 0; page < 10; page++) {
+			const result = await this.request('GET', `rounds/${externalRoundId}/responses?cursor=${cursor}`);
+			if (!Array.isArray(result.responses)) throw apiError('Ungültige Antwortliste.', 'ASSESSMENT_API_SCHEMA_INVALID');
+			body.responses.push(...result.responses);
+			body.closed = result.closed;
+			if (!result.nextCursor) break;
+			if (!Number.isSafeInteger(result.nextCursor) || result.nextCursor <= cursor || page === 9) throw apiError('Ungültige Seitennavigation.', 'ASSESSMENT_API_SCHEMA_INVALID');
+			cursor = result.nextCursor;
+		}
 		if (!Array.isArray(body.responses)) throw apiError('Die Antwort der Mitmachnoten-API enthält keine Antwortliste.', 'ASSESSMENT_API_SCHEMA_INVALID');
 		const responses = [];
 		const invalidResponses = [];
@@ -46,36 +73,35 @@ class AssessmentApiClient {
 				invalidResponses.push({ index, responseId: safeResponseId(raw), reason: error.message });
 			}
 		}
-		return { responses, invalidResponses, ignoredRoundCount };
+		const known = new Set(knownResponseIds.map(String));
+		return { responses: responses.filter(r => !known.has(r.externalResponseId)), invalidResponses, ignoredRoundCount, closed: body.closed };
 	}
 
-	async request(payload) {
-		const preferred = transportByEndpoint.get(this.config.apiUrl);
-		if (preferred === 'get') return this.performRequest('get', payload);
-		try {
-			const result = await this.performRequest('post', payload);
-			transportByEndpoint.set(this.config.apiUrl, 'post');
-			return result;
-		} catch (error) {
-			if (!isPostUnsupported(error)) throw error;
-			const result = await this.performRequest('get', payload);
-			transportByEndpoint.set(this.config.apiUrl, 'get');
+	async request(method, resource, payload) {
+		const preferred = this.getApiUrl();
+		try { return await this.performRequest(preferred, method, resource, payload); }
+		catch (error) {
+			const recoverable = ['ASSESSMENT_API_NETWORK_ERROR', 'ASSESSMENT_API_TIMEOUT', 'ASSESSMENT_API_INVALID_JSON', 'ASSESSMENT_API_UNAVAILABLE'].includes(error.code);
+			const alternative = preferred === this.config.apiUrl ? this.config.fallbackApiUrl : this.config.apiUrl;
+			if (!recoverable || !alternative || alternative === preferred) throw error;
+			const result = await this.performRequest(alternative, method, resource, payload);
+			reachableEndpoints.set(this.config.apiUrl, {url:alternative, until:Date.now()+10*60*1000});
 			return result;
 		}
 	}
 
-	async performRequest(method, payload) {
+	async performRequest(apiUrl, method, resource, payload) {
 		const controller = new AbortController();
 		const timer = setTimeout(() => controller.abort(), this.timeoutMs);
 		let response;
 		try {
-			const request = buildRequest(this.config, method, payload);
+			const request = buildRequest({...this.config, apiUrl}, method, resource, payload);
 			response = await this.fetch(request.url, {
 				method: request.method,
 				headers: request.headers,
 				body: request.body,
 				signal: controller.signal,
-				redirect: 'follow'
+				redirect: 'error'
 			});
 		} catch (error) {
 			if (error && error.name === 'AbortError') throw apiError('Zeitüberschreitung beim Abrufen der Mitmachnoten.', 'ASSESSMENT_API_TIMEOUT');
@@ -84,39 +110,34 @@ class AssessmentApiClient {
 			clearTimeout(timer);
 		}
 		let body;
-		let rawBody = '';
 		try {
-			rawBody = await response.text();
-			body = JSON.parse(rawBody);
+			body = await response.json();
 		} catch (error) {
-			const invalid = apiError('Die Mitmachnoten-API hat keine gültige JSON-Antwort geliefert.', 'ASSESSMENT_API_INVALID_JSON');
-			invalid.allowGetFallback = method === 'post' && /(?:Script-Funktion nicht gefunden|Script function not found):\s*doPost/i.test(rawBody);
-			throw invalid;
+			throw apiError('Die Mitmachnoten-API hat keine gültige JSON-Antwort geliefert.', 'ASSESSMENT_API_INVALID_JSON');
 		}
-		if (response.status === 401 || response.status === 403) throw apiError('Der API-Schlüssel wurde abgelehnt.', 'ASSESSMENT_API_UNAUTHORIZED');
+		if (response.status === 401 || response.status === 403) throw apiError('Der Lehrerzugang ist abgelaufen oder wurde widerrufen.', 'ASSESSMENT_API_UNAUTHORIZED');
+		if (response.status === 404) throw apiError('Die Online-Runde wurde nicht gefunden oder bereits gelöscht.', 'ASSESSMENT_ROUND_NOT_FOUND');
+		if (response.status >= 500) throw apiError('Die Mitmachnoten-API ist vorübergehend nicht verfügbar.', 'ASSESSMENT_API_UNAVAILABLE');
 		if (!response.ok) throw apiError('Die Mitmachnoten-API konnte die Anfrage nicht verarbeiten.', 'ASSESSMENT_API_HTTP_ERROR');
 		if (!body || body.success !== true) throw apiError(publicApiMessage(body), 'ASSESSMENT_API_REJECTED');
 		return body;
 	}
 }
 
-function buildRequest(config, method, payload) {
-	if (method === 'get') {
-		const url = new URL(config.apiUrl);
-		url.searchParams.set('apiKey', config.apiKey);
-		if (payload.roundId) url.searchParams.set('roundId', payload.roundId);
-		return { url: url.toString(), method: 'GET', headers: { Accept: 'application/json' } };
-	}
+function buildRequest(config, method, resource, payload) {
 	return {
-		url: config.apiUrl,
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-		body: JSON.stringify(Object.assign({}, payload, { apiKey: config.apiKey }))
+		url: `${config.apiUrl.replace(/\/$/, '')}/teacher/${resource}`,
+		method,
+		headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${config.teacherToken}` },
+		body: payload === undefined ? undefined : JSON.stringify(payload)
 	};
 }
 
-function isPostUnsupported(error) {
-	return !!(error && error.allowGetFallback);
+function deadlineEndZurich(date) {
+	const midnight = Date.parse(`${date}T23:59:59Z`);
+	const formatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Zurich', timeZoneName: 'longOffset' });
+	const offset = formatter.formatToParts(new Date(midnight)).find(p => p.type === 'timeZoneName').value.match(/GMT\+(\d+)/);
+	return new Date(midnight - Number(offset[1]) * 3600000).toISOString();
 }
 
 function validateResponse(raw, externalRoundId, criteria) {

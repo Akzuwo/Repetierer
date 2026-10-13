@@ -5,37 +5,35 @@
 <head>
 	<meta charset="utf-8">
 	<title>Repetierer</title>
-	<meta name="description" content="(:">
+	<meta name="description" content="Repetition und Mitarbeit im Unterricht erfassen.">
 	<meta name="author" content="srpnt3, Jonas-Luetolf, Akzuwo">
-	<link rel="stylesheet" href="style.css">
 	<link rel="stylesheet" href="tailwind.css">
+	<link rel="preload" href="fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
+	<link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 <div id="container">
 	<div id="title-bar">
-		<div class="ico" id="drawer-toggle" title="Menü">
+		<div class="ico" id="drawer-toggle" title="Menü" role="button" tabindex="0" aria-label="Menü öffnen" aria-expanded="false">
 			<span></span>
 			<span></span>
 			<span></span>
 		</div>
 		<h1 id="title" data-text="Repetierer">Repetierer</h1>
-		<span id="title-author">by srpnt3, Jonas-Luetolf and Akzuwo</span>
-		<span id="version"></span>
 		<span class="title-spacer"></span>
-		<div class="ico" id="settings-btn" title="Einstellungen">
+		<button class="ai-title-button" id="ai-open-btn" title="Lokaler KI-Assistent (Ctrl+K)"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4ZM8 9h8M8 12h5"/></svg><span>Assistent</span><kbd>Ctrl K</kbd></button>
+		<div class="ico" id="settings-btn" title="Einstellungen" role="button" tabindex="0" aria-label="Einstellungen öffnen">
+			<svg class="header-outline" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h7M17 6h3M4 12h2M12 12h8M4 18h10M20 18h0"/><circle cx="14" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+		</div>
+		<div class="ico" id="minimize" title="Minimieren" role="button" tabindex="0" aria-label="Fenster minimieren">
 			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-				<path d="M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.37-.31-.6-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98L14.5 2.42C14.47 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42L9.12 5.07c-.61.25-1.18.59-1.69.98l-2.49-1c-.23-.08-.48 0-.6.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.08.65-.08.98s.03.66.08.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.37.31.6.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.25.42.5.42h4c.25 0 .47-.18.5-.42l.38-2.65c.61-.25 1.18-.59 1.69-.98l2.49 1c.23-.08.48 0 .6.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"/>
+				<path d="M4 12h16"/>
 			</svg>
 		</div>
-		<div class="ico" id="minimize" title="Minimieren">
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 6">
-				<rect width="56" height="6" rx="3"/>
-			</svg>
-		</div>
-		<div class="ico" id="quit" title="Schliessen">
-			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 58.72 57.8">
-				<path d="M57.86.9h0a3,3,0,0,0-4.24,0L29.36,24.69,5.1.86A3,3,0,0,0,.86.9h0a3,3,0,0,0,0,4.24L25.08,28.9.9,52.66a3,3,0,0,0,0,4.24h0a3,3,0,0,0,4.24,0L29.36,33.1,53.62,56.94a3,3,0,0,0,4.24,0h0a3,3,0,0,0,0-4.24L33.64,28.9,57.82,5.14A3,3,0,0,0,57.86.9Z"/>
+		<div class="ico" id="quit" title="Schliessen" role="button" tabindex="0" aria-label="Fenster schliessen">
+			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+				<path d="M5 5l14 14M19 5L5 19"/>
 			</svg>
 		</div>
 	</div>
@@ -44,16 +42,16 @@
 	<aside id="drawer">
 		<div class="drawer-header">
 			<button class="help-button help-button-back drawer-back-button update-hidden" id="drawer-back-btn" title="Zurück">‹</button>
-			<h2 id="drawer-title">Dateien</h2>
+			<h2 id="drawer-title">Navigation</h2>
 			<button class="help-button mini-help-button" id="drawer-help-btn" title="Erklärung">?</button>
 		</div>
 		<div class="drawer-view" id="drawer-main-view">
 			<div class="drawer-actions">
-				<button class="btn-2" id="repetition-nav-btn">Repetition</button>
-				<button class="btn-2" id="assessment-nav-btn">Mitmachnote</button>
-				<button class="btn-2" id="drawer-data-view-btn" title="Datei laden, Klassen importieren und Excel-Daten synchronisieren.">Datenverwaltung</button>
-				<button class="btn-2" id="drawer-protocol-view-btn" title="Backups, Logs und Sitzungsprotokolle ansehen oder exportieren.">Protokoll</button>
-				<button class="btn-2 disabled" id="stats-view-btn" title="Zeigt Klassenstatistiken der geladenen Datei.">Statistiken</button>
+				<button class="btn-2" id="repetition-nav-btn" aria-current="page"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v5h5"/></svg>Repetition</button>
+				<button class="btn-2" id="assessment-nav-btn"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M9 12l2 2 4-4"/></svg>Mitmachnote</button>
+				<button class="btn-2" id="drawer-data-view-btn" title="Datei laden, Klassen importieren und Excel-Daten synchronisieren."><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>Datenverwaltung</button>
+				<button class="btn-2" id="drawer-protocol-view-btn" title="Backups, Logs und Sitzungsprotokolle ansehen oder exportieren."><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h13M7 10h13M7 16h13M3 4h.01M3 10h.01M3 16h.01"/></svg>Protokoll</button>
+				<button class="btn-2 disabled" id="stats-view-btn" title="Zeigt Klassenstatistiken der geladenen Datei."><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11h4v9M10 20V4h4v16M16 20v-7h4v7M3 20h18"/></svg>Statistiken</button>
 			</div>
 		</div>
 		<div class="drawer-view update-hidden" id="drawer-data-view">
@@ -79,20 +77,25 @@
 			<button class="btn-2" id="debug-fake-update-btn">Fake Update</button>
 		</div>
 		<p id="drawer-status">Noch keine Datei ausgewählt.</p>
+		<div class="drawer-about"><span>Über Repetierer</span><small id="version"></small><small>srpnt3 · Jonas-Luetolf · Akzuwo</small></div>
 	</aside>
 
 	<div id="content">
-		<div class="neum" id="class">
-			<div class="panel-heading">
-				<h2>Klasse</h2>
-				<button class="help-button mini-help-button" id="class-help-btn" title="Erklärung">?</button>
+		<aside class="session-sidebar update-hidden" id="class" aria-label="Datei und Klassen">
+			<section class="session-file-context"><h2>Datei</h2><p id="session-workbook-name"></p><button class="btn-2" id="session-data-btn"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M5 3h14v18H5ZM9 7v14M3 12h18M3 17h18"/></svg>Datenverwaltung</button></section>
+			<section class="session-class-navigation"><div class="panel-heading"><h2>Klassen</h2><button class="help-button mini-help-button" id="class-help-btn" title="Erklärung" aria-label="Hilfe zur Klassenauswahl">?</button></div><div id="session-class-slot"></div></section>
+		</aside>
+		<section class="session-empty-view" id="session-empty-view" aria-labelledby="session-start-heading">
+			<div class="session-start-heading"><div><h2 id="session-start-heading">Klasse wählen</h2><p id="session-start-description">Mit welcher Klasse möchtest du heute arbeiten?</p></div><button class="help-button mini-help-button" id="session-start-help-btn" title="Erklärung" aria-label="Hilfe zum Sessionstart">?</button></div>
+			<ol class="session-flow" aria-label="Schritte zum Unterricht"><li aria-current="step"><span>1</span> Klasse wählen</li><li><span>2</span> Abwesenheiten</li><li><span>3</span> Session starten</li></ol>
+			<div class="session-file-empty" id="session-file-empty">
+				<div><h3 id="session-file-heading">Excel-Datei auswählen</h3><p id="session-file-description">Öffne eine Repetierer-Datei oder importiere eine Klassenliste.</p></div>
+				<div class="button-row"><button class="btn-1" id="session-open-file-btn">Excel-Datei öffnen</button><button class="btn-2" id="session-import-btn">Klassenliste importieren</button></div>
 			</div>
-		</div>
-		<div class="neum session-empty-view" id="session-empty-view">
-			<span class="assessment-kicker">Unterrichts-Session</span>
-			<div class="session-start-heading"><div><h2>Klasse wählen</h2><p>Mit einer Klasse beginnen, Abwesende markieren und direkt loslegen.</p></div><button class="help-button mini-help-button" id="session-start-help-btn" title="Erklärung">?</button></div>
 			<div id="class-list" class="session-class-list"><div></div></div>
-		</div>
+			<div id="session-class-home-slot" hidden></div>
+			<div class="session-source update-hidden" id="session-source"><span id="session-source-label"></span><button class="btn-2" id="session-change-file-btn">Datei wechseln</button></div>
+		</section>
 		<div class="session-header update-hidden" id="session-header">
 			<div class="session-meta">
 				<span class="session-live-dot"></span>
@@ -102,36 +105,30 @@
 			<div class="session-tabs">
 				<button class="btn-1" id="session-participation-tab">Mitarbeit</button>
 				<button class="btn-2" id="session-repetition-tab">Repetition</button>
-				<button class="btn-2 session-end-button" id="end-session-btn">Session beenden</button>
 			</div>
+			<button class="btn-2 session-end-button" id="end-session-btn">Session beenden</button>
 		</div>
 		<div class="neum" id="repetition">
 			<div class="repetition-header">
-				<h2>Repetition</h2>
-				<span class="update-hidden" id="class-name" aria-hidden="true"></span>
-				<div class="button-row">
-					<button class="btn-1 disabled" id="start-btn">Start</button>
-					<button class="btn-1 disabled" id="manual-select-btn">Freiwillig</button>
-					<button class="btn-2 disabled" id="probabilities-btn">Chancen</button>
-					<button class="btn-2 disabled update-hidden" id="absences-btn">Abwesend</button>
-				</div>
+				<h2>Repetition <span id="class-name"></span></h2>
 				<div class="repetition-tools">
 					<div class="history-actions">
-						<button class="btn-2 history-btn disabled" id="undo-last-btn" title="Letzte Aktion rückgängig" aria-label="Letzte Aktion rückgängig">↶</button>
-						<button class="btn-2 history-btn disabled" id="redo-last-btn" title="Wiederholen" aria-label="Wiederholen">↷</button>
+						<button class="btn-2 history-btn disabled" id="undo-last-btn" title="Letzte Aktion rückgängig" aria-label="Letzte Aktion rückgängig"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2"/></svg></button>
+						<button class="btn-2 history-btn disabled" id="redo-last-btn" title="Wiederholen" aria-label="Wiederholen"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5M20 9H10a6 6 0 0 0 0 12h2"/></svg></button>
 					</div>
 					<button class="help-button mini-help-button" id="repetition-help-btn" title="Erklärung">?</button>
 				</div>
 			</div>
-			<h1 class="disabled" id="name">Name</h1>
+			<div class="button-row repetition-selection-actions"><button class="btn-1 disabled" id="start-btn">Start</button><button class="btn-2 disabled" id="manual-select-btn">Freiwillig</button><button class="btn-2 disabled" id="probabilities-btn">Chancen</button><button class="btn-2 disabled update-hidden" id="absences-btn">Abwesend</button></div>
+			<div class="repetition-stage"><h1 class="disabled" id="name">Bereit für die nächste Auswahl</h1><p class="repetition-idle-hint" id="repetition-idle-hint">Wähle zufällig aus oder nimm eine freiwillige Meldung an.</p></div>
 			<div id="res">
 				<div id="grade">
-					<label class="disabled">Note: </label>
-					<input class="disabled" name="mark" type="text">
+					<label class="disabled" for="grade-input">Note</label>
+					<input class="disabled" id="grade-input" name="mark" type="text" inputmode="decimal" placeholder="1–6">
 				</div>
 				<button class="btn-2 disabled">Abbrechen</button>
-				<button class="btn-1 disabled">OK</button>
-				<button class="btn-1 disabled">Joker</button>
+				<button class="btn-1 disabled">Speichern</button>
+				<button class="btn-2 disabled">Joker</button>
 			</div>
 			<div class="visual-effect-layer" id="selection-effect" aria-hidden="true">
 				<div class="selection-spotlight selection-spotlight-left"></div>
@@ -161,7 +158,7 @@
 		</div>
 		<div class="neum update-hidden" id="participation-view">
 			<div class="participation-heading">
-				<div><span class="assessment-kicker">Aktive Session</span><h2>Mitarbeit</h2></div>
+				<div><h2>Mitarbeit</h2></div>
 				<button class="btn-2" id="participation-summary-btn">Auswertung</button>
 			</div>
 			<p class="participation-help">Schüler anklicken und direkt einen Wert von 1 bis 6 erfassen.</p>
@@ -173,7 +170,7 @@
 		</div>
 		<div class="neum update-hidden" id="stats-view">
 			<div class="stats-header">
-				<h2>Statistiken</h2>
+				<div><h2>Statistiken</h2></div>
 				<button class="btn-2" id="stats-back-btn">Zurück</button>
 			</div>
 			<p class="stats-empty update-hidden" id="stats-empty">Noch keine Statistikdaten vorhanden.</p>
@@ -182,7 +179,6 @@
 		<div class="neum update-hidden" id="assessment-view">
 			<div class="assessment-header">
 				<div>
-					<span class="assessment-kicker">Mitmachnote</span>
 					<h2 id="assessment-heading">Beurteilungsrunden</h2>
 				</div>
 				<div class="assessment-header-actions">
@@ -190,11 +186,12 @@
 					<button class="btn-2 update-hidden" id="assessment-back-btn">Zurück</button>
 				</div>
 			</div>
+			<p class="ui-loading-status update-hidden" id="assessment-operation-status" role="status"></p>
 			<div id="assessment-body" class="assessment-body"></div>
 		</div>
 	</div>
 
-	<div id="update-panel" class="update-panel update-hidden">
+	<div id="update-panel" class="update-panel ui-alert ui-alert-info update-hidden" role="status">
 		<div class="update-copy">
 			<strong id="update-title">Update</strong>
 			<span id="update-detail"></span>
@@ -285,7 +282,7 @@
 			<p>Es gibt lokale Änderungen, die noch nicht ins Excel geschrieben wurden.</p>
 			<div class="modal-buttons">
 				<button class="btn-1" id="conflict-flush-btn">Zuerst Excel aktualisieren</button>
-				<button class="btn-2" id="conflict-force-reload-btn">Trotzdem neu laden</button>
+				<button class="btn-danger" id="conflict-force-reload-btn">Trotzdem neu laden</button>
 				<button class="btn-2" id="conflict-cancel-btn">Abbrechen</button>
 			</div>
 		</div>
@@ -398,14 +395,23 @@
 				<h2>Einstellungen</h2>
 			</div>
 			<div class="settings-scroll-area">
+				<div class="ai-settings-section">
+					<h3>Lokale KI</h3>
+					<p>Der Assistent läuft mit Ollama auf diesem Gerät. Schülerdaten werden nicht an eine Cloud-KI gesendet.</p>
+					<p id="ai-setup-status" role="status">Status wird geprüft …</p>
+					<div class="ai-progress update-hidden" id="ai-setup-progress"><div id="ai-setup-progress-bar"></div></div>
+					<button class="btn-1" id="ai-setup-btn">Lokale KI einrichten</button>
+				</div>
 				<p id="settings-location"></p>
+				<h3 class="settings-section-heading">Design</h3>
 				<label class="setting-field">
-					<span>Design</span>
+					<span>Farbschema</span>
 					<select id="theme-setting">
 						<option value="midnight">Mitternacht – Schwarz &amp; Blau</option>
 						<option value="classic">Klassisch – Grau &amp; Grün</option>
 					</select>
 				</label>
+				<h3 class="settings-section-heading">Weitere Optionen</h3>
 				<label class="setting-row setting-toggle">
 					<span class="setting-copy">Extra Joker ab 3 Noten</span>
 					<input class="toggle-input" type="checkbox" id="extra-joker-setting" role="switch">
@@ -451,12 +457,13 @@
 					<span>Wiggers-Dauer in Minuten</span>
 					<input id="wiggers-rule-duration-setting" type="number" min="1" max="480" step="1">
 				</label>
+				<h3 class="settings-section-heading">Integrationen</h3>
 				<div class="setting-action assessment-integration-setting">
 					<span>Mitmachnote<small id="assessment-config-status">Umfrage: Nicht eingerichtet</small><small id="assessment-api-status">API: Nicht geprüft</small></span>
 					<div class="integration-actions">
 						<button class="btn-2" id="assessment-config-import-btn">Konfiguration importieren</button>
 						<button class="btn-2 update-hidden" id="assessment-api-test-btn">Verbindung testen</button>
-						<button class="btn-2 update-hidden" id="assessment-config-remove-btn">Konfiguration entfernen</button>
+						<button class="btn-danger update-hidden" id="assessment-config-remove-btn">Konfiguration entfernen</button>
 					</div>
 				</div>
 				<div class="setting-action assessment-integration-setting">
@@ -464,13 +471,13 @@
 					<div class="integration-actions">
 						<button class="btn-2" id="brevo-import-btn">Konfiguration importieren</button>
 						<button class="btn-2 update-hidden" id="brevo-test-btn">Verbindung testen</button>
-						<button class="btn-2 update-hidden" id="brevo-remove-btn">Credentials entfernen</button>
+						<button class="btn-danger update-hidden" id="brevo-remove-btn">Credentials entfernen</button>
 					</div>
 				</div>
 			</div>
 			<div class="modal-buttons">
-				<button class="btn-1" id="save-settings-btn">Speichern</button>
 				<button class="btn-2" id="close-settings-modal">Abbrechen</button>
+				<button class="btn-1" id="save-settings-btn">Speichern</button>
 			</div>
 		</div>
 	</div>
@@ -524,7 +531,7 @@
 		<div class="modal-content session-start-content">
 			<h2>Abwesenheiten erfassen</h2>
 			<p class="session-start-class">Klasse <strong id="session-start-class"></strong></p>
-			<p class="excel-editor-help">Alle Schüler sind standardmässig anwesend. Klicken Sie nur abwesende Schüler an.</p>
+			<p class="excel-editor-help">Alle Schüler sind anwesend. Markiere nur diejenigen, die heute fehlen.</p>
 			<div class="session-attendance-summary"><strong id="session-present-preview">0 anwesend</strong><span id="session-absent-preview">0 abwesend</span></div>
 			<div id="session-attendance-list"></div>
 			<div class="modal-buttons">
@@ -536,22 +543,21 @@
 
 	<div id="session-end-modal" class="modal">
 		<div class="modal-content session-end-confirm-content">
-			<div class="session-end-confirm-icon" aria-hidden="true">!</div>
 			<h2>Session beenden?</h2>
-			<p>Alle bisherigen Einträge bleiben gespeichert. Danach gelangen Sie zurück zur Klassenauswahl.</p>
+			<p>Alle Einträge bleiben gespeichert. Danach gelangst du zur Klassenauswahl.</p>
 			<div class="modal-buttons">
+				<button class="btn-2" id="cancel-session-end-btn">Abbrechen</button>
 				<button class="btn-danger" id="confirm-session-end-btn">Session beenden</button>
-				<button class="btn-2" id="cancel-session-end-btn">Weiter unterrichten</button>
 			</div>
 		</div>
 	</div>
 
 	<div id="participation-modal" class="modal">
 		<div class="modal-content participation-modal-content">
-			<span class="assessment-kicker">Mitarbeit erfassen</span>
-			<h2 id="participation-student-name">Schüler</h2>
+			<h2>Mitarbeit erfassen</h2>
+			<p class="participation-modal-person" id="participation-student-name">Schüler</p>
 			<div class="participation-score-list" id="participation-score-list"></div>
-			<button class="btn-2 participation-cancel" id="participation-cancel-btn">Abbrechen</button>
+			<div class="modal-buttons"><button class="btn-2 participation-cancel" id="participation-cancel-btn">Abbrechen</button></div>
 		</div>
 	</div>
 
@@ -566,14 +572,26 @@
 		</div>
 	</div>
 
+	<div id="ai-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="ai-heading" aria-hidden="true">
+		<div class="modal-content ai-content">
+			<div class="ai-header"><h2 id="ai-heading">KI-Assistent</h2><button class="btn-2" id="ai-close-btn">Schliessen</button></div>
+			<p class="ai-status" id="ai-chat-status" role="status"></p>
+			<button class="btn-2 ai-configure update-hidden" id="ai-configure-btn" type="button">KI in den Einstellungen einrichten</button>
+			<div class="ai-student-card update-hidden" id="ai-student-card"></div>
+			<div class="ai-messages" id="ai-messages" role="log" aria-label="Chatverlauf" aria-live="polite" aria-relevant="additions text"><div class="ai-empty" id="ai-empty"><div class="ai-empty-intro"><canvas class="thinking-orb ai-welcome-orb" id="ai-welcome-orb" aria-hidden="true"></canvas><div><h3>Fragen zum Unterricht</h3><p>Stelle eine Frage zur Klasse oder zur aktuellen Session.</p></div></div><div class="ai-suggestions"><button class="btn-2" type="button" data-ai-prompt="Fasse die aktuelle Session zusammen.">Session zusammenfassen</button><button class="btn-2" type="button" data-ai-prompt="Wer wurde lange nicht aufgerufen?">Lange nicht aufgerufen</button><button class="btn-2" type="button" data-ai-prompt="Zeige Auffälligkeiten der aktuellen Klasse.">Auffälligkeiten anzeigen</button></div></div></div>
+			<div class="ai-activity update-hidden" id="ai-activity" role="status"><canvas class="thinking-orb" id="ai-thinking-orb" aria-hidden="true"></canvas><div><strong id="ai-activity-label">Antwort wird erstellt …</strong><span>Der Assistent verarbeitet deine Anfrage lokal.</span></div></div>
+			<form class="ai-composer" id="ai-form"><label class="sr-only" for="ai-input">Nachricht an den KI-Assistenten</label><div class="ai-input-row"><textarea id="ai-input" rows="1" maxlength="2000" placeholder="Frage zur Klasse oder Session …" autocomplete="off" aria-describedby="ai-input-hint"></textarea><button class="btn-1" id="ai-send-btn" type="submit">Senden</button></div><div class="ai-composer-footer"><span id="ai-input-hint">Enter senden · Shift + Enter neue Zeile</span><span>Lokal auf deinem Gerät</span></div></form>
+		</div>
+	</div>
+
 	<div id="assessment-delete-modal" class="modal">
 		<div class="modal-content conflict-content">
 			<h2>Beurteilungsrunde löschen</h2>
 			<p id="assessment-delete-text"></p>
-			<p class="assessment-warning update-hidden" id="assessment-delete-sent-warning"></p>
-			<p>Das externe Formular, die Tabelle und das Apps Script werden nicht verändert.</p>
+			<p class="ui-alert ui-alert-warning assessment-warning update-hidden" id="assessment-delete-sent-warning"></p>
+			<p>Die Runde und ihre Antworten werden lokal und auf dem Umfrageserver gelöscht. Bereits versendete E-Mails bleiben bei den Empfängern.</p>
 			<div class="modal-buttons">
-				<button class="btn-1" id="assessment-delete-confirm-btn">Runde löschen</button>
+				<button class="btn-danger" id="assessment-delete-confirm-btn">Runde löschen</button>
 				<button class="btn-2" id="assessment-delete-cancel-btn">Abbrechen</button>
 			</div>
 		</div>
@@ -583,8 +601,10 @@
 </body>
 
 <script>
+	require('./uiMotion.js').initUiMotion();
 	require('./renderProcess.js');
 	require('./assessmentRenderer.js');
+	require('./aiRenderer.js');
 </script>
 
 </html>

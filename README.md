@@ -49,7 +49,7 @@ Gesendet wird über `POST /` mit `appId: "Repetierer"` und `type: "issue"`.
 Der benötigte App-Key wird lokal über `REPETIERER_ANALYTICS_KEY`, `ANALYTICS_KEY` oder eine nicht committete `analytics-config.local.json` mit `{ "analyticsKey": "..." }` bereitgestellt.
 
 ### Neue Funktionen
-- **Mitmachnote:** Beurteilungsrunden pro bestehender Klasse, Selbstbeurteilung über ein vorbereitetes Formular mit Apps-Script-API, lokaler Schüler-/Lehrervergleich und persönlicher Resultatversand über Brevo SMTP. Einrichtung und Datenhaltung sind in [docs/mitmachnote.md](docs/mitmachnote.md) beschrieben.
+- **Mitmachnote:** Beurteilungsrunden mit Cloudflare Workers + D1, Selbstbeurteilung ohne Login über `timolu.ch/app/services/repetierer/` mit automatischem `akzuwo.ch`-Fallback, lokale Bewertung/Eigenkorrektur und persönlicher Resultatversand über Brevo SMTP. [Einrichtung und Datenschutz](docs/mitmachnote.md), [Deployment und Tests](docs/cloudflare-deployment.md).
 - **Sitzungsprotokoll exportieren:** Im Menü kann die aktuelle Sitzung als CSV oder PDF exportiert werden. Das Protokoll enthält Zeitpunkt, Datum, Klasse, Person, Aktion, Note und Excel-Status.
 - **Klassenliste importieren:** Eine bestehende Excel- oder CSV-Datei kann importiert und als neue Repetierer-Datei gespeichert werden. Das Programm übernimmt bis zu 25 eindeutige Namen und legt die nötige Excel-Struktur automatisch an.
 - **Letzte Aktion rückgängig machen:** Die letzte Note oder Joker-Nutzung der aktuellen Sitzung kann rückgängig gemacht werden, solange der passende Excel-Eintrag noch unverändert ist. Falls Excel beim Speichern gesperrt war, wird der offene lokale Eintrag entfernt.
@@ -119,3 +119,6 @@ Provide the app key locally through `REPETIERER_ANALYTICS_KEY`, `ANALYTICS_KEY` 
 Quote by the original dev: "I do not plan to continue this project any further, since I will soon finish the school for which I developed the application.
 Of course the project is Open-Source so anyone can continue development."
 I (Akzuwo) am currently developping Repetierer 7. Repetierer 7 contains even more UI/UX upgrades, aswell as two completly new features. Im not going into that for now. Stay tuned ;-)
+# Lokale KI
+
+Der optionale Ollama-Assistent lässt sich in **Einstellungen → Lokale KI** einrichten. Details zu Architektur, Tools und Datenschutz stehen in [docs/lokale-ki.md](docs/lokale-ki.md).
