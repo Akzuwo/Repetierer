@@ -1,5 +1,15 @@
 # UI-Referenzen und eingebundene Komponenten
 
+## Aktuelle Kristall-Integration (23. Oktober 2026)
+
+Die nachfolgenden Abschnitte dokumentieren frühere UI-Arbeiten. Aktuell gilt die vom Nutzer gelieferte [Kristall-Spezifikation](kristall-material.md), mit der Korrektur **ohne Foto**. Die frühere DESIGN.md ist in [design-before-kristall.md](design-before-kristall.md) archiviert. Das Material verwendet nun die native Systemschrift; die alte Geist-Datei bleibt für bestehende Artefakte erhalten.
+
+`design-reference/kristall/` enthält die fünf unverändert extrahierten Referenzdateien. Der lokale Referenz-Test liefert für deren Hintergrund-URL die selbst geschriebene abstrakte SVG-Szene aus. Es gibt keine Fotoabhängigkeit und keinen externen Asset-Aufruf. Die Referenz ist kein zweiter App-Einstieg und wird nicht paketiert.
+
+`public/kristall/` enthält die CommonJS-Portierung, die gemeinsame Federuhr und die DOM-Anbindung. Shader und Federkonstanten bleiben erhalten. Ergänzt wurden Lifecycle-Cleanup, dynamische Controls, Clipping aller Scroll-Vorfahren und die Synchronisierung mit den vorhandenen GSAP-Dialogen. Beim Schliessen wird die Hintergrundebene vor der Fokus-Rückgabe wieder eingeblendet.
+
+`npm run test:kristall` prüft die echte WebGL-Ausgabe mit neutraler Testtextur, sichtbaren Scrollbalken und DPR 1/1.25/2; dazu Navigation, Regler, Schalter, reduzierte Bewegung, Kontextverlust/Wiederherstellung sowie 680×560 und 390×844. Die Produkt-UI-Prüfung verwendet isolierte IPC-Fixtures und belegt keine externen Mail- oder Serverdienste.
+
 Das bestehende dunkle Farbtheme und die Vanilla-JavaScript/Electron-Architektur bleiben erhalten. Alle Animationen laufen lokal; es werden keine Skripte von CDNs geladen.
 
 ## Repetitions-Hierarchie

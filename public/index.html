@@ -4,44 +4,51 @@
 
 <head>
 	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>Repetierer</title>
 	<meta name="description" content="Repetition und Mitarbeit im Unterricht erfassen.">
 	<meta name="author" content="srpnt3, Jonas-Luetolf, Akzuwo">
 	<link rel="stylesheet" href="tailwind.css">
-	<link rel="preload" href="fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin>
 	<link rel="stylesheet" href="style.css">
+	<link rel="stylesheet" href="kristall/kristall.css">
 </head>
 
 <body>
+<div class="crystal-scene" aria-hidden="true"></div>
+<div id="crystal-frame" data-glass="panel" aria-hidden="true"></div>
+<canvas id="glass-canvas" aria-hidden="true"></canvas>
+<div class="crystal-vignette" aria-hidden="true"></div>
 <div id="container">
+<p id="joker-date-migration-notice" class="joker-date-notice update-hidden" role="status"></p>
 	<div id="title-bar">
-		<div class="ico" id="drawer-toggle" title="Menü" role="button" tabindex="0" aria-label="Menü öffnen" aria-expanded="false">
+		<button type="button" class="ico" id="drawer-toggle" title="Menü" role="button" tabindex="0" aria-label="Menü öffnen" aria-expanded="false">
 			<span></span>
 			<span></span>
 			<span></span>
-		</div>
-		<h1 id="title" data-text="Repetierer">Repetierer</h1>
+		</button>
+		<h1 id="title">Repetierer</h1>
 		<span class="title-spacer"></span>
-		<button class="ai-title-button" id="ai-open-btn" title="Lokaler KI-Assistent (Ctrl+K)"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4ZM8 9h8M8 12h5"/></svg><span>Assistent</span><kbd>Ctrl K</kbd></button>
-		<div class="ico" id="settings-btn" title="Einstellungen" role="button" tabindex="0" aria-label="Einstellungen öffnen">
-			<svg class="header-outline" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h7M17 6h3M4 12h2M12 12h8M4 18h10M20 18h0"/><circle cx="14" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>
-		</div>
-		<div class="ico" id="minimize" title="Minimieren" role="button" tabindex="0" aria-label="Fenster minimieren">
+		<button class="ai-title-button" id="ai-open-btn" title="Lokaler KI-Assistent (Ctrl+K)" aria-label="KI-Assistent öffnen"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 3 2.1 6.9L19 12l-6.9 2.1L10 21l-2.1-6.9L1 12l6.9-2.1ZM19 1l1 3 3 1-3 1-1 3-1-3-3-1 3-1ZM20 16l.8 2.2L23 19l-2.2.8L20 22l-.8-2.2L17 19l2.2-.8Z"/></svg></button>
+		<button type="button" class="ico" id="settings-btn" title="Einstellungen" role="button" tabindex="0" aria-label="Einstellungen öffnen">
+			<svg class="header-outline" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><g transform="translate(1 0)"><path d="m9 3-.6 2.3-2 .9-2.1-.7-2 3.5 1.6 1.6v2.8L2.3 15l2 3.5 2.1-.7 2 .9L9 21h4l.6-2.3 2-.9 2.1.7 2-3.5-1.6-1.6v-2.8L19.7 9l-2-3.5-2.1.7-2-.9L13 3Z"/><circle cx="11" cy="12" r="3"/></g></svg>
+		</button>
+		<button type="button" class="ico" id="minimize" title="Minimieren" role="button" tabindex="0" aria-label="Fenster minimieren">
 			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
 				<path d="M4 12h16"/>
 			</svg>
-		</div>
-		<div class="ico" id="quit" title="Schliessen" role="button" tabindex="0" aria-label="Fenster schliessen">
+		</button>
+		<button type="button" class="ico" id="quit" title="Schliessen" role="button" tabindex="0" aria-label="Fenster schliessen">
 			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
 				<path d="M5 5l14 14M19 5L5 19"/>
 			</svg>
-		</div>
+		</button>
 	</div>
 
 	<div id="drawer-scrim"></div>
 	<aside id="drawer">
+		<div id="drawer-content">
 		<div class="drawer-header">
-			<button class="help-button help-button-back drawer-back-button update-hidden" id="drawer-back-btn" title="Zurück">‹</button>
+			<button class="help-button help-button-back drawer-back-button update-hidden" id="drawer-back-btn" title="Zurück" aria-label="Zurück zur Navigation"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h15"/></svg></button>
 			<h2 id="drawer-title">Navigation</h2>
 			<button class="help-button mini-help-button" id="drawer-help-btn" title="Erklärung">?</button>
 		</div>
@@ -49,7 +56,7 @@
 			<div class="drawer-actions">
 				<button class="btn-2" id="repetition-nav-btn" aria-current="page"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v5h5"/></svg>Repetition</button>
 				<button class="btn-2" id="assessment-nav-btn"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M9 12l2 2 4-4"/></svg>Mitmachnote</button>
-				<button class="btn-2" id="drawer-data-view-btn" title="Datei laden, Klassen importieren und Excel-Daten synchronisieren."><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>Datenverwaltung</button>
+				<button class="btn-2" id="drawer-data-view-btn" title="Datei laden, Klassen importieren und Excel-Daten synchronisieren."><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>Dateiverwaltung</button>
 				<button class="btn-2" id="drawer-protocol-view-btn" title="Backups, Logs und Sitzungsprotokolle ansehen oder exportieren."><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h13M7 10h13M7 16h13M3 4h.01M3 10h.01M3 16h.01"/></svg>Protokoll</button>
 				<button class="btn-2 disabled" id="stats-view-btn" title="Zeigt Klassenstatistiken der geladenen Datei."><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11h4v9M10 20V4h4v16M16 20v-7h4v7M3 20h18"/></svg>Statistiken</button>
 			</div>
@@ -69,10 +76,12 @@
 				<button class="btn-2" id="backup-btn" title="Zeigt gespeicherte Backup-Einträge dieser Sitzung und Datei.">Backup anzeigen</button>
 				<button class="btn-2" id="log-btn" title="Öffnet technische Meldungen, falls etwas geprüft werden muss.">Log anzeigen</button>
 				<button class="btn-2" id="export-protocol-btn" title="Exportiert das Sitzungsprotokoll gleichzeitig als PDF und CSV.">Protokoll exportieren</button>
-				<button class="btn-2" id="problem-report-btn" title="Sendet einen Fehlerbericht mit Kommentar und bereinigten Logs.">Problem melden</button>
+				<button class="btn-2 update-hidden" id="problem-report-btn" hidden disabled title="Sendet einen Fehlerbericht mit Kommentar und bereinigten Logs.">Problem melden</button>
 			</div>
 		</div>
+		</div>
 		<div class="drawer-actions debug-actions update-hidden" id="debug-actions">
+			<button class="btn-2" id="debug-scenarios-btn">Debug-Szenarien</button>
 			<button class="btn-2" id="debug-test-alert-btn">Testalert</button>
 			<button class="btn-2" id="debug-fake-update-btn">Fake Update</button>
 		</div>
@@ -82,54 +91,40 @@
 
 	<div id="content">
 		<aside class="session-sidebar update-hidden" id="class" aria-label="Datei und Klassen">
-			<section class="session-file-context"><h2>Datei</h2><p id="session-workbook-name"></p><button class="btn-2" id="session-data-btn"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M5 3h14v18H5ZM9 7v14M3 12h18M3 17h18"/></svg>Datenverwaltung</button></section>
+			<section class="session-file-context"><h2>Datei</h2><p id="session-workbook-name"></p><button class="btn-2" id="session-data-btn"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M5 3h14v18H5ZM9 7v14M3 12h18M3 17h18"/></svg>Dateiverwaltung</button></section>
 			<section class="session-class-navigation"><div class="panel-heading"><h2>Klassen</h2><button class="help-button mini-help-button" id="class-help-btn" title="Erklärung" aria-label="Hilfe zur Klassenauswahl">?</button></div><div id="session-class-slot"></div></section>
 		</aside>
 		<section class="session-empty-view" id="session-empty-view" aria-labelledby="session-start-heading">
 			<div class="session-start-heading"><div><h2 id="session-start-heading">Klasse wählen</h2><p id="session-start-description">Mit welcher Klasse möchtest du heute arbeiten?</p></div><button class="help-button mini-help-button" id="session-start-help-btn" title="Erklärung" aria-label="Hilfe zum Sessionstart">?</button></div>
-			<ol class="session-flow" aria-label="Schritte zum Unterricht"><li aria-current="step"><span>1</span> Klasse wählen</li><li><span>2</span> Abwesenheiten</li><li><span>3</span> Session starten</li></ol>
 			<div class="session-file-empty" id="session-file-empty">
 				<div><h3 id="session-file-heading">Excel-Datei auswählen</h3><p id="session-file-description">Öffne eine Repetierer-Datei oder importiere eine Klassenliste.</p></div>
 				<div class="button-row"><button class="btn-1" id="session-open-file-btn">Excel-Datei öffnen</button><button class="btn-2" id="session-import-btn">Klassenliste importieren</button></div>
 			</div>
 			<div id="class-list" class="session-class-list"><div></div></div>
 			<div id="session-class-home-slot" hidden></div>
-			<div class="session-source update-hidden" id="session-source"><span id="session-source-label"></span><button class="btn-2" id="session-change-file-btn">Datei wechseln</button></div>
+			<div class="session-source update-hidden" id="session-source"><span id="session-source-label"></span></div>
 		</section>
-		<div class="session-header update-hidden" id="session-header">
-			<div class="session-meta">
-				<span class="session-live-dot"></span>
-				<strong id="session-class-name">Klasse</strong>
-				<span id="session-attendance-count">0 anwesend</span>
-			</div>
-			<div class="session-tabs">
-				<button class="btn-1" id="session-participation-tab">Mitarbeit</button>
-				<button class="btn-2" id="session-repetition-tab">Repetition</button>
-			</div>
-			<button class="btn-2 session-end-button" id="end-session-btn">Session beenden</button>
-		</div>
+
+  <section id="session-attendance-view" class="session-attendance-view update-hidden" aria-labelledby="session-attendance-heading">
+   <div class="session-start-heading"><div><h2 id="session-attendance-heading" tabindex="-1">Abwesenheiten festlegen</h2><p class="session-start-class">Klasse <strong id="session-start-class"></strong></p></div></div>
+   <p class="attendance-instruction">Alle Schüler sind anwesend. Klicke auf die Namen der fehlenden Schüler – ihre Pills werden leicht rot. Ein weiterer Klick macht die Auswahl rückgängig.</p>
+   <div class="session-attendance-summary" role="status"><strong id="session-present-preview">0 anwesend</strong><span id="session-absent-preview">0 abwesend</span></div>
+   <div id="session-attendance-list" aria-label="Abwesenheiten auswählen"></div>
+   <div class="attendance-actions"><button class="btn-2" id="cancel-session-start-btn">Zurück zur Klassenauswahl</button><button class="btn-1" id="confirm-session-start-btn">Session starten</button></div>
+  </section>
 		<div class="neum" id="repetition">
 			<div class="repetition-header">
 				<h2>Repetition <span id="class-name"></span></h2>
-				<div class="repetition-tools">
+
+			</div>
+			<div class="button-row repetition-selection-actions"><button class="btn-1 disabled" id="start-btn">Start</button><button class="btn-2 disabled" id="manual-select-btn">Freiwillig</button><button class="btn-2 disabled" id="probabilities-btn">Chancen</button><button class="btn-2 disabled update-hidden" id="absences-btn">Abwesend</button>				<div class="repetition-tools">
 					<div class="history-actions">
 						<button class="btn-2 history-btn disabled" id="undo-last-btn" title="Letzte Aktion rückgängig" aria-label="Letzte Aktion rückgängig"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2"/></svg></button>
 						<button class="btn-2 history-btn disabled" id="redo-last-btn" title="Wiederholen" aria-label="Wiederholen"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5M20 9H10a6 6 0 0 0 0 12h2"/></svg></button>
 					</div>
 					<button class="help-button mini-help-button" id="repetition-help-btn" title="Erklärung">?</button>
-				</div>
-			</div>
-			<div class="button-row repetition-selection-actions"><button class="btn-1 disabled" id="start-btn">Start</button><button class="btn-2 disabled" id="manual-select-btn">Freiwillig</button><button class="btn-2 disabled" id="probabilities-btn">Chancen</button><button class="btn-2 disabled update-hidden" id="absences-btn">Abwesend</button></div>
-			<div class="repetition-stage"><h1 class="disabled" id="name">Bereit für die nächste Auswahl</h1><p class="repetition-idle-hint" id="repetition-idle-hint">Wähle zufällig aus oder nimm eine freiwillige Meldung an.</p></div>
-			<div id="res">
-				<div id="grade">
-					<label class="disabled" for="grade-input">Note</label>
-					<input class="disabled" id="grade-input" name="mark" type="text" inputmode="decimal" placeholder="1–6">
-				</div>
-				<button class="btn-2 disabled">Abbrechen</button>
-				<button class="btn-1 disabled">Speichern</button>
-				<button class="btn-2 disabled">Joker</button>
-			</div>
+				</div></div>
+			<div class="repetition-stage"><h1 class="disabled" id="name">Bereit für die nächste Auswahl</h1><p class="repetition-idle-hint" id="repetition-idle-hint">Wähle zufällig aus oder nimm eine freiwillige Meldung an.</p>
 			<div class="visual-effect-layer" id="selection-effect" aria-hidden="true">
 				<div class="selection-spotlight selection-spotlight-left"></div>
 				<div class="selection-spotlight selection-spotlight-right"></div>
@@ -146,15 +141,19 @@
 				</div>
 				<div class="confetti-stage" id="confetti-stage" aria-hidden="true"></div>
 			</div>
-			<div class="visual-effect-layer completion-effect" id="completion-effect" aria-hidden="true" role="status">
-				<div class="completion-ripple"></div>
-				<div class="completion-check">
-					<svg viewBox="0 0 120 120" aria-hidden="true">
-						<path d="M31 62l19 19 40-44"></path>
-					</svg>
-				</div>
-				<strong>Gespeichert</strong>
 			</div>
+			<div id="res">
+				<div id="grade">
+					<label class="disabled" for="grade-input">Note</label>
+					<input class="disabled" id="grade-input" name="mark" type="text" inputmode="decimal" placeholder="z.B. 5.5">
+				</div>
+				<button class="btn-2 disabled">Abbrechen</button>
+				<button class="btn-1 disabled">Speichern</button>
+				<button class="btn-2 disabled">Joker</button>
+			</div>
+            <div class="visual-effect-layer completion-effect" id="completion-effect" aria-hidden="true" role="status">
+              <div class="completion-receipt"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M31 62l19 19 40-44"></path></svg><strong>Gespeichert</strong></div>
+            </div>
 		</div>
 		<div class="neum update-hidden" id="participation-view">
 			<div class="participation-heading">
@@ -168,15 +167,16 @@
 				<div id="participation-summary-list"></div>
 			</div>
 		</div>
-		<div class="neum update-hidden" id="stats-view">
+		<section class="update-hidden" id="stats-view" aria-labelledby="stats-heading">
 			<div class="stats-header">
-				<div><h2>Statistiken</h2></div>
+				<div><h2 id="stats-heading">Statistiken</h2><p>Repetition im Überblick</p></div>
 				<button class="btn-2" id="stats-back-btn">Zurück</button>
 			</div>
+			<label class="stats-class-picker update-hidden" id="stats-class-picker">Klasse <select id="stats-class-select" aria-label="Statistik einer Klasse anzeigen"></select></label>
 			<p class="stats-empty update-hidden" id="stats-empty">Noch keine Statistikdaten vorhanden.</p>
-			<div id="stats-list"></div>
-		</div>
-		<div class="neum update-hidden" id="assessment-view">
+			<div id="stats-list" tabindex="0" aria-label="Klassenstatistik"></div>
+		</section>
+		<div class="assessment-view update-hidden" id="assessment-view">
 			<div class="assessment-header">
 				<div>
 					<h2 id="assessment-heading">Beurteilungsrunden</h2>
@@ -187,8 +187,113 @@
 				</div>
 			</div>
 			<p class="ui-loading-status update-hidden" id="assessment-operation-status" role="status"></p>
-			<div id="assessment-body" class="assessment-body"></div>
+			<div id="assessment-body" class="assessment-body" tabindex="0" aria-label="Mitmachnote – Inhalt"></div>
 		</div>
+	<section id="settings-view" class="settings-view update-hidden" aria-labelledby="settings-heading">
+		<div class="settings-content">
+			<div class="settings-header">
+				<button class="help-button" id="settings-help-btn" title="Hilfe">?</button>
+				<h2 id="settings-heading" tabindex="-1">Einstellungen</h2>
+				<button class="btn-2 settings-back" id="settings-back-btn">Zurück</button>
+			</div>
+			<div class="settings-scroll-area">
+				<div class="ai-settings-section">
+					<h3>Lokale KI</h3>
+					<p>Der Assistent läuft mit Ollama auf diesem Gerät. Schülerdaten werden nicht an eine Cloud-KI gesendet.</p>
+					<p id="ai-setup-status" role="status">Status wird geprüft …</p>
+					<div class="ai-progress update-hidden" id="ai-setup-progress"><div id="ai-setup-progress-bar"></div></div>
+					<button class="btn-1" id="ai-setup-btn">Lokale KI einrichten</button>
+				</div>
+				<p id="settings-location"></p>
+				<h3 class="settings-section-heading">Weitere Optionen</h3>
+				<label class="setting-row setting-toggle">
+					<span class="setting-copy">Extra Joker ab 3 Noten</span>
+					<input class="toggle-input" type="checkbox" id="extra-joker-setting" role="switch">
+					<span class="toggle-switch" aria-hidden="true"></span>
+				</label>
+				<div class="setting-action" id="extra-joker-migration-setting">
+					<span>
+						Extra-Joker f&uuml;r bestehende Daten
+						<small id="extra-joker-migration-status">Bitte zuerst eine Datei laden.</small>
+					</span>
+					<button class="btn-2" id="extra-joker-migration-btn">Extra-Joker f&uuml;r bestehende Daten nachtragen</button>
+				</div>
+				<label class="setting-field setting-range">
+					<span class="setting-range-heading"><span id="probability-factor-setting-label">Wahrscheinlichkeits-Faktor</span><output id="probability-factor-setting-value" for="probability-factor-setting" aria-hidden="true">3.0×</output></span>
+					<input id="probability-factor-setting" type="range" min="1.1" max="10" step="0.1" value="3" aria-labelledby="probability-factor-setting-label">
+				</label>
+				<label class="setting-row setting-toggle">
+					<span class="setting-copy">Boost für nie ausgewählte Personen</span>
+					<input class="toggle-input" type="checkbox" id="boost-never-selected-setting" role="switch">
+					<span class="toggle-switch" aria-hidden="true"></span>
+				</label>
+				<label class="setting-field setting-range">
+					<span class="setting-range-heading"><span id="never-selected-boost-factor-setting-label">Boost-Faktor</span><output id="never-selected-boost-factor-setting-value" for="never-selected-boost-factor-setting" aria-hidden="true">3.0×</output></span>
+					<input id="never-selected-boost-factor-setting" type="range" min="1.1" max="10" step="0.1" value="3" aria-labelledby="never-selected-boost-factor-setting-label">
+				</label>
+				<label class="setting-row setting-toggle">
+					<span class="setting-copy">
+						Zusätzliche visuelle Effekte
+						<small>Aktiviert Titelanimation, Namensauswahl mit Konfetti und die Speicherbestätigung.</small>
+					</span>
+					<input class="toggle-input" type="checkbox" id="visual-effects-setting" role="switch">
+					<span class="toggle-switch" aria-hidden="true"></span>
+				</label>
+				<label class="setting-row setting-toggle">
+					<span class="setting-copy">
+						Wiggersche Regel aktivieren
+						<small>Wenn jemand den Joker setzt, wird diese Person für eine begrenzte Zeit nicht zufällig ausgewählt.</small>
+					</span>
+					<input class="toggle-input" type="checkbox" id="wiggers-rule-setting" role="switch">
+					<span class="toggle-switch" aria-hidden="true"></span>
+				</label>
+				<label class="setting-field setting-range">
+					<span class="setting-range-heading"><span id="wiggers-rule-duration-setting-label">Wiggers-Dauer in Minuten</span><output id="wiggers-rule-duration-setting-value" for="wiggers-rule-duration-setting" aria-hidden="true">120 Min.</output></span>
+					<input id="wiggers-rule-duration-setting" type="range" min="1" max="480" step="1" value="120" aria-labelledby="wiggers-rule-duration-setting-label">
+				</label>
+				<h3 class="settings-section-heading">Integrationen</h3>
+                <div class="integration-package">
+                  <p>Eine Datei für Cloudflare API und SMTP. Beim Import werden beide Verbindungen übernommen.</p>
+                  <div class="button-row"><button class="btn-1" id="integration-package-import-btn">.repetierer importieren</button><button class="btn-2" id="integration-package-export-btn">Paket exportieren</button></div>
+                  <small>Das exportierte Paket enthält Zugangsdaten. Teile es nur mit der vorgesehenen Lehrperson.</small>
+                  <p id="integration-package-status" role="status"></p>
+                </div>
+				<div class="setting-action assessment-integration-setting">
+					<span>Cloudflare API · Mitmachnote<small id="assessment-config-status">Umfrage: Nicht eingerichtet</small><small id="assessment-api-status">API: Nicht geprüft</small></span>
+					<div class="integration-actions">
+						<button class="btn-2 update-hidden" id="assessment-config-import-btn">Konfiguration importieren</button>
+						<button class="btn-2 update-hidden" id="assessment-api-test-btn">Verbindung testen</button>
+						<button class="btn-danger update-hidden" id="assessment-config-remove-btn">Konfiguration entfernen</button>
+					</div>
+				</div>
+				<div class="setting-action assessment-integration-setting">
+					<span>Brevo SMTP<small id="brevo-status">Nicht eingerichtet</small></span>
+					<div class="integration-actions">
+						<button class="btn-2 update-hidden" id="brevo-import-btn">Konfiguration importieren</button>
+						<button class="btn-2 update-hidden" id="brevo-test-btn">Verbindung testen</button>
+						<button class="btn-danger update-hidden" id="brevo-remove-btn">Credentials entfernen</button>
+					</div>
+				</div>
+			</div>
+			<div class="settings-page-actions">
+				<button class="btn-2" id="close-settings-modal">Verwerfen</button>
+				<button class="btn-1" id="save-settings-btn">Speichern</button>
+			</div>
+		</div>
+	</section>
+	</div>
+
+	<div id="session-chrome">
+		<div class="session-header update-hidden" id="session-header">
+			<div class="session-meta">
+				<strong id="session-class-name">Klasse</strong>
+			</div>
+			<div class="session-tabs">
+				<button class="btn-1" id="session-participation-tab">Mitarbeit</button>
+				<button class="btn-2" id="session-repetition-tab">Repetition</button>
+			</div>
+		</div>
+			<button class="btn-2 session-end-button" id="end-session-btn">Session beenden</button>
 	</div>
 
 	<div id="update-panel" class="update-panel ui-alert ui-alert-info update-hidden" role="status">
@@ -388,99 +493,6 @@
 		</div>
 	</div>
 
-	<div id="settings-modal" class="modal">
-		<div class="modal-content settings-content">
-			<div class="settings-header">
-				<button class="help-button" id="settings-help-btn" title="Hilfe">?</button>
-				<h2>Einstellungen</h2>
-			</div>
-			<div class="settings-scroll-area">
-				<div class="ai-settings-section">
-					<h3>Lokale KI</h3>
-					<p>Der Assistent läuft mit Ollama auf diesem Gerät. Schülerdaten werden nicht an eine Cloud-KI gesendet.</p>
-					<p id="ai-setup-status" role="status">Status wird geprüft …</p>
-					<div class="ai-progress update-hidden" id="ai-setup-progress"><div id="ai-setup-progress-bar"></div></div>
-					<button class="btn-1" id="ai-setup-btn">Lokale KI einrichten</button>
-				</div>
-				<p id="settings-location"></p>
-				<h3 class="settings-section-heading">Design</h3>
-				<label class="setting-field">
-					<span>Farbschema</span>
-					<select id="theme-setting">
-						<option value="midnight">Mitternacht – Schwarz &amp; Blau</option>
-						<option value="classic">Klassisch – Grau &amp; Grün</option>
-					</select>
-				</label>
-				<h3 class="settings-section-heading">Weitere Optionen</h3>
-				<label class="setting-row setting-toggle">
-					<span class="setting-copy">Extra Joker ab 3 Noten</span>
-					<input class="toggle-input" type="checkbox" id="extra-joker-setting" role="switch">
-					<span class="toggle-switch" aria-hidden="true"></span>
-				</label>
-				<div class="setting-action" id="extra-joker-migration-setting">
-					<span>
-						Extra-Joker f&uuml;r bestehende Daten
-						<small id="extra-joker-migration-status">Bitte zuerst eine Datei laden.</small>
-					</span>
-					<button class="btn-2" id="extra-joker-migration-btn">Extra-Joker f&uuml;r bestehende Daten nachtragen</button>
-				</div>
-				<label class="setting-field">
-					<span>Wahrscheinlichkeits-Faktor</span>
-					<input id="probability-factor-setting" type="number" min="1.1" max="10" step="0.1">
-				</label>
-				<label class="setting-row setting-toggle">
-					<span class="setting-copy">Boost für nie ausgewählte Personen</span>
-					<input class="toggle-input" type="checkbox" id="boost-never-selected-setting" role="switch">
-					<span class="toggle-switch" aria-hidden="true"></span>
-				</label>
-				<label class="setting-field">
-					<span>Boost-Faktor</span>
-					<input id="never-selected-boost-factor-setting" type="number" min="1.1" max="10" step="0.1">
-				</label>
-				<label class="setting-row setting-toggle">
-					<span class="setting-copy">
-						Zusätzliche visuelle Effekte
-						<small>Aktiviert Titelanimation, Namensauswahl mit Konfetti und die Speicherbestätigung.</small>
-					</span>
-					<input class="toggle-input" type="checkbox" id="visual-effects-setting" role="switch">
-					<span class="toggle-switch" aria-hidden="true"></span>
-				</label>
-				<label class="setting-row setting-toggle">
-					<span class="setting-copy">
-						Wiggersche Regel aktivieren
-						<small>Wenn jemand den Joker setzt, wird diese Person für eine begrenzte Zeit nicht zufällig ausgewählt.</small>
-					</span>
-					<input class="toggle-input" type="checkbox" id="wiggers-rule-setting" role="switch">
-					<span class="toggle-switch" aria-hidden="true"></span>
-				</label>
-				<label class="setting-field">
-					<span>Wiggers-Dauer in Minuten</span>
-					<input id="wiggers-rule-duration-setting" type="number" min="1" max="480" step="1">
-				</label>
-				<h3 class="settings-section-heading">Integrationen</h3>
-				<div class="setting-action assessment-integration-setting">
-					<span>Mitmachnote<small id="assessment-config-status">Umfrage: Nicht eingerichtet</small><small id="assessment-api-status">API: Nicht geprüft</small></span>
-					<div class="integration-actions">
-						<button class="btn-2" id="assessment-config-import-btn">Konfiguration importieren</button>
-						<button class="btn-2 update-hidden" id="assessment-api-test-btn">Verbindung testen</button>
-						<button class="btn-danger update-hidden" id="assessment-config-remove-btn">Konfiguration entfernen</button>
-					</div>
-				</div>
-				<div class="setting-action assessment-integration-setting">
-					<span>Brevo SMTP<small id="brevo-status">Nicht eingerichtet</small></span>
-					<div class="integration-actions">
-						<button class="btn-2" id="brevo-import-btn">Konfiguration importieren</button>
-						<button class="btn-2 update-hidden" id="brevo-test-btn">Verbindung testen</button>
-						<button class="btn-danger update-hidden" id="brevo-remove-btn">Credentials entfernen</button>
-					</div>
-				</div>
-			</div>
-			<div class="modal-buttons">
-				<button class="btn-2" id="close-settings-modal">Abbrechen</button>
-				<button class="btn-1" id="save-settings-btn">Speichern</button>
-			</div>
-		</div>
-	</div>
 
 	<div id="update-news-modal" class="modal">
 		<div class="modal-content update-news-content">
@@ -527,20 +539,6 @@
 		</div>
 	</div>
 
-	<div id="session-start-modal" class="modal">
-		<div class="modal-content session-start-content">
-			<h2>Abwesenheiten erfassen</h2>
-			<p class="session-start-class">Klasse <strong id="session-start-class"></strong></p>
-			<p class="excel-editor-help">Alle Schüler sind anwesend. Markiere nur diejenigen, die heute fehlen.</p>
-			<div class="session-attendance-summary"><strong id="session-present-preview">0 anwesend</strong><span id="session-absent-preview">0 abwesend</span></div>
-			<div id="session-attendance-list"></div>
-			<div class="modal-buttons">
-				<button class="btn-1" id="confirm-session-start-btn">Session starten</button>
-				<button class="btn-2" id="cancel-session-start-btn">Abbrechen</button>
-			</div>
-		</div>
-	</div>
-
 	<div id="session-end-modal" class="modal">
 		<div class="modal-content session-end-confirm-content">
 			<h2>Session beenden?</h2>
@@ -574,13 +572,13 @@
 
 	<div id="ai-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="ai-heading" aria-hidden="true">
 		<div class="modal-content ai-content">
-			<div class="ai-header"><h2 id="ai-heading">KI-Assistent</h2><button class="btn-2" id="ai-close-btn">Schliessen</button></div>
+			<div class="ai-header"><h2 id="ai-heading">KI-Assistent</h2><button class="btn-2 update-hidden" id="ai-close-btn">Schliessen</button></div>
 			<p class="ai-status" id="ai-chat-status" role="status"></p>
 			<button class="btn-2 ai-configure update-hidden" id="ai-configure-btn" type="button">KI in den Einstellungen einrichten</button>
 			<div class="ai-student-card update-hidden" id="ai-student-card"></div>
-			<div class="ai-messages" id="ai-messages" role="log" aria-label="Chatverlauf" aria-live="polite" aria-relevant="additions text"><div class="ai-empty" id="ai-empty"><div class="ai-empty-intro"><canvas class="thinking-orb ai-welcome-orb" id="ai-welcome-orb" aria-hidden="true"></canvas><div><h3>Fragen zum Unterricht</h3><p>Stelle eine Frage zur Klasse oder zur aktuellen Session.</p></div></div><div class="ai-suggestions"><button class="btn-2" type="button" data-ai-prompt="Fasse die aktuelle Session zusammen.">Session zusammenfassen</button><button class="btn-2" type="button" data-ai-prompt="Wer wurde lange nicht aufgerufen?">Lange nicht aufgerufen</button><button class="btn-2" type="button" data-ai-prompt="Zeige Auffälligkeiten der aktuellen Klasse.">Auffälligkeiten anzeigen</button></div></div></div>
-			<div class="ai-activity update-hidden" id="ai-activity" role="status"><canvas class="thinking-orb" id="ai-thinking-orb" aria-hidden="true"></canvas><div><strong id="ai-activity-label">Antwort wird erstellt …</strong><span>Der Assistent verarbeitet deine Anfrage lokal.</span></div></div>
-			<form class="ai-composer" id="ai-form"><label class="sr-only" for="ai-input">Nachricht an den KI-Assistenten</label><div class="ai-input-row"><textarea id="ai-input" rows="1" maxlength="2000" placeholder="Frage zur Klasse oder Session …" autocomplete="off" aria-describedby="ai-input-hint"></textarea><button class="btn-1" id="ai-send-btn" type="submit">Senden</button></div><div class="ai-composer-footer"><span id="ai-input-hint">Enter senden · Shift + Enter neue Zeile</span><span>Lokal auf deinem Gerät</span></div></form>
+			<div class="ai-messages" id="ai-messages" role="log" aria-label="Chatverlauf" aria-live="polite" aria-relevant="additions text"><div class="ai-empty" id="ai-empty"><div class="ai-empty-intro"><canvas class="thinking-orb ai-welcome-orb" id="ai-welcome-orb" aria-hidden="true"></canvas><div><h3>Fragen zum Unterricht</h3><p>Stelle eine Frage zur Klasse oder zur aktuellen Session.</p></div></div></div></div>
+			<div class="ai-activity update-hidden" id="ai-activity" role="status"><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span><div><strong id="ai-activity-label">Antwort wird erstellt …</strong><span>Der Assistent verarbeitet deine Anfrage lokal.</span></div></div>
+			<form class="ai-composer" id="ai-form"><label class="sr-only" for="ai-input">Nachricht an den KI-Assistenten</label><div class="ai-input-row"><textarea id="ai-input" rows="1" maxlength="2000" placeholder="Frage zur Klasse oder Session …" autocomplete="off"></textarea><button class="btn-1" id="ai-send-btn" type="submit" aria-label="Nachricht senden"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 11 7-7 7 7M12 4v16"/></svg></button></div></form>
 		</div>
 	</div>
 
@@ -597,12 +595,28 @@
 		</div>
 	</div>
 
+ <div id="joker-date-migration-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="joker-date-migration-heading">
+  <div class="modal-content joker-date-migration-content">
+   <h2 id="joker-date-migration-heading">Joker-Daten in Excel erweitern</h2>
+   <p id="joker-date-migration-summary"></p>
+   <ul id="joker-date-migration-preview"></ul>
+   <p>Jeder gesetzte Joker erhält eine eigene Datumsspalte. Die gespeicherten Daten aus der bisherigen Sammelzelle werden übernommen. Namen, Noten und verbleibende Joker bleiben unverändert.</p>
+   <p>Vor der Änderung erstellt die App eine Sicherungskopie neben der Excel-Datei. Nicht gespeicherte historische Joker-Daten können nicht nachträglich ermittelt werden.</p>
+   <p>Bitte die Datei in Excel schliessen. Mit «Später» bleibt sie unverändert und kann weiterhin verwendet werden.</p>
+   <p id="joker-date-migration-status" class="update-hidden" role="status"></p>
+   <div class="modal-buttons"><button class="btn-2" id="joker-date-migration-skip">Später</button><button class="btn-1" id="joker-date-migration-run">Sicherung erstellen und erweitern</button></div>
+  </div>
+ </div>
+
 </div>
 </body>
 
 <script>
+	require('./debugMode.js').install();
+	require('./kristall/integration.js').initKristall();
 	require('./uiMotion.js').initUiMotion();
 	require('./renderProcess.js');
+	require('./jokerDateMigration.js');
 	require('./assessmentRenderer.js');
 	require('./aiRenderer.js');
 </script>

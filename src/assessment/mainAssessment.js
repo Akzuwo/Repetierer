@@ -6,6 +6,8 @@ const { deliverRound, sanitizeMailError, validateRoundForDelivery } = require('.
 const {
 	buildRoundFormUrl,
 	importIntegrationEnv,
+	exportIntegrationFile,
+	readIntegrationValues,
 	publicAssessmentConfig,
 	publicBrevoConfig,
 	readAssessmentConfig,
@@ -103,7 +105,7 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 	register('assessment:config-import', async () => {
 		const selected = dialog.showOpenDialogSync(BrowserWindow.getFocusedWindow(), {
 			properties: ['openFile'],
-			filters: [{ name: 'Repetierer-Konfiguration', extensions: ['env'] }]
+			filters: [{ name: 'Repetierer-Paket', extensions: ['repetierer'] }, { name: 'Bisherige Konfiguration', extensions: ['env'] }]
 		});
 		if (!selected) return { cancelled: true };
 		const result = await importIntegrationEnv(selected[0], paths.integrationEnvPath, {
@@ -117,6 +119,18 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 			}
 		});
 		return result;
+	});
+	register('assessment:config-export', async () => {
+		const destination = dialog.showSaveDialogSync(BrowserWindow.getFocusedWindow(), {
+			title: 'SMTP und Cloudflare gemeinsam exportieren',
+			defaultPath: 'Repetierer-Konfiguration.repetierer',
+			filters: [{name:'Repetierer-Paket',extensions:['repetierer']}]
+		});
+		if (!destination) return {cancelled:true};
+		const filePath = destination.toLowerCase().endsWith('.repetierer') ? destination : destination + '.repetierer';
+		return exportIntegrationFile(filePath, readIntegrationValues(paths.integrationEnvPath, paths.brevoEnvPath), {
+			revealTeacherToken: token => revealTeacherToken(token, safeStorage)
+		});
 	});
 	register('assessment:api-test', async () => {
 		const config = await requireAssessmentConfig(paths);
@@ -151,7 +165,7 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 			classRecord: current.classRecord,
 			round: current.round,
 			mode: args.mode === 'failed_only' ? 'failed_only' : 'pending',
-			buildMessage: (student, assessment) => buildResultMessage({ student, assessment, round: current.round, sender: config }),
+			buildMessage: (student, assessment) => buildResultMessage({ student, assessment, round: current.round }),
 			send: message => mailer.send(message),
 			updateStatus: (studentId, status, details) => store.setMailStatus(context.filePath, context.className, context.students, current.round.id, studentId, status, details)
 		});

@@ -45,4 +45,22 @@ function createThinkingOrb(canvas, { state = 'working', size = 64, paused = fals
 	};
 }
 
-module.exports = { createThinkingOrb };
+// A small, bounded glass receipt acknowledges saving without covering the page.
+function createSaveReceipt(layer) {
+ const {gsap}=require('./vendor/ui-motion.js');
+ const receipt=layer.querySelector('.completion-receipt'),path=receipt.querySelector('path'),label=receipt.querySelector('strong');
+ let timeline;
+ function stop(){timeline?.kill();timeline=null;delete receipt.dataset.receipt;gsap.set(receipt,{clearProps:'opacity,transform'});}
+ function start(){
+  stop();receipt.dataset.receipt='running';
+  gsap.set(path,{strokeDasharray:90,strokeDashoffset:90});gsap.set(label,{opacity:0,x:-6});
+  timeline=gsap.timeline({onComplete:()=>{delete receipt.dataset.receipt;timeline=null;}})
+   .fromTo(receipt,{opacity:0,scaleX:.35,scaleY:.7,y:14},{opacity:1,scaleX:1,scaleY:1,y:0,duration:.34,ease:'back.out(1.4)'},0)
+   .to(path,{strokeDashoffset:0,duration:.26,ease:'power2.out'},.16)
+   .to(label,{opacity:1,x:0,duration:.22,ease:'power2.out'},.25)
+   .to(receipt,{opacity:0,scale:.94,y:-6,duration:.22,ease:'power2.in'},1.03);
+  window.repetiererKristall?.clock.animateFor(1400);
+ }
+ return {start,stop,destroy:stop};
+}
+module.exports={createThinkingOrb,createSaveReceipt};

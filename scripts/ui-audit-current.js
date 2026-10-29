@@ -136,7 +136,7 @@ async function main() {
 		'person-modal', 'absence-modal', 'backup-modal', 'log-modal', 'problem-report-modal',
 		'reload-conflict-modal', 'class-import-modal', 'teacher-help-modal', 'joker-migration-modal',
 		'joker-migration-help-modal', 'probabilities-modal', 'excel-editor-modal', 'update-news-modal',
-		'settings-help-modal', 'session-start-modal', 'session-end-modal', 'participation-modal',
+		'settings-help-modal', 'session-end-modal', 'participation-modal',
 		'assessment-confirm-modal', 'assessment-delete-modal'
 	];
 	for (const id of modals) {

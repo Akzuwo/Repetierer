@@ -1,840 +1,93 @@
-# DESIGN.md
+# Repetierer – Kristall
 
-## 1. Zielbild
+Die aktuelle Oberfläche folgt dem Kristall-Material aus [Design.md](docs/kristall-material.md), Version 1.3.0. Die frühere Designspezifikation bleibt in [docs/design-before-kristall.md](docs/design-before-kristall.md) erhalten.
 
-Repetierer soll wie eine einzige, konsistente Desktop-App wirken: ruhig, klar, modern, hochwertig und funktional.
+## Projektvorgaben
 
-Der visuelle Wow-Effekt entsteht nicht durch möglichst viele Effekte, Karten oder Farben, sondern durch:
+- Kein Foto. Die lokale, abstrakte Salbei-Szene `public/kristall/assets/scene.svg` ist die gemeinsame Hintergrundtextur für CSS und WebGL.
+- Ein optischer Canvas; echte semantische HTML-Controls liegen darüber. Repetition, Mitarbeit, Beurteilungen, Excel, lokale KI und ihre Datenflüsse bleiben erhalten.
+- Systemschrift, weisse Schrift/Icons, Mint-Akzente, pillenförmige Controls und Panels mit Radius 30/32 px.
+- Unveränderte Kristall-Shaderkonstanten: Brechung 1, Frost 0, Dichte .08. Ein Rand, ein Schatten; keine zusätzliche CSS-Glasfüllung im WebGL-Modus.
+- Eine gemeinsame Federuhr für Marker, Toggles und Regler. Bestehende GSAP-Ansichtswechsel versorgen dieselbe optische Uhr für ihre begrenzte Dauer.
+- Inaktive HTML-Inhalte unter Dialogen/Drawer ausblenden: Der Shader bricht nur die Szene und darf keine übereinander lesbaren Texte erzeugen.
+- Canvas-Koordinaten an den tatsächlichen Bounds und den effektiven Pixelverhältnissen messen. Alle Overflow-Vorfahren beim Clippen berücksichtigen.
+- Native Tastaturbedienung, Fokus, reduzierte Bewegung, Pointer-Abbruch, WebGL-Fallback und Lifecycle-Cleanup gehören zur Integration.
 
-- klare Informationshierarchie
-- saubere Abstände
-- konsistente Komponenten
-- gezielte Akzentfarbe
-- subtile Tiefe
-- kurze, saubere Animationen
-- klaren Fokus auf die aktuelle Aufgabe
+## Prüfung
 
-Neue Screens, Modals und Funktionen müssen sich in die bestehende Designsprache einfügen. Sie dürfen nicht wie Komponenten aus einer anderen App wirken.
+`npm test`, `npm run test:ui`, `npm run test:kristall`. Die Materialprüfung erfasst Scrollbalken, DPR 1/1.25/2, Rasterzentren, unterbrochene Navigation, Regler, Schalter, kompakte/mobile Fenster und Kontextverlust. Screenshots und Messwerte liegen lokal in `.kristall-check/` bzw. `.ui-polish-smoke/`.
 
----
+Alte Builds nie löschen. Neue Ausgaben in einem eigenen Unterordner unter `builds/` erstellen. Keine Veröffentlichung ohne Auftrag.
 
-## 2. Grundprinzipien
+## Präzisierung: feste App-Chrome
 
-### 2.1 Eine visuelle Sprache
+Header als abgetrennter, fester Glasbereich; Drawer direkt darunter am linken Fensterrand, ohne schwebende Abstände. Header- und Drawer-Aktionen ohne Glaslinsen oder Pills: nur leichter Hover-Glow. Grösserer statischer App-Titel, Zahnrad und reines Drei-Sterne-Icon für die KI. Fenster mit 24-px-Glaskanten, kein Mauszeigerlicht. Der Drawer-Titel steht linksbündig mit den Kategorie-Icons.
 
-Alle Screens verwenden dieselben Regeln für:
+## Chat und Session
 
-- Header
-- Typografie
-- Buttons
-- Cards und Panels
-- Modals
-- Alerts
-- Eingabefelder
-- Navigation
-- Icons
-- Abstände
-- Overlays
-- Animationen
+Header unten gerade; weisse Hover-Glows und rote Fenster-/Session-Schliessen-Aktionen. Einstellungen drehen sich beim Hover. Drawer lässt die Hauptansicht sichtbar. Dialoge erhalten ein ungerahmtes X rechts oben, mit den bestehenden Abbrechen-Handlern.
 
-Keine neue Variante einer bestehenden Komponente einführen, wenn bereits ein passendes Muster existiert.
+KI-Chat ohne Vorschläge, Bereitschaftspunkt oder Fusszeile. Pfeil zum Senden im Eingabefeld, ohne optische Linse auf der Eingabe. Nachricht fliegt beim Senden in den Verlauf; Reduced Motion überspringt die Bewegung. Drei Punkte zeigen die laufende Anfrage.
 
-### 2.2 Nur den aktuellen Zustand zeigen
+Session-Navigation als festes schwebendes Glasdock 18 px über dem Fensterrand, ohne Unterstrich. Session beenden und Auswertung bleiben ungerahmte Textaktionen. Mitarbeit hat keine eigene Glasbox.
 
-Die UI zeigt nur Elemente, die im aktuellen Schritt relevant sind.
+## Letzte Präzisierungen
 
-Beispiel Session-Flow:
+Schülernamen bleiben Glas-Pills; Session beenden steht rechts oben. Session-Tabs sind breiter, Mitarbeit und Repetition verwenden grössere Titel. Auswahl und Verlauf-/Hilfeaktionen stehen in einer gleich hohen Toolbar. Der Notenbereich hat Innenabstand, der Noteninput nur eine Unterlinie. Hilfe-Fusszeilen entfallen. Die Speicherbestätigung verwendet das gemeinsame Kristallmaterial. Das Zahnrad dreht um seine optische Mitte.
 
-1. Klasse wählen
-2. Abwesenheiten erfassen
-3. Session starten
-4. Repetition / Mitarbeit
-5. Session beenden
+Der Begrüssungs-Orb bleibt im leeren Chat erhalten. Ladezustand: drei Punkte. Sendepill vorab in Zielgrösse berechnen, beim Flug einblenden. Antworten sind ungerahmter Text und werden nach Eingang schrittweise ausgegeben; dies ist eine Darstellungsanimation, kein Netzwerk-Streaming.
 
-Nicht bereits die spätere Repetitionsoberfläche ausgegraut anzeigen, solange noch keine Klasse gewählt wurde.
+## Aktuelle Detailkorrekturen und Build-Grenze
 
-### 2.3 Fokus vor Informationsmenge
+Keine Installer oder Windows-Builds automatisch erstellen; der Nutzer baut diese selbst. Nur Quellcode bearbeiten und lokal testen, sofern kein neuer ausdrücklicher Build-Auftrag vorliegt.
 
-Auf jedem Screen muss sofort klar sein:
+Zahnrad über Grid zentrieren; keine absolute SVG-Zentrierung oder Translation mit der Rotation kombinieren. Fenster mit 32-px-Glaskanten. Dock-Tabs etwas kompakter, Session beenden wieder als Pill und in der Repetitionsansicht oberhalb der Hauptbox. Repetitionstitel 32 px, näher am oberen Boxrand; Note 21 px, Fokus nur durch die Unterlinie.
 
-- Wo bin ich?
-- Was ist der aktuelle Zustand?
-- Was ist die wichtigste Information?
-- Was ist die primäre Aktion?
+Roulette zeigt ausschliesslich Vornamen; Personenidentität und Auswahl bleiben unverändert. Der Chat verbirgt die Zielnachricht über einen eigenen Flight-Zustand, bis der beschleunigte Flug endet. Allgemeine Einblendanimationen dürfen die Zielnachricht nicht vorzeitig zeigen. Nach dem Senden zum Verlaufende scrollen. Mitarbeit-Punkte als fettgedruckte Zahlen ohne Kreis, mit zurückhaltendem Hover-Glow; Beschreibungen in einem stabilen Grid daneben.
 
-Sekundäre Aktionen dürfen nicht visuell mit der Hauptaktion konkurrieren.
+## Joker-Datumsspalten
 
-### 2.4 Bestehende Funktionalität schützen
+Die Excel-Vorlage enthält ab Q sechs Spalten «Joker Datum 1–6»; weitere werden bei Bedarf ergänzt. Bestehende Dateien erhalten beim Öffnen eine optionale Migrationsvorschau mit Sicherungskopie. Eigene Spalten bleiben erhalten; bei belegtem Bereich wird der neue Datumsblock weiter rechts angelegt und die alte Sammelspalte als Archiv gekennzeichnet. Fehlende historische Daten nicht rekonstruieren oder erfinden. Migration, Joker-Speicherung, Undo/Redo, Warteschlange und Klassenlistenbearbeitung verwenden dieselbe Spaltenlogik. Keine Installer automatisch bauen.
 
-UI-Arbeiten dürfen nicht unnötig Logik verändern.
+## Offener Unterrichtsstart und Scrollbewegung
 
-Bei Designänderungen:
+Klassenauswahl ohne eigene Karte: Glas-Pills in drei Spalten, ohne sichtbare Scrollleiste und ohne Datei-wechseln-Aktion. Abwesenheiten als eigener Schritt auf derselben Inhaltsfläche, kein Modal und keine Checkboxen. Native Buttons mit aria-pressed markieren Abwesenheiten durch leicht rote Glaslinsen; erneutes Aktivieren nimmt die Markierung zurück. Zurück führt zur Klassenauswahl, Session starten übernimmt die ausgewählten IDs. Während des Starts sind die Auswahl und die Zurück-Aktion gesperrt; bei Fehlern werden sie wieder freigegeben.
 
-- bestehende Funktionen erhalten
-- bestehende Datenflüsse respektieren
-- nur notwendige Komponenten anfassen
-- keine ungefragten Refactorings
-- keine neuen Abhängigkeiten nur für kleine optische Details
+Mitarbeit ebenfalls mit drei Schüler-Pills pro Zeile; schmale Fenster reduzieren die Spaltenzahl. Native Scrollbereiche bleiben per Mausrad, Touchpad und Tastatur nutzbar. Ein gemeinsamer Scroll-Controller beobachtet Listen, Statistiken, Einstellungen, Editoren und Verlaufseinträge. Beim Wiedereintritt in den sichtbaren Bereich wird der dezente Fade/Versatz erneut abgespielt, in beiden Richtungen und beliebig oft. Reduced Motion überspringt die Bewegung. Glas und DOM werden über dieselbe optische Uhr aktualisiert. Keine dauerhafte Animationsschleife im Leerlauf.
 
----
+## Korrektur des offenen Startablaufs
 
-# 3. Globale App-Struktur
+Keine Drei-Schritte-Anzeige auf Klassen- oder Abwesenheitsauswahl. Dateiinfo der Klassenauswahl dicht über dem unteren Fensterrand. Die intern gewählte Klasse erhält auf der Auswahlseite keine abweichende Darstellung; Tastaturfokus bleibt sichtbar.
 
-## 3.1 Header
+Neue Inhaltsflächen und Abwesenheits-Pills müssen ausdrücklich `app-region: no-drag` verwenden. Sie dürfen den verschiebbaren Fensterbereich nicht erben. Hover, Maus-Klick, Mausrad und Tastatur sind direkt zu testen; programmatische `.click()`-Tests allein erkennen native Electron-Drag-Regionen nicht.
 
-Der globale Header bleibt auf allen Hauptscreens identisch.
+## Flüssige Seitenwechsel und Debug-Szenarien
 
-Links:
+Seitenwechsel bewegen den lebenden Hauptinhalt: Die alte Seite zieht sich in 140 ms leicht zusammen und bewegt sich abwärts hinaus. Die neue Seite kommt von oben mit 94 Prozent Grösse und federt über 460 ms auf ihre Endposition. Nur `#content` bewegt sich; Header und Szene bleiben stationär. Der gemeinsame Glas-Renderer folgt den tatsächlichen Bounds und der Deckkraft, einschliesslich skalierter Scroll-Clips. Schnelle Navigation löst die vorherige Animation ab; reduzierte Bewegung setzt den Zustand direkt. Bestehende Scroll-Effekte bleiben unabhängig nutzbar.
 
-```text
-☰  Repetierer
-```
+Einstellungen sind eine eigene Seite im Hauptinhalt, ohne Modal oder äussere Glaskarte. Titel, Zurück und Speichern bleiben sichtbar; die Optionen scrollen ohne sichtbare Leiste. Zurück/Verwerfen speichern keine Änderungen, Speichern nutzt dieselbe bestehende Validierung und Persistenz. Die vorherige Ansicht wird wiederhergestellt; aktive Sessions und Abwesenheitsauswahl bleiben erhalten. Hilfe und notwendige Bestätigungen liegen als Dialog über dieser Seite. Der Debug-Katalog führt Einstellungen unter Pages, nicht unter Modals.
 
-Rechts:
+Debug starten mit `npm run start:debug` oder `Repetierer.exe --debug`; `--debug-mode` und `--dev-mode` bleiben kompatibel. Im Drawer «Debug-Szenarien», rechts unten «Debug» oder Ctrl+Shift+D öffnet die durchsuchbare Übersicht. Sie enthält alle vorhandenen Modals und feste Beispielszenarien für Seiten, KI, Updates, Benachrichtigungen und Datenmigration. Jedes Szenario startet mit einem frischen Dokument. Während der Simulation werden alle ausgehenden IPC-Aktionen lokal abgefangen, ausser Fenster schliessen/minimieren. Keine Dateiänderungen, Downloads, Installationen oder Nachrichten. «Simulation beenden» verwirft das Szenario und lädt die normalen Daten neu. Ohne Debug-Flag gibt es keine Debug-Oberfläche und gespeicherte Szenarien werden nicht aktiviert. `npm run test:debug` prüft den echten App-Einstieg und die Szenarien in einem separaten temporären Benutzerverzeichnis.
 
-```text
-KI   Einstellungen   Fenstersteuerung
-```
+## Aktuelle Bewegungs- und Einstellungsdetails
 
-Regeln:
+Session-Dock und Session beenden liegen als eigene Chrome neben dem bewegten Inhalt; ihre Position bleibt bei Seitenwechseln unverändert. Notenleiste und Aktionen poppen beim Start einer Auswahl hinein und beim Abschluss hinaus. Während des Roulettes bleibt die Notenleiste inert.
 
-- Der Appname ist immer `Repetierer`.
-- Funktionsnamen wie `Mitmachnote` ersetzen den Appnamen nie.
-- Autoreninformationen gehören nicht in den Header.
-- Versionsinformationen gehören nicht in den Header.
-- Headerhöhe und Innenabstände sind überall identisch.
-- Header-Icons verwenden dieselbe Grösse und Strichstärke.
-- Der Header soll ruhig wirken und nicht mit dem Seiteninhalt konkurrieren.
+Modals öffnen mit einem kurzen weichen Pop; beim Schliessen verformen sie sich kurz und ziehen sich zusammen. Keine X-Buttons. Ein Klick neben den Inhalt schliesst über den bestehenden Abbrechen-Handler, damit der Dialogzustand aufgeräumt bleibt. Laufende Schreiboperationen werden durch das Ausblenden nicht abgebrochen. Tastatur und reduzierte Bewegung bleiben nutzbar.
 
-Autoren- und Versionsinformationen gehören in einen `Über Repetierer`-Bereich oder dezent in den unteren Bereich des Drawers.
+Mitarbeitspunkte haben eine direkte Druckreaktion und eine kurze Bestätigung der ausgewählten Zahl. Mehrfachaktivierungen speichern einen Eintrag. Die Speicherbestätigung ist eine kompakte Glasplakette im unteren Repetitionsbereich. Sie poppt kurz auf, zeichnet das dezente Häkchen, zeigt «Gespeichert» und zieht sich zurück. Keine Teilchen und kein flächiges Overlay; kein dauerhafter Animations-Loop.
 
----
+Scrollpositionen treiben ein deutliches Ein- und Herausfliegen an beiden Rändern, auch beim Umkehren der Richtung. An Listenanfang und -ende bleiben die ersten/letzten Einträge vollständig lesbar. Reduzierte Bewegung entfernt den Versatz und die Randblenden.
 
-## 3.2 Seitenhierarchie
+Zurück steht ohne Pfeil über Einstellungen. Keine Designauswahl und keine Spinnerpfeile an Zahlenfeldern. Ein gemeinsamer Import/Export über `.repetierer` überträgt SMTP und Cloudflare-Umfrage-API zusammen; Details in [configuration-package.md](docs/configuration-package.md). Exportierte Pakete enthalten portable Zugangsdaten, keine Schülerdaten. Die Quelle bleibt beim Paketimport erhalten.
 
-Normale Inhaltsseiten verwenden klare Titel ohne vorgeschaltete Eyebrows:
+Wahrscheinlichkeits-Faktor, Boost-Faktor und Wiggers-Dauer sind native Range-Regler mit dem vorhandenen Kristall-Griff und der gefüllten Glasspur. Ein Wert rechts neben der Beschriftung aktualisiert sich beim Ziehen und bei Tastatureingaben. Faktoren bleiben bei 1.1–10 in 0.1-Schritten, Minuten bei 1–480 in Einer-Schritten. Deaktivierte Optionen sperren auch den jeweiligen Regler. Speichern verwendet weiterhin dieselben numerischen Einstellungen. Keine zusätzlichen Karten oder Eingabefelder um die Werte.
 
-```text
-Seitentitel
-Kurze Beschreibung, falls nötig
 
-Hauptinhalt
+## Mitmachnote und Chat-Reihenfolge
 
-Aktionen
-```
+Die Mitmachnote ist eine offene Seite ohne äussere oder verschachtelte dunkle Karten. Übersicht, Runde und Schülerbeurteilung verwenden den gemeinsamen Seiten-Pop; bei einem Wechsel beginnt der Inhalt wieder oben. Der Header bleibt fest. Ein begrenzter, per Mausrad und Tastatur nutzbarer Inhaltsbereich verhindert abgeschnittene Beurteilungslisten. Mitarbeit-Auswertungen erhalten ebenfalls den Übergang.
 
-Beispiel:
+Die KI-Anfrage startet direkt beim Senden. Die drei Ladepunkte bleiben während des Nachrichtenflugs verborgen und erscheinen erst nach der Landung. Auch schnelle Antworten warten auf diese Landung. Reduzierte Bewegung und Schliessen während des Flugs räumen den Flug auf und lassen keine wartende Anzeige hängen.
 
-```text
-Beurteilungsrunden                     Klasse L23a
-
-[Inhalt]
-```
-
----
-
-# 4. Typografie
-
-Es gibt klar definierte Ebenen.
-
-Die App verwendet die lokal eingebundene variable Geist-Schrift von Vercel: 28 px für die Klassenauswahl, 20 px für Ansichten/Dialoge, 14 px für Inhalt und 12–13 px für Navigation/Metadaten. Medium (500) und Semibold (600) tragen die Hierarchie. Zahlen verwenden tabellarische Ziffern. Der Schülername bleibt gross (bis 88 px), in normaler Schreibweise; lange Namen skalieren auf die tatsächlich verfügbare Breite. Die bestehende Splash-Typografie bleibt getrennt in Roboto.
-
-## Display
-
-Nur für zentrale Inhalte:
-
-- aktuell gezogener Schüler
-- besonders wichtige Sessioninformation
-
-Sehr gross und sparsam verwenden.
-
-## H1
-
-Seitentitel.
-
-Beispiele:
-
-- Klasse wählen
-- Einstellungen
-- Beurteilungsrunde
-
-## H2
-
-Bereichstitel innerhalb eines Screens.
-
-## Body
-
-Normaler Beschreibungstext.
-
-## Label
-
-Für:
-
-- Buttons
-- Inputs
-- kleine UI-Beschriftungen
-
-## Muted
-
-Für:
-
-- Zeitstempel
-- Versionsnummer
-- Sekundärinformationen
-- Hilfstexte
-
----
-
-# 5. Farben
-
-## 5.1 Dunkle Ebenen
-
-Nicht jede Fläche soll exakt dieselbe Farbe besitzen.
-
-Verwende subtile Tiefenstufen:
-
-1. App Background
-2. Surface / Panel
-3. Elevated Surface
-4. Modal Surface
-
-Unterschiede sollen subtil bleiben.
-
-## 5.2 Akzentblau
-
-Blau wird verwendet für:
-
-- aktive Zustände
-- primäre Aktionen
-- Fokus
-- aktive Navigation
-- wichtige Highlights
-
-Blau nicht gleichzeitig auf zu vielen Elementen verwenden.
-
-## 5.3 Statusfarben
-
-Einheitlich:
-
-- Info: Blau
-- Success: Grün
-- Warning: Gelb
-- Error: Rot
-- Danger: Rot
-
----
-
-# 6. Spacing
-
-Verwende vorzugsweise diese Abstufungen:
-
-```text
-4 px
-8 px
-12 px
-16 px
-24 px
-32 px
-48 px
-64 px
-```
-
-Regeln:
-
-- ähnliche Komponenten verwenden gleiche Abstände
-- keine zufälligen Zwischenwerte ohne Grund
-- Inhalte nicht unnötig an den oberen Rand kleben
-- grosse leere Bereiche bewusst ausbalancieren
-- Container benötigen konsistente Innenabstände
-
----
-
-# 7. Buttons
-
-Es gibt vier Button-Typen.
-
-## Primary
-
-Für die wichtigste Aktion.
-
-Beispiele:
-
-- Start
-- Speichern
-- Beurteilung öffnen
-- Antworten aktualisieren
-
-Darstellung:
-
-- klar hervorgehoben
-- Akzentblau
-- eindeutiger Hover- und Focus-State
-
-## Secondary
-
-Für normale Alternativen.
-
-Beispiele:
-
-- Abbrechen
-- Zurück
-- Chancen
-
-Darstellung:
-
-- dunkle Fläche
-- dezenter Rand
-- weniger dominant als Primary
-
-## Ghost
-
-Für kleine Toolbar- und Nebenaktionen.
-
-Beispiele:
-
-- Hilfe
-- Aktualisieren
-- Icon-Aktionen
-
-## Danger
-
-Nur für destruktive Aktionen.
-
-Beispiele:
-
-- Runde löschen
-- Daten löschen
-- Session beenden
-
-Danger-Aktionen dürfen nicht wie normale Navigation wirken.
-
-## Grössen
-
-Standard:
-
-```text
-Höhe: 36 px
-Radius: 6 px
-```
-
-Small:
-
-```text
-Höhe: 28–32 px
-```
-
-Large nur für spezielle Hauptaktionen:
-
-```text
-Höhe: ca. 52–56 px
-```
-
-Keine Mischung aus extrem runden Pills, fast rechteckigen Buttons und unterschiedlichen Höhen auf demselben Screen.
-
----
-
-# 8. Cards und Panels
-
-Cards dienen der Gruppierung, nicht der Dekoration.
-
-Regeln:
-
-- subtile Abhebung vom Hintergrund
-- konsistenter Radius
-- konsistente Innenabstände
-- keine unnötigen Rahmen
-- keine übertriebenen Schatten
-- Schatten nur für tatsächlich überlagerte Flächen wie Dialoge und Drawer
-
-Nicht jede Textgruppe benötigt eine Card.
-
-Klassen, Mitarbeit und Beurteilungsrunden werden als flache Zeilen dargestellt. Die Startansicht und die Hauptansichten haben keine umrahmende Card. Statistikgruppen werden durch Abstand und Trennlinien gegliedert.
-
----
-
-# 9. Inputs
-
-Alle Eingabefelder verwenden:
-
-- gleiche Höhe
-- gleichen Radius
-- gleiche Hintergrundfarbe
-- gleiche Label-Struktur
-- konsistente Focus-Darstellung
-- Akzentblau im Focus-State
-- keinen übertriebenen Glow
-
----
-
-# 10. Modals
-
-## 10.1 Standardstruktur
-
-Normale Modals verwenden:
-
-```text
-Titel
-Kurze Beschreibung
-
-Inhalt
-
---------------------------------
-
-Abbrechen    Primäre Aktion
-```
-
-Regeln:
-
-- normalerweise linksbündig
-- die Dialogbox immer horizontal und vertikal im Overlay zentrieren; lange Inhalte innerhalb der Box scrollen
-- konsistente Breite
-- konsistente Innenabstände
-- konsistenter Footer
-- gleiche Button-Höhen
-- keine wechselnden Modal-Sprachen
-
-Grosse Warnsymbole nur, wenn wirklich notwendig.
-
-## 10.2 Overlay
-
-- Hintergrund abdunkeln
-- moderater Blur
-- darunterliegenden Kontext weiterhin erkennen lassen
-
-Das Modal soll über dem aktuellen Screen liegen und nicht wie ein neuer Screen wirken.
-
-## 10.3 Bestätigungsdialoge
-
-Beispiel:
-
-```text
-SESSION
-
-Session beenden?
-
-Alle bisherigen Einträge bleiben gespeichert.
-Du gelangst danach zurück zur Klassenauswahl.
-
-Abbrechen    Session beenden
-```
-
-Ein normales Session-Ende nicht unnötig dramatisieren.
-
----
-
-# 11. Drawer / Navigation
-
-Der Drawer ist Navigation, kein Stapel grosser Aktionsbuttons.
-
-Bereiche:
-
-- Repetition
-- Mitmachnote
-- Datenverwaltung
-- Protokoll
-- Statistiken
-
-Regeln:
-
-- kompakte Zeilen
-- aktive Seite mit Akzentblau hervorheben
-- inaktive Einträge ruhig darstellen
-- Icons aus derselben Familie
-- keine übergrossen Pills
-- Hilfe und Status dezent platzieren
-
-Unten können stehen:
-
-- Version
-- Autoren
-- App-Status
-
----
-
-# 12. Startseite / Klassenauswahl
-
-Die Klassenauswahl ist ein eigener Zustand.
-
-Solange keine Klasse gewählt wurde, nicht anzeigen:
-
-- Repetition
-- Schülername
-- Note
-- deaktivierte Sessionbuttons
-- inaktive Hauptaktionen
-
-Zielstruktur:
-
-```text
-Klasse wählen
-
-Wähle eine Klasse und erfasse die heutigen Abwesenheiten.
-
-1 Klasse wählen   2 Abwesenheiten   3 Session starten
-
-L23a                                      >
-M24b                                      >
-K25c                                      >
-
-3 Klassen · Unterricht.xlsx    Datei wechseln
-```
-
-Der Screen soll ruhig, klar und bewusst leer wirken.
-
-Die Liste ist auf 720 px begrenzt und scrollt bei vielen Klassen. Ohne Datei zeigt derselbe Aufbau die Aktionen zum Öffnen und Importieren. Keine verschachtelten Panels, dekorativen Icons oder Marketingtexte.
-
----
-
-# 13. Session-Flow
-
-Der Session-Flow soll visuell eindeutig sein.
-
-## Zustand A: Klasse wählen
-
-Nur Klassenauswahl.
-
-## Zustand B: Abwesenheiten
-
-Klare Auswahl der abwesenden Schüler.
-
-Primäraktion:
-
-```text
-Session starten
-```
-
-## Zustand C: Aktive Session
-
-Nur jetzt erscheinen:
-
-- Repetitionssteuerung
-- Mitarbeit
-- Schülerauswahl
-- Bewertung
-- Sessionaktionen
-
-## Zustand D: Session beenden
-
-Ein standardisierter Bestätigungsdialog.
-
----
-
-# 14. Aktive Repetition
-
-Die aktive Repetition ist der wichtigste Screen der App.
-
-Der Aufbau orientiert sich an der ursprünglichen Version von Jonas-Luetolf/Repetierer: Datei und Klassen als flache Navigation ohne Cards links, Repetition rechts. Die Kontextlabels sind klein und zurückhaltend. Klassenname neben dem Titel, Start/Freiwillig darunter, Schülername gross und linksbündig im Hauptbereich, Note unten links und Bewertungsaktionen unten rechts. Die bestehenden Theme-Farben bleiben erhalten. Neue Funktionen erhalten eine sekundäre visuelle Ebene.
-
-Der gezogene Schüler ist der visuelle Fokus.
-
-Ziel:
-
-```text
-REPETITION
-
-ANNA MÜLLER
-
-[Bewertung / Aktion]
-
-Abbrechen    OK    Joker
-```
-
-Regeln:
-
-- Schülername gross und prominent
-- nicht nur als normales Label oben links
-- sekundäre Controls zurückhaltend
-- Note / Bewertung klar gruppieren
-- Sessionstatus sichtbar, aber nicht dominant
-
----
-
-# 15. Mitmachnote
-
-Mitmachnote bleibt Teil von Repetierer.
-
-Der globale Header bleibt:
-
-```text
-Repetierer
-```
-
-Im Inhalt:
-
-```text
-MITMACHNOTE
-
-L23a · HS 2026
-```
-
-## Statistik-Karten
-
-Geeignet für:
-
-- Selbstbeurteilungen
-- Lehrerbeurteilungen
-- Versendet
-- Synchronisation
-
-Alle Karten gleich aufbauen.
-
-## Aktionen
-
-Primär:
-
-- Antworten aktualisieren
-- Beurteilungen öffnen
-
-Sekundär:
-
-- Einladung kopieren
-- Klassensatz versenden
-
-Destruktiv:
-
-- Runde löschen
-
-`Runde löschen` nicht gleichwertig zwischen normalen Aktionen platzieren.
-
-Bevorzugt:
-
-```text
-⋯
-Runde löschen
-```
-
----
-
-# 16. Alerts und Statusmeldungen
-
-Eine gemeinsame Alert-Komponente verwenden.
-
-Varianten:
-
-- Info
-- Success
-- Warning
-- Error
-
-Alle verwenden:
-
-- gleiche Struktur
-- gleiche Abstände
-- gleichen Radius
-- konsistente Icons
-- konsistente Statusfarben
-
-Statusmeldungen im Drawer oder Footer sollen kleiner und ruhiger sein als Alerts im Hauptinhalt.
-
----
-
-# 17. Einstellungen
-
-Klare Sektionen:
-
-```text
-Einstellungen
-
-Lokale KI
-[...]
-
-Design
-[...]
-
-Weitere Optionen
-[...]
-```
-
-Footer:
-
-```text
---------------------------------
-
-Abbrechen    Speichern
-```
-
-Wenn die Einstellungen weiter wachsen, Kategorien verwenden:
-
-- Allgemein
-- Design
-- KI
-- Integrationen
-- Daten
-- Updates
-
----
-
-# 18. KI-Assistent
-
-Der Empty State muss bewusst gestaltet sein.
-
-Nicht nur ein leeres Panel mit Eingabefeld anzeigen.
-
-Beispiel:
-
-```text
-KI-Assistent
-
-Frage etwas zur aktuellen Klasse,
-Session oder Schülerauswahl.
-
-[Session zusammenfassen]
-[Wer wurde lange nicht aufgerufen?]
-[Auffälligkeiten anzeigen]
-
-Nachricht schreiben...
-```
-
-Prompt-Vorschläge dezent darstellen.
-
----
-
-# 19. Icons
-
-Icons:
-
-- aus derselben Icon-Familie
-- gleiche Strichstärke
-- gleiche visuelle Grösse
-- kein Mix aus Emoji, Filled und Outline Icons
-
-Icons unterstützen die Orientierung, ersetzen aber keine klaren Labels bei wichtigen Aktionen.
-
----
-
-# 20. Animationen
-
-Animationen sind kurz und funktional.
-
-Thinking Orbs verwenden die originale Canvas-Engine aus `thinking-orbs`, mit Zuständen passend zur tatsächlichen KI-Aktivität. GSAP steuert die App-Übergänge zentral: Dialoge und Drawer, Ansichtswechsel, Namensauswahl, Nachrichten und Fensteraktionen. Keine gestaffelten Einblendungen statischer Cards oder Listen. Ein Border Beam markiert den KI-Ladestatus. Diese Effekte bleiben lokal und pausieren bei Unsichtbarkeit beziehungsweise respektieren reduzierte Bewegung. Quellen und Lizenzen stehen in `docs/ui-sources.md`.
-
-Verwenden für:
-
-- Screenwechsel
-- Modal öffnen/schliessen
-- Drawer
-- Schülerauswahl
-- Statuswechsel
-- Hover
-- Focus
-
-Keine langen oder verspielten Animationen im normalen Workflow.
-
-Beispiel Schülerauswahl:
-
-```text
-Start
-→ bestehende Controls treten leicht zurück
-→ Schülername wird kurz mit GSAP eingeblendet
-→ UI stabilisiert sich
-```
-
----
-
-# 21. Glow
-
-Die normale Arbeitsoberfläche verwendet keine dekorativen Glows. Der Akzent entsteht durch aktive Tabs, ausgewählte Klassen und primäre Aktionen.
-
-Erlaubt bei:
-
-- Intro und die ausdrücklich aktivierten zusätzlichen visuellen Effekte
-
-Nicht bei:
-
-- jedem Button
-- jedem Panel
-- jedem Icon
-
----
-
-# 22. Destruktive Aktionen
-
-Destruktive Aktionen klar trennen.
-
-Nicht mitten zwischen normalen Aktionen platzieren.
-
-Beispiele:
-
-- Runde löschen
-- Session beenden
-- Daten löschen
-
-Bevorzugt:
-
-- eigener Danger-Bereich
-- Kontextmenü
-- Danger-Button im Bestätigungsdialog
-
----
-
-# 23. Bestehende gute Komponenten
-
-Nicht alles neu gestalten.
-
-Bestehende Komponenten, die bereits gut zur App passen, sollen primär vereinheitlicht werden.
-
-Dazu gehören insbesondere:
-
-- Participation Entry Modal
-- Chancen / Wahrscheinlichkeiten
-- Logs
-- Update-News
-- funktionale Editor-Screens
-
-Dort hauptsächlich anpassen:
-
-- Spacing
-- Typografie
-- Buttons
-- Modal-Standard
-- Farben
-- Footer
-
----
-
-# 24. Regeln für neue UI
-
-Vor einem neuen Screen oder Modal:
-
-1. Prüfen, ob bereits eine passende Komponente existiert.
-2. Bestehende Komponenten wiederverwenden.
-3. Diese DESIGN.md beachten.
-4. Keine neue visuelle Sprache einführen.
-5. Neue Komponenten nur erstellen, wenn wirklich nötig.
-6. Wiederverwendbare Komponenten bevorzugen.
-7. Globalen Header und bestehende Navigation nicht unnötig verändern.
-
----
-
-# 25. Regeln für Codex
-
-Bei UI-Aufgaben:
-
-- zuerst diese `DESIGN.md` lesen
-- nur den relevanten Screen und direkt abhängige Komponenten bearbeiten
-- keine app-weiten Änderungen ohne expliziten Auftrag
-- keine neue Komponentenfamilie einführen
-- bestehende Styles und Komponenten bevorzugen
-- Funktionalität nicht verändern, wenn nur Design verlangt ist
-- vor neuen Komponenten prüfen, ob bereits etwas Passendes existiert
-- nach der Änderung gegen diese Datei prüfen
-
----
-
-# 26. Zielzustand
-
-Repetierer soll sich anfühlen wie:
-
-- eine zusammenhängende Desktop-App
-- nicht wie eine Sammlung einzelner Features
-- schnell verständlich
-- ruhig und professionell
-- modern, aber nicht verspielt
-- visuell fokussiert
-- konsistent
-
-Grundsatz:
-
-**Funktionalität vor Dekoration.  
-Fokus vor Informationsmenge.  
-Konsistenz vor Individualität einzelner Screens.**
+Scrollleisten sind überall in der App unsichtbar, inklusive Chat, Dialogen, Textfeldern und Auswertungen. Native Scrollbedienung bleibt erhalten. Gezielte Prüfungen: `node scripts/liquid-refinement-focused.cjs --assessment-polish` und `--ai-flight`.

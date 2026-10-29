@@ -131,3 +131,9 @@ release_notes.md
 
 # Local importer test files
 importer-samples/
+
+# Local Kristall material diagnostics
+.kristall-check/
+
+# Local template authoring and original preservation
+.joker-date-work/

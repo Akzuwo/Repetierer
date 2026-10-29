@@ -1,5 +1,7 @@
 const {ipcRenderer, clipboard} = require('electron');
 const uiMotion = require('./uiMotion.js');
+let currentRepetitionToken = null;
+function startRepetitionTiming() { if(currentRepetitionToken && (state === 3 || state === 4)) ipcRenderer.send('repetition-timing-start', currentRepetitionToken); }
 let state = 0; // 0: select file, 1: select class, 2: click start, 3: set grade
 
 // elements
@@ -24,6 +26,10 @@ const _backupBtn = document.getElementById('backup-btn');
 const _logBtn = document.getElementById('log-btn');
 const _exportProtocolBtn = document.getElementById('export-protocol-btn');
 const _problemReportBtn = document.getElementById('problem-report-btn');
+const {problemReportsEnabled} = require('../src/featureFlags');
+_problemReportBtn.hidden = !problemReportsEnabled;
+_problemReportBtn.disabled = !problemReportsEnabled;
+_problemReportBtn.classList.toggle('update-hidden', !problemReportsEnabled);
 const _statsViewBtn = document.getElementById('stats-view-btn');
 const _importClassListBtn = document.getElementById('import-class-list-btn');
 const _undoLastBtn = document.getElementById('undo-last-btn');
@@ -53,6 +59,7 @@ const _spinwheelTrack = document.getElementById('spinwheel-track');
 const _winnerName = document.getElementById('winner-name');
 const _confettiStage = document.getElementById('confetti-stage');
 const _completionEffect = document.getElementById('completion-effect');
+const saveReceipt = require('./visualFeedback').createSaveReceipt(_completionEffect);
 const _label = document.getElementById('grade').children.item(0);
 const _grade = document.getElementById('grade').children.item(1);
 const _cancel = document.getElementById('res').children.item(1);
@@ -73,7 +80,6 @@ const _sessionStartHelpBtn = document.getElementById('session-start-help-btn');
 const _sessionEmptyView = document.getElementById('session-empty-view');
 const _sessionHeader = document.getElementById('session-header');
 const _sessionClassName = document.getElementById('session-class-name');
-const _sessionAttendanceCount = document.getElementById('session-attendance-count');
 const _sessionParticipationTab = document.getElementById('session-participation-tab');
 const _sessionRepetitionTab = document.getElementById('session-repetition-tab');
 const _endSessionBtn = document.getElementById('end-session-btn');
@@ -83,7 +89,7 @@ const _participationSummaryBtn = document.getElementById('participation-summary-
 const _participationSummary = document.getElementById('participation-summary');
 const _participationSummaryList = document.getElementById('participation-summary-list');
 const _participationSummaryCloseBtn = document.getElementById('participation-summary-close-btn');
-const _sessionStartModal = document.getElementById('session-start-modal');
+const _sessionAttendanceView = document.getElementById('session-attendance-view');
 const _sessionStartClass = document.getElementById('session-start-class');
 const _sessionAttendanceList = document.getElementById('session-attendance-list');
 const _sessionPresentPreview = document.getElementById('session-present-preview');
@@ -147,13 +153,13 @@ const _excelEditorJoker = document.getElementById('excel-editor-joker');
 const _excelEditorAddBtn = document.getElementById('excel-editor-add-btn');
 const _excelEditorSaveBtn = document.getElementById('excel-editor-save-btn');
 const _excelEditorCloseBtn = document.getElementById('excel-editor-close-btn');
-const _settingsModal = document.getElementById('settings-modal');
+const _settingsView = document.getElementById('settings-view');
 const _settingsHelpBtn = document.getElementById('settings-help-btn');
 const _settingsHelpModal = document.getElementById('settings-help-modal');
 const _closeSettingsHelpBtn = document.getElementById('close-settings-help-btn');
 const _closeSettingsHelpBottomBtn = document.getElementById('close-settings-help-bottom-btn');
 const _settingsLocation = document.getElementById('settings-location');
-const _themeSetting = document.getElementById('theme-setting');
+
 const _updateNewsModal = document.getElementById('update-news-modal');
 const _updateNewsTitle = document.getElementById('update-news-title');
 const _updateNewsBody = document.getElementById('update-news-body');
@@ -167,6 +173,20 @@ const _neverSelectedBoostFactorSetting = document.getElementById('never-selected
 const _visualEffectsSetting = document.getElementById('visual-effects-setting');
 const _wiggersRuleSetting = document.getElementById('wiggers-rule-setting');
 const _wiggersRuleDurationSetting = document.getElementById('wiggers-rule-duration-setting');
+const settingsRanges = [_probabilityFactorSetting, _neverSelectedBoostFactorSetting, _wiggersRuleDurationSetting];
+const factorFormat = new Intl.NumberFormat('de-CH', {minimumFractionDigits:1, maximumFractionDigits:1});
+function updateSettingsRangeValue(input) {
+	const value = input.valueAsNumber;
+	const minutes = input === _wiggersRuleDurationSetting;
+	const formatted = minutes ? `${value} Min.` : `${factorFormat.format(value)}×`;
+	document.getElementById(`${input.id}-value`).value = formatted;
+	input.setAttribute('aria-valuetext', minutes ? `${value} ${value === 1 ? 'Minute' : 'Minuten'}` : `${factorFormat.format(value)}-fach`);
+}
+for (const input of settingsRanges) {
+	input.addEventListener('input', () => updateSettingsRangeValue(input));
+	input.addEventListener('change', () => updateSettingsRangeValue(input));
+	updateSettingsRangeValue(input);
+}
 const _saveSettingsBtn = document.getElementById('save-settings-btn');
 const _closeSettingsModal = document.getElementById('close-settings-modal');
 const _updatePanel = document.getElementById('update-panel');
@@ -208,6 +228,9 @@ let completionEffectRun = 0;
 const selectionEffectTimers = [];
 const completionEffectTimers = [];
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+prefersReducedMotion.addEventListener('change', () => {
+	if (prefersReducedMotion.matches) { clearSelectionEffect(); startRepetitionTiming(); }
+});
 
 /*
  * events to main
@@ -228,7 +251,6 @@ _file.addEventListener('click', () => {
 	ipcRenderer.send('file');
 });
 document.getElementById('session-open-file-btn').addEventListener('click', () => _file.click());
-document.getElementById('session-change-file-btn').addEventListener('click', () => _file.click());
 document.getElementById('session-import-btn').addEventListener('click', () => _importClassListBtn.click());
 document.getElementById('session-data-btn').addEventListener('click', () => { if (!_drawer.classList.contains('drawer-open')) toggleDrawer(); setDrawerView('data'); });
 
@@ -470,6 +492,7 @@ _excelEditorModal.addEventListener('click', (e) => {
 
 // settings
 _settingsBtn.addEventListener('click', () => {
+	if (!_settingsView.classList.contains('update-hidden')) { document.getElementById('settings-heading').focus(); return; }
 	ipcRenderer.send('get-settings');
 });
 
@@ -511,7 +534,7 @@ _saveSettingsBtn.addEventListener('click', () => {
 	}
 
 	ipcRenderer.send('save-settings', {
-		theme: _themeSetting.value,
+		theme: 'midnight',
 		extraJokerAfterThreeGrades: _extraJokerSetting.checked,
 		probabilityDecreaseFactor: probabilityDecreaseFactor,
 		boostNeverSelected: _boostNeverSelectedSetting.checked,
@@ -520,7 +543,7 @@ _saveSettingsBtn.addEventListener('click', () => {
 		wiggersRuleEnabled: _wiggersRuleSetting.checked,
 		wiggersRuleDurationMinutes: wiggersRuleDurationMinutes
 	});
-	closeModal(_settingsModal);
+	closeModal(_settingsView);
 });
 
 _extraJokerMigrationBtn.addEventListener('click', () => {
@@ -539,14 +562,9 @@ _extraJokerMigrationBtn.addEventListener('click', () => {
 });
 
 _closeSettingsModal.addEventListener('click', () => {
-	closeModal(_settingsModal);
+	closeModal(_settingsView);
 });
-
-_settingsModal.addEventListener('click', (e) => {
-	if (e.target === _settingsModal) {
-		closeModal(_settingsModal);
-	}
-});
+document.getElementById('settings-back-btn').addEventListener('click', () => closeSettingsPage());
 
 _closeUpdateNewsBtn.addEventListener('click', () => {
 	closeUpdateNewsModal();
@@ -559,7 +577,7 @@ _updateNewsModal.addEventListener('click', (e) => {
 });
 
 _settingsHelpBtn.addEventListener('click', () => {
-	closeModal(_settingsModal, () => openModal(_settingsHelpModal));
+	openModal(_settingsHelpModal);
 });
 
 _closeSettingsHelpBtn.addEventListener('click', () => {
@@ -648,6 +666,7 @@ _start.addEventListener('click', () => {
 
 // cancel
 _cancel.addEventListener('click', () => {
+	ipcRenderer.send('repetition-timing-cancel'); currentRepetitionToken = null;
 	state = 2;
 	updateState();
 });
@@ -680,18 +699,23 @@ _absencesBtn.addEventListener('click', () => {
 	ipcRenderer.send('get-absence-persons');
 });
 
-_cancelSessionStartBtn.addEventListener('click', () => closeModal(_sessionStartModal));
-_sessionStartModal.addEventListener('click', event => {
-	if (event.target === _sessionStartModal) closeModal(_sessionStartModal);
-});
+_cancelSessionStartBtn.addEventListener('click', uiMotion.pageHandler(() => {
+ sessionSetup=null;sessionSetupAbsentIds=[];
+ _sessionAttendanceView.classList.add('update-hidden');
+ renderTeachingSessionView();
+ const selected=_classes.querySelector('.class-selected');if(selected)selected.focus();
+}));
 _confirmSessionStartBtn.addEventListener('click', () => {
 	if (!sessionSetup) return;
 	disableElement(_confirmSessionStartBtn);
+ _confirmSessionStartBtn.disabled=true;
+ _cancelSessionStartBtn.disabled=true;
+ _sessionAttendanceList.inert=true;
 	ipcRenderer.send('start-teaching-session', { className: sessionSetup.className, absentIds: sessionSetupAbsentIds });
 });
 
-_sessionParticipationTab.addEventListener('click', () => showSessionArea('participation'));
-_sessionRepetitionTab.addEventListener('click', () => showSessionArea('repetition'));
+_sessionParticipationTab.addEventListener('click', uiMotion.pageHandler(() => showSessionArea('participation')));
+_sessionRepetitionTab.addEventListener('click', uiMotion.pageHandler(() => showSessionArea('repetition')));
 _endSessionBtn.addEventListener('click', () => {
 	if (activeTeachingSession) openModal(_sessionEndModal);
 });
@@ -767,6 +791,7 @@ _randomSelectBtn.addEventListener('click', () => {
 
 // classes
 ipcRenderer.on('classes', (event, args, filePath) => {
+ sessionSetup=null;sessionSetupAbsentIds=[];_sessionAttendanceView.classList.add('update-hidden');
 	if (args) {
 		state = 1;
 		if (filePath) _filePath.innerText = filePath;
@@ -867,7 +892,6 @@ ipcRenderer.on('debug-mode', (event, isDebugMode) => {
 });
 
 ipcRenderer.on('settings-data', (event, settings, paths, migrationStatus) => {
-	_themeSetting.value = settings.theme === 'classic' ? 'classic' : 'midnight';
 	_extraJokerSetting.checked = !!settings.extraJokerAfterThreeGrades;
 	_probabilityFactorSetting.value = settings.probabilityDecreaseFactor;
 	_boostNeverSelectedSetting.checked = !!settings.boostNeverSelected;
@@ -876,12 +900,12 @@ ipcRenderer.on('settings-data', (event, settings, paths, migrationStatus) => {
 	updateVisualEffects(settings.visualEffectsEnabled);
 	_wiggersRuleSetting.checked = settings.wiggersRuleEnabled !== false;
 	_wiggersRuleDurationSetting.value = settings.wiggersRuleDurationMinutes;
+	settingsRanges.forEach(updateSettingsRangeValue);
 	updateNeverSelectedBoostField();
 	updateWiggersRuleFields();
 	updateExtraJokerMigrationStatus(migrationStatus);
 	_settingsLocation.innerText = paths ? paths.settingsPath : '';
-	openModal(_settingsModal);
-	_closeSettingsModal.focus();
+	openModal(_settingsView);
 });
 
 ipcRenderer.on('extra-joker-migration-done', (event, result) => {
@@ -1231,6 +1255,7 @@ ipcRenderer.on('excel-reload-failed', (event, result) => {
 
 // name
 ipcRenderer.on('name', (event, args, selectionNames, selectedPerson) => {
+	currentRepetitionToken = selectedPerson?.selectionToken || null;
 	aiSelectedStudentId = selectedPerson && selectedPerson.id;
 	
 	const [name, joker] = args
@@ -1248,8 +1273,7 @@ ipcRenderer.on('name', (event, args, selectionNames, selectedPerson) => {
 	_name.innerText = displayName;
 	_nameSize = 5.5;
 	scaleName();
-	uiMotion.revealStudent(_name);
-	runSelectionEffect(displayName, (selectionNames || []).map(getFirstName));
+	runSelectionEffect(name, selectionNames || [], () => {uiMotion.revealStudent(_name);startRepetitionTiming();});
 
 })
 
@@ -1506,6 +1530,7 @@ ipcRenderer.on('editor-persons-save-failed', (event, result) => {
 
     
 ipcRenderer.on('session-setup-data', (event, setup) => {
+	if (uiMotion.beginPageChange(() => { ipcRenderer.emit('session-setup-data', event, setup); })) return;
 	if (!setup || !setup.className || !Array.isArray(setup.persons) || setup.persons.length === 0) {
 		showUpdatePanel({ title: 'Session nicht möglich', detail: 'Wähle zuerst eine Klasse mit Schülern aus.', primaryVisible: false, secondaryText: 'OK', secondaryVisible: true });
 		return;
@@ -1515,16 +1540,26 @@ ipcRenderer.on('session-setup-data', (event, setup) => {
 	_sessionStartClass.innerText = setup.className;
 	renderSessionAttendance();
 	enableElement(_confirmSessionStartBtn);
-	openModal(_sessionStartModal);
+ _confirmSessionStartBtn.disabled=false;
+ _cancelSessionStartBtn.disabled=false;
+ _sessionAttendanceList.inert=false;
+	_sessionEmptyView.classList.add('update-hidden');
+ _sessionAttendanceView.classList.remove('update-hidden');
+ uiMotion.revealView(_sessionAttendanceView);
+ document.getElementById('session-attendance-heading').focus();
 });
 
-ipcRenderer.on('teaching-session-started', (event, session) => {
-	closeModal(_sessionStartModal);
+ipcRenderer.on('teaching-session-started', uiMotion.pageHandler((event, session) => {
+	_sessionAttendanceView.classList.add('update-hidden');
+ sessionSetup=null;sessionSetupAbsentIds=[];
 	setActiveTeachingSession(session);
-});
+}));
 
 ipcRenderer.on('teaching-session-start-failed', (event, result) => {
 	enableElement(_confirmSessionStartBtn);
+ _confirmSessionStartBtn.disabled=false;
+ _cancelSessionStartBtn.disabled=false;
+ _sessionAttendanceList.inert=false;
 	showUpdatePanel({ title: 'Session nicht gestartet', detail: result && result.reason === 'session-already-active' ? 'Es läuft bereits eine Session.' : 'Die Session konnte nicht gestartet werden.', primaryVisible: false, secondaryText: 'OK', secondaryVisible: true });
 });
 
@@ -1544,6 +1579,7 @@ ipcRenderer.on('active-teaching-session-data', (event, session) => {
 });
 
 ipcRenderer.on('teaching-session-ended', () => {
+	currentRepetitionToken = null;
 	closeModal(_sessionEndModal);
 	enableElement(_confirmSessionEndBtn);
 	activeTeachingSession = null;
@@ -1575,25 +1611,19 @@ ipcRenderer.on('teaching-session-required', () => {
 });
 
 function renderSessionAttendance() {
-	_sessionAttendanceList.innerHTML = '';
-	(sessionSetup.persons || []).forEach(person => {
-		const label = document.createElement('label');
-		label.className = 'attendance-person';
-		const checkbox = document.createElement('input');
-		checkbox.type = 'checkbox';
-		checkbox.checked = sessionSetupAbsentIds.some(id => String(id) === String(person.id));
-		const text = document.createElement('span');
-		text.innerText = person.name;
-		checkbox.addEventListener('change', () => {
-			if (checkbox.checked) sessionSetupAbsentIds.push(person.id);
-			else sessionSetupAbsentIds = sessionSetupAbsentIds.filter(id => String(id) !== String(person.id));
-			label.classList.toggle('is-absent', checkbox.checked);
-			updateAttendancePreview();
-		});
-		label.append(checkbox, text);
-		_sessionAttendanceList.appendChild(label);
-	});
-	updateAttendancePreview();
+ _sessionAttendanceList.replaceChildren();
+ (sessionSetup.persons || []).forEach(person => {
+  const button=document.createElement('button');button.type='button';button.className='attendance-person';
+  button.textContent=person.name;
+  const update=()=>{const absent=sessionSetupAbsentIds.some(id=>String(id)===String(person.id));button.classList.toggle('is-absent',absent);button.setAttribute('aria-pressed',String(absent));button.setAttribute('aria-label',`${person.name}, ${absent?'abwesend':'anwesend'}`);};
+  update();button.addEventListener('click',()=>{
+   if(sessionSetupAbsentIds.some(id=>String(id)===String(person.id))) sessionSetupAbsentIds=sessionSetupAbsentIds.filter(id=>String(id)!==String(person.id));
+   else sessionSetupAbsentIds.push(person.id);
+   update();updateAttendancePreview();
+  });
+  _sessionAttendanceList.append(button);
+ });
+ updateAttendancePreview();
 }
 
 function updateAttendancePreview() {
@@ -1605,17 +1635,19 @@ function updateAttendancePreview() {
 function setActiveTeachingSession(session) {
 	activeTeachingSession = session;
 	_sessionClassName.innerText = session.className;
-	_sessionAttendanceCount.innerText = `${session.presentStudents.length} anwesend`;
 	renderParticipationStudents();
 	renderTeachingSessionView();
 	updateState();
 }
 
 function renderTeachingSessionView() {
+	if (!_settingsView.classList.contains('update-hidden')) return;
 	const assessmentView = document.getElementById('assessment-view');
 	if (assessmentView && !assessmentView.classList.contains('update-hidden')) return;
 	if (_statsView && !_statsView.classList.contains('update-hidden')) return;
 	const isActive = !!activeTeachingSession;
+	const destination = isActive ? (activeSessionArea === 'repetition' ? _repetition : _participationView) : (sessionSetup ? _sessionAttendanceView : _sessionEmptyView);
+	if (destination.classList.contains('update-hidden') && uiMotion.beginPageChange(() => { renderTeachingSessionView(); })) return;
 	const homeWasHidden = _sessionEmptyView.classList.contains('update-hidden');
 	_contentToggleSessionClass(isActive);
 	_sessionHeader.classList.toggle('update-hidden', !isActive);
@@ -1623,7 +1655,8 @@ function renderTeachingSessionView() {
 	const classList = document.getElementById('class-list');
 	if (isActive) document.getElementById('session-class-slot').appendChild(classList);
 	else _sessionEmptyView.insertBefore(classList, document.getElementById('session-class-home-slot'));
-	_sessionEmptyView.classList.toggle('update-hidden', isActive);
+	_sessionEmptyView.classList.toggle('update-hidden', isActive || !!sessionSetup);
+ _sessionAttendanceView.classList.toggle('update-hidden', isActive || !sessionSetup);
 	if (!isActive) {
 		_participationView.classList.add('update-hidden');
 		_repetition.classList.add('update-hidden');
@@ -1711,6 +1744,7 @@ function renderParticipationStudents() {
 }
 
 function openParticipationScore(person) {
+	delete _participationScoreList.dataset.submitting;
 	selectedParticipationStudent = person;
 	_participationStudentName.innerText = person.name;
 	_participationScoreList.innerHTML = '';
@@ -1731,8 +1765,11 @@ function openParticipationScore(person) {
 		text.innerText = description;
 		button.append(score, text);
 		button.addEventListener('click', () => {
+			if (_participationScoreList.dataset.submitting === 'true') return;
+			_participationScoreList.dataset.submitting = 'true';
+			_participationScoreList.querySelectorAll('button').forEach(item => {item.disabled = true;});
 			ipcRenderer.send('add-participation-entry', { sessionId: activeTeachingSession.id, studentId: person.id, points: index + 1 });
-			closeModal(_participationModal);
+			uiMotion.confirmScore(button, () => closeModal(_participationModal));
 		});
 		_participationScoreList.appendChild(button);
 	});
@@ -1740,6 +1777,7 @@ function openParticipationScore(person) {
 }
 
 function renderParticipationSummary(rows) {
+	if (_participationSummary.classList.contains('update-hidden') && uiMotion.beginPageChange(() => { renderParticipationSummary(rows); })) return;
 	_participationStudentList.classList.add('update-hidden');
 	_participationSummary.classList.remove('update-hidden');
 	_participationSummaryList.innerHTML = '';
@@ -1780,12 +1818,14 @@ function renderParticipationSummary(rows) {
 }
 
 function closeParticipationSummary() {
+	if (!_participationSummary.classList.contains('update-hidden') && uiMotion.beginPageChange(() => { closeParticipationSummary(); })) return;
 	_participationSummary.classList.add('update-hidden');
 	_participationStudentList.classList.remove('update-hidden');
 }
 
 window.restoreTeachingSessionView = renderTeachingSessionView;
-window.closeRepetiererSettings = afterClose => closeModal(_settingsModal, afterClose);
+window.closeRepetiererSettings = afterClose => closeSettingsPage(afterClose);
+window.dismissRepetiererSettingsForNavigation = dismissSettingsForNavigation;
 window.navigateRepetiererAi = command => {
 	if (!selectClassForNavigation(command.classId)) return false;
 	if (typeof window.openRepetiererRepetition === 'function') window.openRepetiererRepetition();
@@ -1807,6 +1847,7 @@ window.getRepetiererAiContext = () => ({
 
 // update the buttons based on the state
 function updateState() {
+	if (state !== 3 && state !== 4) clearSelectionEffect();
 	switch (state) {
 		case 0:
 			_classes.innerHTML = '';
@@ -1878,7 +1919,7 @@ function updateState() {
 	}
 	disableElement(_absencesBtn);
 	renderSessionStartState();
-	document.getElementById('res').classList.toggle('update-hidden', state !== 3 && state !== 4);
+	uiMotion.setGradingVisible(document.getElementById('res'), state === 3 || state === 4);
 	document.getElementById('repetition-idle-hint').classList.toggle('update-hidden', state === 3 || state === 4);
 
 	function disable(e) {
@@ -1973,6 +2014,8 @@ function renderAbsencePersons(persons) {
 
 function openStatsView() {
 	if (_statsViewBtn.classList.contains('disabled')) return;
+	if (uiMotion.beginPageChange(() => { openStatsView(); })) return;
+	dismissSettingsForNavigation();
 	uiMotion.cancel(_statsView);
 	resetStatsScrollMotion();
 	disconnectStatsCardObserver();
@@ -1985,6 +2028,7 @@ function openStatsView() {
 	_sessionHeader.classList.add('update-hidden');
 	_participationView.classList.add('update-hidden');
 	_sessionEmptyView.classList.add('update-hidden');
+ _sessionAttendanceView.classList.add('update-hidden');
 	[_classPanel, _repetition].forEach(panel => {
 		if (!panel) return;
 		panel.classList.remove('stats-panel-return');
@@ -1994,6 +2038,7 @@ function openStatsView() {
 	_statsView.classList.remove('update-hidden');
 	uiMotion.revealView(_statsView);
 	_statsEmpty.classList.add('update-hidden');
+	document.getElementById('stats-class-picker').classList.add('update-hidden');
 	_statsList.replaceChildren(window.createRepetiererLoadingState('Statistiken werden geladen …', 'stats'));
 	_statsList.setAttribute('aria-busy', 'true');
 	_statsList.scrollTop = 0;
@@ -2003,6 +2048,7 @@ function openStatsView() {
 
 function closeStatsView() {
 	if (!_statsView) return;
+	if (!_statsView.classList.contains('update-hidden') && uiMotion.beginPageChange(() => { closeStatsView(); })) return;
 	_statsViewBtn.removeAttribute('aria-current');
 	document.getElementById('repetition-nav-btn').setAttribute('aria-current', 'page');
 	if (activeTeachingSession && !_statsView.classList.contains('update-hidden')) {
@@ -2022,15 +2068,18 @@ function closeStatsView() {
 	clearTimeout(statsResultsTimer);
 	_statsView.classList.remove('stats-opening', 'stats-results-entering');
 	_statsView.classList.add('stats-closing');
-	uiMotion.exitView(_statsView, () => {
-		_statsView.classList.remove('stats-closing', 'stats-scrolling-up', 'stats-scrolling-down', 'stats-is-scrolling');
-		renderTeachingSessionView();
-	});
+	_statsView.classList.add('update-hidden');
+	_statsView.classList.remove('stats-closing', 'stats-scrolling-up', 'stats-scrolling-down', 'stats-is-scrolling');
+	renderTeachingSessionView();
 }
 
 function renderClassStatistics(stats) {
+	const select = document.getElementById('stats-class-select');
+	const previous = select.value;
+	select.replaceChildren();
 	_statsList.innerHTML = '';
 	_statsList.setAttribute('aria-busy', 'false');
+	document.getElementById('stats-class-picker').classList.toggle('update-hidden', !stats?.length);
 
 	if (!stats || stats.length === 0) {
 		_statsEmpty.classList.remove('update-hidden');
@@ -2038,23 +2087,30 @@ function renderClassStatistics(stats) {
 	}
 
 	_statsEmpty.classList.add('update-hidden');
-	stats.forEach((classStats, index) => {
+	stats.forEach(classStats => {
+		select.add(new Option(classStats.className, classStats.className));
 		const card = createStatsClassCard(classStats);
-		card.style.setProperty('--stats-index', Math.min(index, 10));
 		_statsList.appendChild(card);
 	});
-
-	if (!_statsView.classList.contains('update-hidden') && !_statsView.classList.contains('stats-closing')) {
-		_statsView.classList.remove('stats-results-entering');
-		void _statsView.offsetWidth;
-		_statsView.classList.add('stats-results-entering');
-		clearTimeout(statsResultsTimer);
-		statsResultsTimer = setTimeout(() => {
-			_statsView.classList.remove('stats-results-entering');
-		}, motionDelay(1100));
-		setupStatsCardObserver();
-	}
+	const selected = stats.some(item => item.className === previous) ? previous : stats.some(item => item.className === _currentClass?.innerText) ? _currentClass.innerText : stats[0].className;
+	selectStatsClass(selected);
 }
+
+function selectStatsClass(className) {
+	const select = document.getElementById('stats-class-select');
+	if (![...select.options].some(option => option.value === className)) return false;
+	select.value = className;
+	for (const card of _statsList.children) card.classList.toggle('update-hidden', card.dataset.className !== className);
+	_statsList.scrollTop = 0;
+	setupStatsCardObserver();
+	window.repetiererKristall?.refresh();
+	return true;
+}
+document.getElementById('stats-class-select').addEventListener('change', event => {
+	const className = event.target.value;
+	uiMotion.pageChange(() => selectStatsClass(className));
+});
+window.selectRepetiererStatsClass = selectStatsClass;
 
 function handleStatsScroll() {
 	if (_statsView.classList.contains('update-hidden') || statsScrollFrame) return;
@@ -2077,27 +2133,8 @@ function handleStatsScroll() {
 }
 
 function setupStatsCardObserver() {
-	disconnectStatsCardObserver();
-	if (!('IntersectionObserver' in window)) return;
-
-	statsCardObserver = new IntersectionObserver(entries => {
-		entries.forEach(entry => {
-			if (entry.isIntersecting) {
-				entry.target.classList.remove('stats-card-outside');
-				return;
-			}
-			const leftThroughTop = entry.rootBounds && entry.boundingClientRect.bottom <= entry.rootBounds.top;
-			entry.target.classList.toggle('stats-from-top', !!leftThroughTop);
-			entry.target.classList.toggle('stats-from-bottom', !leftThroughTop);
-			entry.target.classList.add('stats-card-outside');
-		});
-	}, {
-		root: _statsList,
-		rootMargin: '-0.35rem 0px',
-		threshold: 0.08
-	});
-
-	Array.from(_statsList.children).forEach(card => statsCardObserver.observe(card));
+ disconnectStatsCardObserver();
+ uiMotion.refreshScrollEffects();
 }
 
 function disconnectStatsCardObserver() {
@@ -2124,36 +2161,57 @@ function resetStatsScrollMotion(removeDirection = true) {
 
 function createStatsClassCard(classStats) {
 	const card = document.createElement('section');
-	card.className = 'stats-class-card';
+	card.className = 'stats-class-card stats-class-detail';
+	card.dataset.className = classStats.className;
 
+	const heading = document.createElement('div');
+	heading.className = 'stats-class-heading';
 	const title = document.createElement('h3');
 	title.innerText = classStats.className || 'Klasse';
-	card.appendChild(title);
+	const count = document.createElement('span');
+	count.textContent = `${formatInteger(classStats.personCount)} Personen`;
+	heading.append(title, count);
+	card.appendChild(heading);
 
 	const rows = [
-		['Anzahl Personen', formatInteger(classStats.personCount)],
-		['Repetitionen total', formatInteger(classStats.repetitionsTotal)],
-		['Durchschnittliche Note der Klasse', formatDecimal(classStats.averageGrade)],
-		['Person mit den meisten Repetitionen', formatTopRepetitionPerson(classStats)],
-		['Durchschnittliche Repetitionen pro Person', formatDecimal(classStats.averageRepetitionsPerPerson)]
+		['Ø Note', formatDecimal(classStats.averageGrade), 'Notenskala 1–6'],
+		['Repetitionen', formatInteger(classStats.repetitionsTotal), 'In der Excel-Datei erfasst'],
+		['Ø Repetitionsdauer', formatRepetitionDuration(classStats.averageRepetitionDurationMs), 'Minuten : Sekunden'],
+		['Ø pro Person', formatDecimal(classStats.averageRepetitionsPerPerson), 'Repetitionen']
 	];
-
-	rows.forEach(([label, value]) => {
+	const metrics = document.createElement('div');
+	metrics.className = 'stats-metrics';
+	rows.forEach(([label, value, caption]) => {
 		const row = document.createElement('div');
-		row.className = 'stats-row';
-
+		row.className = 'stats-metric';
 		const labelElement = document.createElement('span');
 		labelElement.innerText = label;
-
 		const valueElement = document.createElement('strong');
 		valueElement.innerText = value;
-
-		row.appendChild(labelElement);
-		row.appendChild(valueElement);
-		card.appendChild(row);
+		const hint = document.createElement('small');
+		hint.textContent = caption;
+		row.append(labelElement, valueElement, hint);
+		metrics.appendChild(row);
 	});
-
+	card.appendChild(metrics);
+	const detail = document.createElement('div');
+	detail.className = 'stats-detail';
+	const topLabel = document.createElement('span'); topLabel.textContent = 'Am häufigsten repetiert';
+	const top = document.createElement('strong'); top.textContent = formatTopRepetitionPerson(classStats);
+	detail.append(topLabel, top);
+	card.appendChild(detail);
+	const note = document.createElement('p');
+	note.className = 'stats-timing-note';
+	const measured = Number(classStats.timedRepetitionsCount || 0);
+	note.textContent = measured > 0 ? `Zeitmessung: ${measured} ${measured === 1 ? 'Repetition' : 'Repetitionen'} auf diesem Gerät. Von der Namensauswahl bis zum Speichern. Ältere Einträge ohne Messung zählen nicht mit.` : 'Noch keine Zeitmessung. Neue Repetitionen werden von der Namensauswahl bis zum Speichern gemessen. Joker und abgebrochene Versuche zählen nicht mit.';
+	card.appendChild(note);
 	return card;
+}
+
+function formatRepetitionDuration(value) {
+	if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return '–';
+	const seconds = Math.round(value / 1000);
+	return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
 function formatTopRepetitionPerson(classStats) {
@@ -2169,6 +2227,7 @@ function formatInteger(value) {
 }
 
 function formatDecimal(value) {
+	if (value === null || value === undefined || value === '') return '–';
 	const number = Number(value);
 	return Number.isFinite(number) ? number.toFixed(2) : '–';
 }
@@ -2306,13 +2365,13 @@ function openTeacherHelp(topic) {
 		'drawer-main': {
 			title: 'Dateien',
 			paragraphs: [
-				'Datenverwaltung bündelt das Auswählen der Excel-Datei, den Import von Klassenlisten und das Synchronisieren der Excel-Daten.',
-				'Protokoll öffnet Backups, technische Logs, den Export des Sitzungsprotokolls und das Melden von Problemen.',
+				'Dateiverwaltung bündelt das Auswählen der Excel-Datei, den Import von Klassenlisten und das Synchronisieren der Excel-Daten.',
+				'Protokoll öffnet Backups, technische Logs und den Export des Sitzungsprotokolls.',
 				'Statistiken zeigt Auswertungen der geladenen Klassen und bleibt direkt aus diesem Menü erreichbar.'
 			]
 		},
 		'drawer-data': {
-			title: 'Datenverwaltung',
+			title: 'Dateiverwaltung',
 			paragraphs: [
 				'Datei auswählen lädt die Excel-Datei, aus der Klassen, Namen, Noten und Joker gelesen werden.',
 				'Klassenliste importieren übernimmt eine Namensliste aus Excel oder CSV und erstellt daraus eine neue Repetierer-Klasse.',
@@ -2371,8 +2430,11 @@ function closeDrawer() {
 }
 
 function setDrawerView(view) {
+	if (drawerView === view && !document.getElementById('drawer-content').dataset.viewMotion) return;
+	uiMotion.changeDrawerView(() => {
 	drawerView = view;
-	_drawerTitle.innerText = view === 'data' ? 'Datenverwaltung' : view === 'protocol' ? 'Protokoll' : 'Navigation';
+	_drawer.classList.toggle('drawer-submenu', view !== 'main');
+	_drawerTitle.innerText = view === 'data' ? 'Dateiverwaltung' : view === 'protocol' ? 'Protokoll' : 'Navigation';
 
 	[_drawerMainView, _drawerDataView, _drawerProtocolView].forEach(drawerViewElement => {
 		drawerViewElement.classList.add('update-hidden');
@@ -2388,7 +2450,7 @@ function setDrawerView(view) {
 		_drawerMainView.classList.remove('update-hidden');
 		_drawerBackBtn.classList.add('update-hidden');
 	}
-	uiMotion.revealView(view === 'data' ? _drawerDataView : view === 'protocol' ? _drawerProtocolView : _drawerMainView);
+	});
 }
 
 function setActiveClassButton(button) {
@@ -2589,6 +2651,7 @@ function closeUpdateNewsModal() {
 }
 
 function openProblemReportModal() {
+	if (!problemReportsEnabled) return;
 	problemReportPreview = null;
 	problemReportSending = false;
 	_problemReportComment.value = '';
@@ -2644,6 +2707,7 @@ function renderProblemReportPreview() {
 }
 
 function sendProblemReport() {
+	if (!problemReportsEnabled) return;
 	if (problemReportSending) return;
 	if ((_problemReportComment.value || '').length > 4000) {
 		setProblemReportStatus('Der Kommentar ist zu lang.', 'error');
@@ -2666,11 +2730,55 @@ function setProblemReportStatus(message, type) {
 	if (type === 'success') _problemReportStatus.classList.add('report-status-success');
 }
 
+let settingsReturnState = null;
+function openSettingsPage() {
+	if (!_settingsView.classList.contains('update-hidden')) return;
+	uiMotion.pageChange(() => {
+		if (!_settingsView.classList.contains('update-hidden')) return;
+		const content = document.getElementById('content');
+		settingsReturnState = {
+			views: [...content.children].filter(element => element !== _settingsView).map(element => [element, element.classList.contains('update-hidden')]),
+			sessionActive: content.classList.contains('session-active')
+		};
+		for (const [element] of settingsReturnState.views) element.classList.add('update-hidden');
+		content.classList.remove('session-active');
+		content.classList.add('settings-active');
+		_settingsView.classList.remove('update-hidden');
+		_settingsBtn.setAttribute('aria-current', 'page');
+		closeDrawer();
+		document.getElementById('settings-back-btn').focus();
+	});
+}
+function dismissSettingsForNavigation() {
+	_settingsView.classList.add('update-hidden');
+	document.getElementById('content').classList.remove('settings-active');
+	_settingsBtn.removeAttribute('aria-current');
+	settingsReturnState = null;
+}
+function closeSettingsPage(afterClose) {
+	if (!settingsReturnState) { afterClose?.(); return; }
+	uiMotion.pageChange(() => {
+		const previous = settingsReturnState;
+		if (!previous) return;
+		dismissSettingsForNavigation();
+		for (const [element, hidden] of previous.views) element.classList.toggle('update-hidden', hidden);
+		document.getElementById('content').classList.toggle('session-active', previous.sessionActive);
+		renderTeachingSessionView();
+		_settingsBtn.focus();
+	}, afterClose);
+}
+document.addEventListener('keydown', event => {
+	if (event.key === 'Escape' && !_settingsView.classList.contains('update-hidden') && !document.querySelector('.modal-open, .modal-closing')) {
+		event.preventDefault(); closeSettingsPage();
+	}
+});
 function openModal(modal) {
+	if (modal === _settingsView) return openSettingsPage();
 	uiMotion.openDialog(modal);
 }
 
 function closeModal(modal, afterClose) {
+	if (modal === _settingsView) return closeSettingsPage(afterClose);
 	uiMotion.closeDialog(modal, afterClose);
 }
 
@@ -2679,7 +2787,7 @@ function motionDelay(duration) {
 }
 
 function closeSettingsHelp() {
-	closeModal(_settingsHelpModal, () => openModal(_settingsModal));
+	closeModal(_settingsHelpModal, () => _settingsHelpBtn.focus());
 }
 
 function closeJokerMigrationHelp() {
@@ -2731,51 +2839,54 @@ function updateWiggersRuleFields() {
 	_wiggersRuleDurationSetting.closest('.setting-field').classList.toggle('setting-disabled', !isEnabled);
 }
 
-function runSelectionEffect(selectedName, names) {
+function runSelectionEffect(selectedName, names, onComplete) {
 	clearSelectionEffect();
-	if (!visualEffectsEnabled || prefersReducedMotion.matches || !_selectionEffect || !_spinwheelTrack) return;
+	if (!visualEffectsEnabled || prefersReducedMotion.matches || !_selectionEffect || !_spinwheelTrack) {
+		onComplete();
+		return;
+	}
 
 	const runId = selectionEffectRun;
 	const candidates = Array.from(new Set((names || []).map(name => String(name || '').trim()).filter(Boolean)));
 	if (!candidates.includes(selectedName)) candidates.push(selectedName);
 	const reelNames = [];
-	const fillerNames = candidates.filter(name => name !== selectedName);
-	const sourceNames = fillerNames.length > 0 ? fillerNames : [selectedName];
-	for (let index = 0; index < 18; index += 1) {
-		reelNames.push(sourceNames[Math.floor(Math.random() * sourceNames.length)]);
+	// Every pass includes every candidate; the actual selection remains authoritative.
+	const passes = Math.max(2, Math.ceil(24 / candidates.length));
+	for (let pass = 0; pass < passes; pass += 1) {
+		const shuffled = [...candidates];
+		for (let index = shuffled.length - 1; index > 0; index -= 1) {
+			const other = Math.floor(Math.random() * (index + 1));
+			[shuffled[index], shuffled[other]] = [shuffled[other], shuffled[index]];
+		}
+		if (shuffled.length > 1 && shuffled[0] === reelNames[reelNames.length - 1]) {
+			[shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
+		}
+		reelNames.push(...shuffled);
 	}
-	reelNames.push(selectedName);
+	if (reelNames[reelNames.length - 1] !== selectedName) reelNames.push(selectedName);
 
-	_spinwheelTrack.innerHTML = '';
-	reelNames.forEach((name, index) => {
+	_spinwheelTrack.replaceChildren(...reelNames.map(name => {
 		const item = document.createElement('div');
-		item.className = index === reelNames.length - 1 ? 'spinwheel-item spinwheel-item-selected' : 'spinwheel-item';
-		item.innerText = name;
-		_spinwheelTrack.appendChild(item);
-	});
-	_winnerName.innerText = selectedName;
-	createConfetti();
-	_spinwheelTrack.style.transition = 'none';
-	_spinwheelTrack.style.transform = 'translateY(0)';
+		item.className = 'spinwheel-item';
+		item.innerText = getFirstName(name);
+		return item;
+	}));
+	_selectionEffect.closest('.repetition-stage').classList.add('selection-running');
+	document.getElementById('res').inert = true;
 	_selectionEffect.setAttribute('aria-hidden', 'false');
 	_selectionEffect.classList.add('is-active', 'is-spinning');
-	void _spinwheelTrack.offsetHeight;
-
-	requestAnimationFrame(() => {
-		if (runId !== selectionEffectRun) return;
-		_selectionEffect.classList.add('is-rolling');
-		_spinwheelTrack.style.transition = 'transform 1550ms cubic-bezier(.12, .72, .16, 1)';
-		_spinwheelTrack.style.transform = `translateY(-${(reelNames.length - 1) * 4.4}rem)`;
-	});
-
+	const rowHeight = _spinwheelTrack.firstElementChild.offsetHeight;
+	let delay = 0;
+	for (let index = 1; index < reelNames.length; index += 1) {
+		delay += 40 + 150 * Math.pow(index / reelNames.length, 5);
+		queueSelectionEffect(() => {
+			_spinwheelTrack.style.transform = `translateY(-${index * rowHeight}px)`;
+		}, delay, runId);
+	}
 	queueSelectionEffect(() => {
-		_selectionEffect.classList.remove('is-spinning', 'is-rolling');
-		_selectionEffect.classList.add('is-celebrating');
-	}, 1580, runId);
-	queueSelectionEffect(() => {
-		_selectionEffect.classList.add('spotlights-on');
-	}, 1840, runId);
-	queueSelectionEffect(() => clearSelectionEffect(), 3750, runId);
+		clearSelectionEffect();
+		onComplete();
+	}, delay + 450, runId);
 }
 
 function getFirstName(name) {
@@ -2815,11 +2926,12 @@ function queueSelectionEffect(callback, delay, runId) {
 function clearSelectionEffect() {
 	selectionEffectRun += 1;
 	selectionEffectTimers.splice(0).forEach(timer => clearTimeout(timer));
+	document.getElementById('res').inert = false;
 	if (!_selectionEffect) return;
+	_selectionEffect.closest('.repetition-stage').classList.remove('selection-running');
 	_selectionEffect.classList.remove('is-active', 'is-spinning', 'is-rolling', 'is-celebrating', 'spotlights-on');
 	_selectionEffect.setAttribute('aria-hidden', 'true');
 	if (_spinwheelTrack) {
-		_spinwheelTrack.style.transition = 'none';
 		_spinwheelTrack.style.transform = 'translateY(0)';
 	}
 }
@@ -2831,9 +2943,10 @@ function runCompletionEffect() {
 	const runId = completionEffectRun;
 	_completionEffect.setAttribute('aria-hidden', 'false');
 	_completionEffect.classList.add('is-active');
+	saveReceipt.start();
 	const timer = setTimeout(() => {
 		if (runId === completionEffectRun) clearCompletionEffect();
-	}, motionDelay(1650));
+	}, motionDelay(1350));
 	completionEffectTimers.push(timer);
 }
 
@@ -2842,6 +2955,7 @@ function applyTheme(theme) {
 }
 
 function clearCompletionEffect() {
+	saveReceipt.stop();
 	completionEffectRun += 1;
 	completionEffectTimers.splice(0).forEach(timer => clearTimeout(timer));
 	if (!_completionEffect) return;
@@ -2865,6 +2979,7 @@ function updateVisualEffects(isEnabled) {
 	}
 	if (!enabled) {
 		clearSelectionEffect();
+		startRepetitionTiming();
 		clearCompletionEffect();
 	}
 }

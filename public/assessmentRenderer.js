@@ -75,6 +75,19 @@ elements.back.addEventListener('click', async () => {
 });
 
 elements.settings.addEventListener('click', loadIntegrationStatuses);
+const packageImport = document.getElementById('integration-package-import-btn');
+const packageExport = document.getElementById('integration-package-export-btn');
+const packageStatus = document.getElementById('integration-package-status');
+for (const [button, channel] of [[packageImport,'assessment:config-import'],[packageExport,'assessment:config-export']]) button.addEventListener('click', async () => {
+	packageImport.disabled = packageExport.disabled = true;
+	packageStatus.textContent = channel.endsWith('export') ? 'Paket wird erstellt …' : 'Paket wird geprüft …';
+	try {
+		const result = await invoke(channel);
+		await loadIntegrationStatuses();
+		packageStatus.textContent = result.cancelled ? '' : result.exported ? 'Das gemeinsame .repetierer-Paket wurde gespeichert.' : 'Konfiguration importiert. Die Verbindungsanzeigen wurden aktualisiert.';
+	} catch (error) { packageStatus.textContent = error.message; }
+	finally {packageImport.disabled = packageExport.disabled = false;}
+});
 elements.assessmentConfigImport.addEventListener('click', () => integrationAction('assessment:config-import', elements.assessmentConfigStatus, result => {
 		loadIntegrationStatuses();
 		if (result && result.deleteError) showNotice(result.deleteError, 'warning');
@@ -112,6 +125,8 @@ elements.deleteConfirm.addEventListener('click', deleteRound);
 
 async function openAssessment() {
 	if (busy) return;
+	if (assessmentMotion.beginPageChange(() => { openAssessment(); })) return;
+	window.dismissRepetiererSettingsForNavigation?.();
 	closeDrawer();
 	elements.repetitionNav.removeAttribute('aria-current');
 	elements.assessmentNav.setAttribute('aria-current', 'page');
@@ -123,6 +138,7 @@ async function openAssessment() {
 	elements.sessionHeader.classList.add('update-hidden');
 	elements.participation.classList.add('update-hidden');
 	elements.sessionEmpty.classList.add('update-hidden');
+ document.getElementById('session-attendance-view').classList.add('update-hidden');
 	elements.view.classList.remove('update-hidden');
 	assessmentMotion.revealView(elements.view);
 	elements.title.innerText = 'Repetierer';
@@ -135,6 +151,8 @@ async function openAssessment() {
 }
 
 function openRepetition() {
+	if (assessmentMotion.beginPageChange(() => { openRepetition(); })) return;
+	window.dismissRepetiererSettingsForNavigation?.();
 	closeDrawer();
 	elements.assessmentNav.removeAttribute('aria-current');
 	elements.repetitionNav.setAttribute('aria-current', 'page');
@@ -182,6 +200,8 @@ async function loadOverview() {
 }
 
 function renderOverview() {
+	if (assessmentMotion.beginPageChange(() => { renderOverview(); })) return;
+	elements.body.scrollTop = 0;
 	roundView = null;
 	elements.heading.innerText = `${overview.name} · Beurteilungsrunden`;
 	elements.back.classList.add('update-hidden');
@@ -237,6 +257,8 @@ async function openRound(roundId) {
 }
 
 function renderRound() {
+	if (assessmentMotion.beginPageChange(() => { renderRound(); })) return;
+	elements.body.scrollTop = 0;
 	const { round, summary, students, invitation, invitationError, deliveryValidation } = roundView;
 	const assessmentConfigured = roundView.assessmentConfigured && !!round.cloudStatus;
 	elements.heading.innerText = `${selectedClass} · ${round.title}`;
@@ -352,6 +374,8 @@ async function assignResponse(responseId) {
 }
 
 function openTeacher(index) {
+	if (assessmentMotion.beginPageChange(() => { openTeacher(index); })) return;
+	elements.body.scrollTop = 0;
 	teacherIndex = Math.max(0, Math.min(index, roundView.students.length - 1));
 	const student = roundView.students[teacherIndex];
 	const assessment = roundView.round.assessments[student.id] || {};
@@ -359,16 +383,42 @@ function openTeacher(index) {
 	const criteriaRows = roundView.round.criteria.map(criterion => {
 		const self = assessment.studentAnswers && assessment.studentAnswers[criterion.id];
 		const teacher = assessment.teacherAnswers && assessment.teacherAnswers[criterion.id];
-		return `<div class="teacher-criterion-block"><div class="teacher-criterion"><strong>${escapeHtml(criterion.label)}</strong><span>${escapeHtml(formatCriterionValue(criterion, self))}</span><select data-teacher-criterion="${escapeAttribute(criterion.id)}" aria-label="Lehrerbewertung: ${escapeAttribute(criterion.label)}"><option value="">–</option>${[1,2,3,4,5].map(value => `<option value="${value}"${teacher === value ? ' selected' : ''}>${escapeHtml(formatCriterionValue(criterion, value))}</option>`).join('')}</select><b data-difference="${escapeAttribute(criterion.id)}">${self && teacher ? signed(teacher - self) : '–'}</b></div><label class="teacher-criterion-comment"${teacher ? '' : ' hidden'}>Kommentar zu diesem Kriterium (optional)<textarea data-teacher-comment="${escapeAttribute(criterion.id)}" aria-label="Kommentar: ${escapeAttribute(criterion.label)}" rows="2" maxlength="2000">${escapeHtml(assessment.teacherCriterionComments?.[criterion.id] || '')}</textarea></label></div>`;
+		const rated = Number.isInteger(teacher) && teacher >= 1 && teacher <= 5;
+		const inputId = `teacher-rating-${criterion.id}`;
+		const comment = assessment.teacherCriterionComments?.[criterion.id] || '';
+		return `<div class="teacher-criterion-block">
+			<div class="teacher-criterion">
+				<strong>${escapeHtml(criterion.label)}</strong>
+				<span class="teacher-self">${escapeHtml(formatCriterionValue(criterion, self))}</span>
+				<div class="teacher-rating${rated ? ' is-rated' : ''}">
+					<output for="${escapeAttribute(inputId)}">${rated ? escapeHtml(formatCriterionValue(criterion, teacher)) : 'Noch nicht bewertet'}</output>
+					<input id="${escapeAttribute(inputId)}" type="range" min="1" max="5" step="1" value="${rated ? teacher : 3}" data-teacher-criterion="${escapeAttribute(criterion.id)}" data-rated="${rated}" aria-label="Lehrerbewertung: ${escapeAttribute(criterion.label)}" aria-valuetext="${rated ? escapeAttribute(formatCriterionValue(criterion, teacher)) : 'Noch nicht bewertet'}">
+					<div class="teacher-rating-ticks" aria-hidden="true"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span></div>
+				</div>
+				<b class="teacher-difference" data-difference="${escapeAttribute(criterion.id)}">${self && rated ? signed(teacher - self) : '–'}</b>
+			</div>
+			<details class="teacher-criterion-comment"><summary>${comment ? 'Kommentar bearbeiten' : 'Kommentar hinzufügen'} <span>(optional)</span></summary><label>Kommentar zu diesem Kriterium<textarea data-teacher-comment="${escapeAttribute(criterion.id)}" aria-label="Kommentar: ${escapeAttribute(criterion.label)}" rows="3" maxlength="2000">${escapeHtml(comment)}</textarea></label></details>
+		</div>`;
 	}).join('');
 	elements.body.innerHTML = `
 		<section class="teacher-assessment">
+			<p class="teacher-rating-hint">Bewertung von 1 bis 5: Regler anklicken oder ziehen. Kommentare kannst du bei Bedarf aufklappen.</p>
 			<div class="teacher-grid-heading"><span>Kriterium</span><span>Schüler</span><span>Lehrer</span><span>Differenz</span></div>
 			${criteriaRows}
 			<div class="teacher-comments"><div><h3>Zusätzliche Qualität</h3><p>${escapeHtml(assessment.studentAdditionalQuality || 'Keine Angabe.')}</p></div><div><h3>Sonstige Bemerkungen</h3><p>${escapeHtml(assessment.studentComment || 'Keine Angabe.')}</p></div><label><h3>Kommentar Lehrer</h3><textarea id="teacher-comment" rows="5" maxlength="4000">${escapeHtml(assessment.teacherComment || '')}</textarea></label></div>
 			<div class="teacher-actions"><button class="btn-2${teacherIndex === 0 ? ' disabled' : ''}" id="teacher-previous-btn">Vorheriger</button><button class="btn-1" id="teacher-save-btn">Speichern</button><button class="btn-1" id="teacher-next-btn">Speichern & nächster</button></div>
 		</section>`;
-	elements.body.querySelectorAll('[data-teacher-criterion]').forEach(select => select.addEventListener('change', updateDifferences));
+	elements.body.querySelectorAll('[data-teacher-criterion]').forEach(input => {
+		const rate = () => {input.dataset.rated = 'true'; updateDifferences();};
+		input.addEventListener('input', rate);
+		input.addEventListener('change', rate);
+		// A click on the middle value must also count as an intentional rating.
+		input.addEventListener('pointerup', rate);
+		input.addEventListener('keydown', event => {
+			if (event.key === 'Enter' || event.key === ' ') {event.preventDefault(); rate();}
+		});
+	});
+	window.repetiererKristall?.refresh();
 	document.getElementById('teacher-previous-btn').addEventListener('click', () => openTeacher(teacherIndex - 1));
 	document.getElementById('teacher-save-btn').addEventListener('click', () => saveTeacher(false));
 	document.getElementById('teacher-next-btn').addEventListener('click', () => saveTeacher(true));
@@ -383,11 +433,16 @@ function formatCriterionValue(criterion, value) {
 
 function updateDifferences() {
 	const assessment = roundView.round.assessments[roundView.students[teacherIndex].id] || {};
-	elements.body.querySelectorAll('[data-teacher-criterion]').forEach(select => {
-		const self = assessment.studentAnswers && assessment.studentAnswers[select.dataset.teacherCriterion];
-		const difference = elements.body.querySelector(`[data-difference="${cssEscape(select.dataset.teacherCriterion)}"]`);
-		difference.innerText = self && select.value ? signed(Number(select.value) - self) : '–';
-		select.closest('.teacher-criterion-block').querySelector('.teacher-criterion-comment').hidden = !select.value;
+	elements.body.querySelectorAll('[data-teacher-criterion]').forEach(input => {
+		const id = input.dataset.teacherCriterion;
+		const self = assessment.studentAnswers && assessment.studentAnswers[id];
+		const criterion = roundView.round.criteria.find(item => item.id === id);
+		const rated = input.dataset.rated === 'true';
+		const rating = input.closest('.teacher-rating');
+		rating.classList.toggle('is-rated', rated);
+		rating.querySelector('output').textContent = rated ? formatCriterionValue(criterion, input.value) : 'Noch nicht bewertet';
+		input.setAttribute('aria-valuetext', rated ? formatCriterionValue(criterion, input.value) : 'Noch nicht bewertet');
+		elements.body.querySelector(`[data-difference="${cssEscape(id)}"]`).innerText = self && rated ? signed(Number(input.value) - self) : '–';
 	});
 }
 
@@ -395,7 +450,7 @@ async function saveTeacher(moveNext) {
 	const student = roundView.students[teacherIndex];
 	const answers = {};
 	const criterionComments = {};
-	elements.body.querySelectorAll('[data-teacher-criterion]').forEach(select => { answers[select.dataset.teacherCriterion] = Number(select.value); });
+	elements.body.querySelectorAll('[data-teacher-criterion]').forEach(input => { answers[input.dataset.teacherCriterion] = input.dataset.rated === 'true' ? Number(input.value) : 0; });
 	elements.body.querySelectorAll('[data-teacher-comment]').forEach(field => { criterionComments[field.dataset.teacherComment] = field.value; });
 	try {
 		const updated = await invoke('assessment:save-teacher', { className: selectedClass, roundId: roundView.round.id, studentId: student.id, answers, criterionComments, comment: document.getElementById('teacher-comment').value });

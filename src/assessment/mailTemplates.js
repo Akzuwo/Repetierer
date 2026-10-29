@@ -1,4 +1,5 @@
 const { isValidEmail } = require('./matching.js');
+const resultSender = require('./senderIdentity');
 
 function buildInvitation(round, responderUrl, teacherName = 'Herr Schaufelberger') {
 	const deadline = round.deadline ? ` bis am ${formatDate(round.deadline)}` : '';
@@ -18,7 +19,8 @@ function buildInvitation(round, responderUrl, teacherName = 'Herr Schaufelberger
 	return { subject, text, complete: `Betreff: ${subject}\n\n${text}` };
 }
 
-function buildResultMessage({ student, assessment, round, sender }) {
+function buildResultMessage({ student, assessment, round }) {
+	const sender = resultSender;
 	if (!assessment || !isValidEmail(assessment.studentEmail)) throw mailError('Die E-Mail-Adresse des Schülers ist ungültig.');
 	if (!assessment.studentAnswers || !assessment.teacherAnswers) throw mailError('Die Beurteilung ist noch nicht vollständig.');
 	const rows = round.criteria.map(criterion => {

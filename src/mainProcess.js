@@ -10,7 +10,7 @@ const { createTeachingSessionStore } = require('./teachingSessions.js');
 const { createOllamaService } = require('./ai/ollamaService.js');
 const { createAiToolRegistry } = require('./ai/toolRegistry.js');
 const { createAiAssistantService } = require('./ai/assistantService.js');
-const isDebugMode = process.argv.includes('--dev-mode');
+const isDebugMode = require('./debugFlags').isDebugMode(process.argv);
 const sessionEntries = [];
 let lastUndoEntry;
 let lastRedoEntry;
@@ -276,6 +276,7 @@ ipcMain.on('end-teaching-session', (event, sessionId) => {
 	}
 	const result = getTeachingSessionStore().endSession(sessionId);
 	if (result.success) {
+		getProgram().cancelRepetitionTiming();
 		getProgram().setAbsences([], () => {});
 		logEvent('Unterrichts-Session beendet', { sessionId, className: active.className });
 		event.sender.send('teaching-session-ended', result.session);
@@ -390,6 +391,8 @@ function getSelectionNames() {
 registerAssessmentHandlers({ getProgram, getPaths });
 
 // ok
+ipcMain.on('repetition-timing-start', (_event, token) => { getProgram().startRepetitionTiming(token); });
+ipcMain.on('repetition-timing-cancel', () => { getProgram().cancelRepetitionTiming(); });
 ipcMain.on('ok', (event, args) => {
 	getProgram().saveGrade(args, (result, backupEntry) => {
 		const wasSaved = handleExcelBackupEntry(event, backupEntry);
@@ -426,10 +429,15 @@ ipcMain.on('get-logs', (event, args) => {
 });
 
 ipcMain.on('get-report-preview', (event, args) => {
+	if (!require('./featureFlags').problemReportsEnabled) return;
 	event.sender.send('report-preview-data', buildReportPayload(''));
 });
 
 ipcMain.on('send-problem-report', async (event, args) => {
+	if (!require('./featureFlags').problemReportsEnabled) {
+		event.sender.send('problem-report-result', {ok:false, error:'feature-disabled'});
+		return;
+	}
 	const comment = args && typeof args.comment === 'string' ? args.comment : '';
 	const payload = buildReportPayload(comment.slice(0, MAX_REPORT_COMMENT_LENGTH));
 	const headers = {
@@ -531,12 +539,22 @@ ipcMain.on('run-joker-migration', (event, args) => {
 		if (result && result.success) {
 			logEvent('Joker-Migration abgeschlossen', { migratedCells: result.migratedCells });
 			event.sender.send('joker-migration-done', result);
-			event.sender.send('classes', result.worksheets, getExcelFilePath());
+			sendClassesOrJokerMigration(event, result.worksheets, getExcelFilePath());
 		} else {
 			logEvent('Joker-Migration fehlgeschlagen', result || {});
 			event.sender.send('joker-migration-failed', result || { success: false, reason: 'unknown' });
 		}
 	});
+});
+
+ipcMain.on('run-joker-date-migration', (event, fingerprint) => {
+ getProgram().migrateJokerDates(fingerprint, result => {
+  event.sender.send('joker-date-migration-result',result);
+  if(result.success) event.sender.send('classes',result.worksheets,getProgram().getCurrentFilePath());
+ });
+});
+ipcMain.on('skip-joker-date-migration', event => {
+ event.sender.send('classes',getProgram().getClasses(),getProgram().getCurrentFilePath());
 });
 
 ipcMain.on('run-extra-joker-migration', (event, args) => {
@@ -1191,6 +1209,7 @@ function fillImportedWorksheet(worksheet, names) {
 		column.width = 16;
 	});
 	worksheet.getColumn(1).width = 28;
+ require('./jokerDates').migrateWorksheet(worksheet);
 }
 
 function sanitizeWorksheetName(name) {
@@ -1274,7 +1293,7 @@ function reloadExcelFile(event) {
 		if (result && result.success) {
 			logEvent('Excel neu geladen', { filePath: result.filePath, className: result.className });
 			sendClassesOrJokerMigration(event, result.worksheets, result.filePath);
-			if (!getProgram().getJokerMigrationStatus().needsMigration) {
+			if (!getProgram().getJokerMigrationStatus().needsMigration && !getProgram().getJokerDateMigrationStatus().needsMigration) {
 				event.sender.send('excel-reloaded', result);
 			}
 			event.sender.send('pending-excel-status', getPendingExcelEntries().length);
@@ -1298,5 +1317,7 @@ function sendClassesOrJokerMigration(event, worksheets, filePath) {
 		return;
 	}
 
-	event.sender.send('classes', worksheets, filePath);
+ const dateStatus=getProgram().getJokerDateMigrationStatus();
+ if(dateStatus.needsMigration) { event.sender.send('joker-date-migration-required',dateStatus,filePath);return; }
+ event.sender.send('classes', worksheets, filePath);
 }

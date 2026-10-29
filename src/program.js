@@ -1,5 +1,6 @@
-const { init, read, read_editor_persons, read_grade_history, get_class_names, read_class_statistics, write_grade, write_joker, edit_persons, apply_entries, undo_entry, getJokerMigrationStatus, migrate_jokers, award_extra_jokers_after_three } = require('./excelReader.js');
-const { getAppSettings, getFileMigrationStatus, getWiggersRulePenalties, markFileMigrationCompleted, saveWiggersRulePenalty, removeWiggersRulePenalty } = require('./storage.js');
+const { getJokerDateMigrationStatus, migrate_joker_dates, init, read, read_editor_persons, read_grade_history, get_class_names, read_class_statistics, write_grade, write_joker, edit_persons, apply_entries, undo_entry, getJokerMigrationStatus, migrate_jokers, award_extra_jokers_after_three } = require('./excelReader.js');
+const { getAppSettings, getBackup, getFileMigrationStatus, getWiggersRulePenalties, markFileMigrationCompleted, saveWiggersRulePenalty, removeWiggersRulePenalty } = require('./storage.js');
+const repetitionTimer = require('./repetitionTimer').createRepetitionTimer();
 let cls;
 let persons;
 let person;
@@ -11,6 +12,7 @@ const EXTRA_JOKER_MIGRATION_ID = 'extra-joker-after-three-existing-data';
 
 // set the file
 function setFile(file, callback) {
+	repetitionTimer.cancel();
 	filePath = file;
 	init(file, (r) => {
 		callback(r);
@@ -19,6 +21,7 @@ function setFile(file, callback) {
 
 // set the class
 function setClass(clss, callback) {
+	repetitionTimer.cancel();
 	cls = clss;
 	persons = read(cls);
 	callback(!persons);
@@ -30,7 +33,7 @@ function getPersons() {
 }
 
 function getSelectedPerson() {
-	return person ? { id: person.id, name: person.name } : null;
+	return person ? { id: person.id, name: person.name, selectionToken: repetitionTimer.token } : null;
 }
 
 function getEditorPersons() {
@@ -52,7 +55,7 @@ function getStudentGradeHistory(className, studentId) {
 }
 
 function getClassStatistics() {
-	return read_class_statistics() || [];
+	return require('./classStats').withRepetitionDurations(read_class_statistics() || [], getBackup().entries || [], filePath);
 }
 
 function getAbsencePersons() {
@@ -108,12 +111,15 @@ function getProbabilities() {
 
 // select a specific person manually
 function selectSpecificPerson(personId) {
+	repetitionTimer.cancel();
 	person = filterAbsentPersons(persons).find(p => p.id === personId);
+	if (person) repetitionTimer.select();
 	return person ? getPersonResult(person) : null;
 }
 
 // select a random person (based on the amount of grades)
 function selectPerson() {
+	repetitionTimer.cancel();
 	if (!persons || persons.length === 0) return null;
 
 	const weightedPersons = getWeightedPersons();
@@ -132,6 +138,7 @@ function selectPerson() {
 	}
 
 	if (!person) person = selectablePersons[selectablePersons.length - 1].person;
+	repetitionTimer.select();
 	return getPersonResult(person);
 }
 
@@ -175,6 +182,7 @@ function saveGrade(grade, callback) {
 	const awardExtraJoker = settings.extraJokerAfterThreeGrades && person.grades < 3 && person.grades + 1 >= 3;
 	const entry = {
 		type: 'grade',
+		durationMs: repetitionTimer.capture(),
 		className: cls,
 		filePath: filePath,
 		personId: person.id,
@@ -446,6 +454,13 @@ function getWiggersRuleKey(personId) {
 }
 
 module.exports = {
+	startRepetitionTiming: token => repetitionTimer.ready(token),
+	cancelRepetitionTiming: () => repetitionTimer.cancel(),
+ getJokerDateMigrationStatus,
+ migrateJokerDates: (fingerprint,callback) => migrate_joker_dates(fingerprint,result=>{
+   if(result.success && cls && result.worksheets.includes(cls)) persons=read(cls);
+   callback(result);
+ }),
 	getClasses,
 	getStudentGradeHistory,
 	setFile: setFile,

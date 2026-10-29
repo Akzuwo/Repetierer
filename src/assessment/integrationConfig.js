@@ -108,7 +108,9 @@ async function importIntegrationEnv(sourcePath, destinationPath, options = {}) {
 	} catch (error) {
 		throw configError('Die ausgewählte .env-Datei konnte nicht gelesen werden.');
 	}
-	const imported = parseEnv(original);
+	if (Buffer.byteLength(original, 'utf8') > 262144) throw configError('Die Konfigurationsdatei ist zu gross.');
+	const portable = path.extname(source).toLowerCase() === '.repetierer';
+	const imported = portable ? parsePortableConfig(original) : parseEnv(original);
 	const hasAssessment = hasAny(imported, ASSESSMENT_KEYS);
 	const hasBrevo = hasAny(imported, BREVO_KEYS);
 	if (!hasAssessment && !hasBrevo) throw configError('Die .env-Datei enthält keine unterstützte Mitmachnoten- oder Brevo-Konfiguration.');
@@ -140,12 +142,37 @@ async function importIntegrationEnv(sourcePath, destinationPath, options = {}) {
 	let originalDeleted = false;
 	let deleteError = null;
 	try {
+		if (portable || options.preserveSource) return { configured: publicIntegrationStatus(merged), originalDeleted: false, deleteError: null };
 		fs.unlinkSync(source);
 		originalDeleted = true;
 	} catch (error) {
 		deleteError = 'Die interne Kopie wurde gespeichert, aber die ursprüngliche Datei konnte nicht gelöscht werden.';
 	}
 	return { configured: publicIntegrationStatus(merged), originalDeleted, deleteError };
+}
+
+function parsePortableConfig(content) {
+	let bundle;
+	try { bundle = JSON.parse(String(content).replace(/^\uFEFF/, '')); } catch { throw configError('Die .repetierer-Datei ist kein gültiges Konfigurationspaket.'); }
+	if (!bundle || bundle.format !== 'repetierer-settings' || bundle.version !== 1 || !bundle.values || Array.isArray(bundle.values) || typeof bundle.values !== 'object') throw configError('Unbekanntes .repetierer-Format oder nicht unterstützte Version.');
+	if (Object.keys(bundle.values).some(key => !KNOWN_KEYS.includes(key) || typeof bundle.values[key] !== 'string')) throw configError('Das Paket enthält unbekannte oder ungültige Einstellungen.');
+	const values = pickKnown(bundle.values);
+	validateAssessmentConfig(values); validateBrevoConfig(values);
+	if (values.ASSESSMENT_TEACHER_TOKEN.startsWith('encrypted:')) throw configError('Dieses Paket enthält einen gerätegebundenen Zugang. Bitte über «Paket exportieren» neu erstellen.');
+	return values;
+}
+
+function exportIntegrationFile(destinationPath, values, options = {}) {
+	const exported = pickKnown(values);
+	if (exported.ASSESSMENT_TEACHER_TOKEN?.startsWith('encrypted:')) {
+		if (!options.revealTeacherToken) throw configError('Der lokale Lehrerzugang konnte nicht für das Paket geöffnet werden.');
+		exported.ASSESSMENT_TEACHER_TOKEN = options.revealTeacherToken(exported.ASSESSMENT_TEACHER_TOKEN);
+	}
+	// A package always contains both connections and only portable credentials.
+	const content = JSON.stringify({format:'repetierer-settings', version:1, values:exported}, null, 2) + '\n';
+	parsePortableConfig(content);
+	atomicWrite(destinationPath, content);
+	return { exported: true, filePath: destinationPath };
 }
 
 function removeConfigGroup(integrationPath, legacyBrevoPath, group) {
@@ -165,7 +192,7 @@ function publicAssessmentConfig(config) {
 }
 
 function publicBrevoConfig(config) {
-	return config ? { configured: true, host: config.host, port: config.port, fromEmail: config.fromEmail, fromName: config.fromName } : { configured: false };
+	return config ? { configured: true, host: config.host, port: config.port, ...require('./senderIdentity') } : { configured: false };
 }
 
 function publicIntegrationStatus(values) {
@@ -245,6 +272,8 @@ module.exports = {
 	cleanIntegrationConfig,
 	buildRoundFormUrl,
 	importIntegrationEnv,
+	exportIntegrationFile,
+	parsePortableConfig,
 	parseEnv,
 	publicAssessmentConfig,
 	publicBrevoConfig,

@@ -1,6 +1,6 @@
 const { ipcRenderer: aiIpc } = require('electron');
-const { createThinkingOrb } = require('./visualFeedback.js');
 const aiMotion = require('./uiMotion.js');
+const { createThinkingOrb } = require('./visualFeedback.js');
 
 const aiUi = {
 	open: document.getElementById('ai-open-btn'), modal: document.getElementById('ai-modal'), close: document.getElementById('ai-close-btn'),
@@ -15,14 +15,30 @@ let aiBusy = false;
 let aiPending = false;
 let aiOpenedStudent = null;
 let aiReturnFocus = null;
-const aiThinkingOrb = createThinkingOrb(document.getElementById('ai-thinking-orb'), { state: 'composing', paused: true });
-const aiWelcomeOrb = createThinkingOrb(document.getElementById('ai-welcome-orb'), { state: 'breathing' });
-window.addEventListener('beforeunload', () => { aiThinkingOrb.destroy(); aiWelcomeOrb.destroy(); }, { once: true });
+let aiFlightActive = false, currentFlight = null;
+
+const welcomeOrb = createThinkingOrb(document.getElementById('ai-welcome-orb'), { state: 'breathing' });
+const typePreference = matchMedia('(prefers-reduced-motion: reduce)');
+const writers = new Map();
+function finishWriters() { for (const finish of [...writers.values()]) finish(); }
+typePreference.addEventListener('change', () => { if(typePreference.matches) { finishWriters(); currentFlight?.finish(); } });
+document.addEventListener('visibilitychange', () => { if(document.hidden) { finishWriters(); currentFlight?.finish(); } });
+window.addEventListener('beforeunload', () => { welcomeOrb.destroy(); finishWriters(); }, {once:true});
+function typeAnswer(text) {
+ const item = aiMessage('assistant', '');
+ if(typePreference.matches || document.hidden) { item.textContent=text; return; }
+ const letters=Array.from(text); let frame=0; const start=performance.now();
+ item.dataset.typing='true'; item.setAttribute('aria-busy','true');
+ const finish=()=>{cancelAnimationFrame(frame);item.textContent=text;delete item.dataset.typing;item.removeAttribute('aria-busy');writers.delete(item);};
+ writers.set(item,finish);
+ const tick=time=>{if(!item.isConnected){finish();return;} const count=Math.min(letters.length,Math.max(1,Math.floor((time-start)/Math.min(22,8000/Math.max(1,letters.length))))); item.textContent=letters.slice(0,count).join('');aiUi.messages.scrollTop=aiUi.messages.scrollHeight;if(count<letters.length)frame=requestAnimationFrame(tick);else finish();};
+ frame=requestAnimationFrame(tick);
+}
 
 function aiUpdateComposer() {
 	aiUi.send.disabled = aiBusy || aiPending || !aiReady || !aiUi.input.value.trim();
 	aiUi.input.disabled = !aiReady;
-	aiUi.send.textContent = aiBusy ? 'Verarbeitet …' : 'Senden';
+	aiUi.send.setAttribute('aria-label', aiBusy ? 'Anfrage wird verarbeitet' : 'Nachricht senden');
 	aiUi.input.style.height = 'auto';
 	aiUi.input.style.height = `${Math.max(48, Math.min(aiUi.input.scrollHeight + 2, 112))}px`;
 }
@@ -30,17 +46,18 @@ function aiUpdateComposer() {
 function aiSetBusy(value) {
 	aiBusy = value;
 	aiUpdateComposer();
-	aiUi.activity.classList.toggle('update-hidden', !value);
-	aiThinkingOrb.setPaused(!value);
-	if (value) aiThinkingOrb.setState('composing');
+	aiSyncActivity();
+	aiUi.activity.dataset.busy = String(value);
+
 	aiUi.messages.setAttribute('aria-busy', String(value));
 	if (value) aiUi.activityLabel.textContent = 'Antwort wird erstellt …';
 	else if (aiUi.modal.classList.contains('modal-open') && aiReady && !aiPending) aiUi.input.focus();
 }
+function aiSyncActivity() { aiUi.activity.classList.toggle('update-hidden', !aiBusy || aiFlightActive); }
 
 function aiMessage(role, content) {
 	const empty = document.getElementById('ai-empty');
-	if (empty) { aiWelcomeOrb.destroy(); empty.remove(); }
+	if (empty) { welcomeOrb.destroy(); empty.remove(); }
 	const item = document.createElement('div');
 	item.className = `ai-message ai-${role}${role === 'error' ? ' ui-alert ui-alert-error' : ''}`;
 	if (role === 'error') item.setAttribute('role', 'alert');
@@ -55,7 +72,7 @@ function aiErrorText(error) {
 }
 
 function aiShowResult(result) {
-	if (result.type === 'answer') { aiMessage('assistant', result.text); return; }
+	if (result.type === 'answer') { typeAnswer(result.text); return; }
 	if (result.type !== 'confirmation') throw new Error('Ungültige Assistentenantwort.');
 	aiPending = true;
 	const card = document.createElement('div');
@@ -105,7 +122,8 @@ async function aiRefreshStatus() {
 async function aiOpen() {
 	if (!aiUi.modal.classList.contains('modal-open') && !aiUi.modal.contains(document.activeElement)) aiReturnFocus = document.activeElement;
 	aiMotion.openDialog(aiUi.modal);
-	aiUi.close.focus();
+	document.getElementById('ai-heading').tabIndex = -1;
+	document.getElementById('ai-heading').focus();
 	await aiRefreshStatus();
 	if (aiUi.modal.classList.contains('modal-open') && aiReady && !aiPending) aiUi.input.focus();
 }
@@ -118,6 +136,7 @@ aiUi.messages.addEventListener('click', event => {
 	aiUi.input.focus();
 });
 function aiClose(afterClose) {
+	currentFlight?.finish();
 	aiMotion.closeDialog(aiUi.modal, () => {
 		if (typeof afterClose === 'function') afterClose();
 		else if (aiReturnFocus && aiReturnFocus.isConnected) aiReturnFocus.focus();
@@ -172,21 +191,39 @@ aiIpc.on('ai-activity', (event, activity) => {
 	if (!aiBusy) return;
 	aiUi.activityLabel.textContent = activity.label || 'Klassendaten werden geprüft …';
 	const state = activity.tool === 'searchStudents' ? 'searching' : ['createRepetitionGrade', 'addParticipationPoints'].includes(activity.tool) ? 'solving' : 'working';
-	aiThinkingOrb.setState(state);
+	aiUi.activity.dataset.activity = state;
 });
 
 aiUi.form.addEventListener('submit', async event => {
 	event.preventDefault();
 	const text = aiUi.input.value.trim();
 	if (!text || !aiReady || aiBusy || aiPending) return;
-	aiUi.input.value = '';
-	aiMessage('user', text);
-	aiSetBusy(true);
+	const source = aiUi.input.getBoundingClientRect();
+ aiUi.input.value = '';
+ aiFlightActive = !typePreference.matches && !document.hidden;
+ aiSetBusy(true);
+ const message = aiMessage('user', text);
+ let landed = Promise.resolve();
+ if (aiFlightActive) {
+   let resolveLanding; landed = new Promise(resolve => {resolveLanding=resolve;});
+   const target = message.getBoundingClientRect();
+   const ghost = document.createElement('div'); ghost.className = 'ai-message ai-user ai-send-flight'; ghost.textContent = text; ghost.setAttribute('aria-hidden','true');
+   ghost.style.cssText = `position:fixed;pointer-events:none;z-index:2000;left:${source.left}px;top:${source.top}px;width:${target.width}px;height:${target.height}px;box-sizing:border-box;overflow:hidden`;
+   document.body.append(ghost); message.dataset.inFlight='true';
+   const flight=ghost.animate([{transform:'translate(0,0)',opacity:0},{transform:`translate(${target.left-source.left}px,${target.top-source.top}px)`,opacity:1}],{duration:480,easing:'cubic-bezier(.7,0,.84,0)'});
+   currentFlight=flight;
+   const finish=()=>{ghost.remove();delete message.dataset.inFlight;aiUi.messages.scrollTop=aiUi.messages.scrollHeight;aiFlightActive=false;currentFlight=null;aiSyncActivity();resolveLanding();};flight.onfinish=finish;flight.oncancel=finish;
+ }
+
+ aiUi.messages.scrollTop=aiUi.messages.scrollHeight;
+ requestAnimationFrame(()=>{aiUi.messages.scrollTop=aiUi.messages.scrollHeight;});
 	try {
 		const context = typeof window.getRepetiererAiContext === 'function' ? window.getRepetiererAiContext() : {};
 		if (aiOpenedStudent && context.classId === aiOpenedStudent.classId && context.studentId === null && context.page !== 'evaluation' && context.page !== 'statistics') { context.studentId = aiOpenedStudent.studentId; context.page = 'student'; }
-		aiShowResult(await aiIpc.invoke('ai:ask', { text, context }));
-	} catch (error) { aiMessage('error', aiErrorText(error)); }
+		const result=await aiIpc.invoke('ai:ask', { text, context });
+		await landed;
+		aiShowResult(result);
+	} catch (error) { await landed; aiMessage('error', aiErrorText(error)); }
 	finally { aiSetBusy(false); }
 });
 
@@ -195,6 +232,7 @@ aiIpc.on('ai-navigate', (event, command) => {
 	if (!window.navigateRepetiererAi(command)) { aiMessage('error', 'Die Klasse konnte nicht geöffnet werden.'); return; }
 	if (command.page === 'evaluation') {
 		aiIpc.once('class-statistics-data', () => setTimeout(() => {
+			window.selectRepetiererStatsClass?.(command.classId);
 			const card = Array.from(document.querySelectorAll('#stats-list .stats-class-card')).find(item => item.querySelector('h2, h3, h4')?.textContent === command.classId);
 			if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 		}, 120));

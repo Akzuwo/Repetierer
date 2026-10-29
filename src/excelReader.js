@@ -1,6 +1,8 @@
 const ExcelJS = require('exceljs');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('node:crypto');
+const jokerDates = require('./jokerDates');
 const { spawnSync } = require('child_process');
 const { buildClassStatistics } = require('./classStats.js');
 let f;
@@ -399,7 +401,7 @@ function write_joker(clss, person, callback) {
 	}
 	jokerCell.value = remainingJokers - 1;
 
-	appendJokerDate(ws.getCell('Q' + (person.id + 6)), getFormattedDate());
+	jokerDates.append(ws, person.id + 6, getFormattedDate());
 	writeWorkbook(clss, callback, { type: 'joker' });
 }
 
@@ -501,7 +503,7 @@ function apply_entries(clss, entries, callback) {
 			const remainingJokers = Number(jokerCell.value || 0);
 			if (remainingJokers <= 0) return;
 			jokerCell.value = remainingJokers - 1;
-			appendJokerDate(entryWorksheet.getCell('Q' + row), entry.date || getFormattedDate());
+			jokerDates.append(entryWorksheet, row, entry.date || getFormattedDate());
 			applied.push(entry.id);
 		}
 	});
@@ -568,8 +570,7 @@ function undo_entry(clss, entry, callback) {
 	if (entry.type === 'joker') {
 		const jokerCell = entryWorksheet.getCell('H' + row);
 		jokerCell.value = Number(jokerCell.value || 0) + 1;
-		const jokerDateCell = entryWorksheet.getCell('Q' + row);
-		removeJokerDate(jokerDateCell, entry.date);
+		jokerDates.remove(entryWorksheet, row, entry.date);
 
 		writeWorkbook(clss, callback, { type: 'undo-joker' });
 		return;
@@ -582,43 +583,6 @@ function sameCellValue(a, b) {
 	return String(a === null || a === undefined ? '' : a).trim() === String(b === null || b === undefined ? '' : b).trim();
 }
 
-function getJokerHistoryDates(value) {
-	const normalized = String(value === null || value === undefined ? '' : value)
-		.split(/[;,]/)
-		.map(date => date.trim())
-		.filter(Boolean);
-	return normalized;
-}
-
-function appendJokerDate(cell, date) {
-	const dates = getJokerHistoryDates(cell.value);
-	dates.push(date);
-	cell.value = dates.join('; ');
-}
-
-function removeJokerDate(cell, date) {
-	const dates = getJokerHistoryDates(cell.value);
-	if (dates.length === 0) {
-		cell.value = null;
-		return;
-	}
-
-	let indexToRemove = dates.length - 1;
-	if (date) {
-		indexToRemove = -1;
-		for (let i = dates.length - 1; i >= 0; i--) {
-			if (sameCellValue(dates[i], date)) {
-				indexToRemove = i;
-				break;
-			}
-		}
-		if (indexToRemove === -1) return;
-	}
-
-	dates.splice(indexToRemove, 1);
-	cell.value = dates.length > 0 ? dates.join('; ') : null;
-}
-
 function countGradesForRow(worksheet, row) {
 	let n = 0;
 	[1,2,3,4,5,6].map(x => {
@@ -629,24 +593,63 @@ function countGradesForRow(worksheet, row) {
 
 function copyRowValues(worksheet, row) {
 	const values = {};
-	for (let column = 1; column <= 17; column++) {
+	for (let column = 1; column <= Math.max(17, worksheet.columnCount); column++) {
 		values[column] = worksheet.getCell(row, column).value;
 	}
 	return values;
 }
 
 function writeRowValues(worksheet, row, values) {
-	for (let column = 1; column <= 17; column++) {
+	for (let column = 1; column <= Math.max(17, worksheet.columnCount); column++) {
 		worksheet.getCell(row, column).value = Object.prototype.hasOwnProperty.call(values, column) ? values[column] : null;
 	}
 }
 
 function clearRosterRow(worksheet, row) {
-	for (let column = 1; column <= 17; column++) {
+	for (let column = 1; column <= Math.max(17, worksheet.columnCount); column++) {
 		worksheet.getCell(row, column).value = null;
 	}
 }
+function getJokerDateMigrationStatus() {
+ if(!wb || !f) return {needsMigration:false,sheets:[]};
+ try {
+  const sheets=wb.worksheets.filter(sheet=>sheet.getCell('A1').value==='repetierer').map(jokerDates.inspect);
+  return {needsMigration:sheets.some(sheet=>sheet.needsMigration),sheets, fingerprint:crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex')};
+ } catch(error) { return {needsMigration:true,sheets:[],error:error.message}; }
+}
+async function migrate_joker_dates(fingerprint, callback) {
+ let backupPath, tempPath;
+ const target=f;
+ try {
+  if(!target || !wb) throw new Error('Keine Excel-Datei geladen.');
+  const lock=getFileLockStatus(target);
+  if(lock.locked) return callback({success:false,reason:'excel-locked',error:lock.error});
+  const content=fs.readFileSync(target), digest=crypto.createHash('sha256').update(content).digest('hex');
+  if(!fingerprint || fingerprint!==digest) return callback({success:false,reason:'file-changed'});
+  const updated=new ExcelJS.Workbook(); await updated.xlsx.load(content);
+  const sheets=updated.worksheets.filter(sheet=>sheet.getCell('A1').value==='repetierer');
+  const plans=sheets.map(jokerDates.inspect).filter(plan=>plan.needsMigration);
+  if(!plans.length) return callback({success:true,alreadyMigrated:true,worksheets:updated.worksheets.map(sheet=>sheet.name)});
+  sheets.forEach(jokerDates.migrateWorksheet);
+  backupPath=path.join(path.dirname(target),`${path.basename(target,path.extname(target))}.vor-joker-datum-${new Date().toISOString().replace(/[:.]/g,'-')}-${crypto.randomUUID().slice(0,8)}${path.extname(target)}`);
+  fs.copyFileSync(target,backupPath,fs.constants.COPYFILE_EXCL);
+  tempPath=path.join(path.dirname(target),`.joker-datum-${crypto.randomUUID()}.xlsx`);
+  await updated.xlsx.writeFile(tempPath);
+  const verification=new ExcelJS.Workbook();await verification.xlsx.readFile(tempPath);
+  if(verification.worksheets.filter(sheet=>sheet.getCell('A1').value==='repetierer').some(sheet=>jokerDates.inspect(sheet).needsMigration)) throw new Error('Die erweiterten Spalten konnten nicht geprüft werden.');
+  const current=crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex');
+  if(current!==digest) return callback({success:false,reason:'file-changed',backupPath});
+  const finalLock=getFileLockStatus(target);
+  if(finalLock.locked) return callback({success:false,reason:'excel-locked',backupPath});
+  fs.renameSync(tempPath,target);tempPath=undefined;
+  init(target,worksheets=>callback({success:!!worksheets,worksheets,backupPath,migratedSheets:plans.length,dates:plans.reduce((sum,plan)=>sum+plan.dates,0)}));
+ } catch(error) { callback({success:false,reason:'migration-failed',error:error.message,backupPath}); }
+ finally { if(tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath); }
+}
+
 module.exports = {
+ getJokerDateMigrationStatus,
+ migrate_joker_dates,
 	init: init,
 	read: read,
 	read_editor_persons: read_editor_persons,
