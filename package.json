@@ -1,6 +1,8 @@
 {
   "name": "repetierer",
   "version": "7.0.0",
+  "buildNumber": 28,
+  "buildDate": "09112026",
   "description": "(:",
   "license": "GPL-3.0",
   "repository": {

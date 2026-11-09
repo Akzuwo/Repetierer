@@ -2,6 +2,16 @@ const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const rcedit = require("rcedit");
+const {createBuildMetadata} = require('../src/buildInfo');
+
+function buildArguments(metadata, env = process.env, date = new Date()) {
+  const info = createBuildMetadata(metadata,env,date);
+  return {
+    info,
+    metadataArgs: [`--config.extraMetadata.buildNumber=${info.buildNumber}`,`--config.extraMetadata.buildDate=${info.buildDate}`],
+    artifactArg: `--config.nsis.artifactName=Repetierer-\${version}-Build-${info.build}.\${ext}`
+  };
+}
 
 const rootDir = path.resolve(__dirname, "..");
 const outputDir = path.join(rootDir, "builds");
@@ -57,12 +67,8 @@ async function main() {
   const node = process.execPath;
   const electronBuilderCli = path.join(rootDir, "node_modules", "electron-builder", "out", "cli", "cli.js");
   const publishMode = process.env.PUBLISH_MODE || "always";
-  const localBuildNumber = /^\d+$/.test(process.env.LOCAL_BUILD_NUMBER || "")
-    ? process.env.LOCAL_BUILD_NUMBER
-    : "";
-  const localMetadataArgs = localBuildNumber
-    ? [`--config.extraMetadata.localBuildNumber=${localBuildNumber}`]
-    : [];
+  const plan = buildArguments(require('../package.json'));
+  const localMetadataArgs = plan.metadataArgs;
 
   requireFile(iconPath, "App Icon");
   requireFile(electronBuilderCli, "electron-builder CLI");
@@ -96,9 +102,7 @@ async function main() {
     publishMode,
     ...localMetadataArgs,
   ];
-  if (localBuildNumber) {
-    installerArgs.push(`--config.nsis.artifactName=Repetierer-\${version}-Build-${localBuildNumber}.\${ext}`);
-  }
+  installerArgs.push(plan.artifactArg);
   run(node, installerArgs);
 }
 
@@ -116,7 +120,8 @@ async function editExecutableIcon(executablePath, executableIconPath) {
 	throw lastError;
 }
 
-main().catch((error) => {
+module.exports={buildArguments};
+if(require.main === module) main().catch((error) => {
   console.error(error);
   process.exit(1);
 });

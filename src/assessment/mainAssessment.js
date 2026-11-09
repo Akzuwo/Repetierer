@@ -178,6 +178,15 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 	});
 
 	register('assessment:brevo-status', async () => getBrevoStatus(paths));
+	register('debug:send-test-mail', async (event,args) => {
+		if (!require('../debugFlags').isDebugMode(process.argv)) throw contextError('Testmails sind nur im Debug-Modus verfügbar.');
+		const message=require('./debugMail').buildDebugMessage(args.recipient);
+		const config=requireBrevo(paths);
+		try {
+			await createSmtpMailer(config).send(message);
+			return {sent:true};
+		} catch(error) { throw contextError(sanitizeMailError(error)); }
+	});
 	register('assessment:brevo-test', async () => {
 		const config = requireBrevo(paths);
 		try {

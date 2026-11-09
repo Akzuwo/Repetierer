@@ -12,6 +12,22 @@ let mainWindow;
 let splashWindow;
 let autoUpdater;
 const isDebugMode = require('./src/debugFlags').isDebugMode(process.argv);
+const debugUpdate = require('./src/debugUpdate').createDebugUpdate({
+	enabled: isDebugMode,
+	version: app.getVersion(),
+	send: sendUpdateStatus,
+	restart: () => {
+		fs.writeFileSync(path.join(app.getPath('userData'), 'debug-update-state.json'), JSON.stringify({previousPid:process.pid}));
+		app.relaunch();
+		app.exit(0);
+	}
+});
+ipcMain.on('debug-update-show', (event, mode) => {
+	if (event.sender === mainWindow?.webContents) debugUpdate.show(mode);
+});
+ipcMain.on('debug-update-cancel', event => {
+	if (event.sender === mainWindow?.webContents) debugUpdate.cancel();
+});
 const mainWindowSize = { width: 1100, height: 800 };
 const startupWindowSize = { width: 560, height: 260 };
 let updateDownloadApproved = false;
@@ -87,6 +103,17 @@ function createMainWindow() {
 		closeSplashWindow();
 	});
 	mainWindow.webContents.on('did-finish-load', () => {
+		if (isDebugMode) {
+			const marker = path.join(app.getPath('userData'), 'debug-update-state.json');
+			try {
+				if (fs.existsSync(marker)) {
+					const state = JSON.parse(fs.readFileSync(marker, 'utf8'));
+					fs.unlinkSync(marker);
+					fs.writeFileSync(path.join(app.getPath('userData'), 'debug-update-completed.json'), JSON.stringify({...state,pid:process.pid}));
+					sendUpdateStatus('installed', {version:app.getVersion(),simulated:true});
+				}
+			} catch { sendUpdateStatus('error', {message:'Die Update-Simulation konnte nicht abgeschlossen werden.'}); }
+		}
 		notifyInstalledUpdateIfNeeded();
 		checkForUpdatesWithConsent();
 	});
@@ -201,6 +228,9 @@ function registerUpdaterListeners() {
 }
 
 ipcMain.on('update-download-approved', async event => {
+	if (event.sender !== mainWindow?.webContents) return;
+	try { if (await debugUpdate.approve()) return; }
+	catch { sendUpdateStatus('error', {message:'Die Update-Simulation ist fehlgeschlagen.'}); return; }
 	if (!app.isPackaged) {
 		sendUpdateStatus('error', {
 			message: 'Updates sind im Entwicklungsmodus deaktiviert.'

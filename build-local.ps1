@@ -6,6 +6,7 @@ $ErrorActionPreference = "Stop"
 
 $previousPublishMode = $env:PUBLISH_MODE
 $previousLocalBuildNumber = $env:LOCAL_BUILD_NUMBER
+$previousLocalBuildDate = $env:LOCAL_BUILD_DATE
 $rootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 function Invoke-NativeCommand {
@@ -39,13 +40,16 @@ try {
       throw "Ungueltige lokale Buildnummer in $buildNumberPath."
     }
   }
-  $localBuildNumber = $lastBuildNumber + 1
+  $packageMetadata = Get-Content -LiteralPath (Join-Path $rootDir "package.json") -Raw | ConvertFrom-Json
+  $localBuildNumber = [Math]::Max($lastBuildNumber, [int]$packageMetadata.buildNumber) + 1
 
   Write-Host "Baue Tailwind CSS..."
   Invoke-NativeCommand { npm run build:css } "CSS-Build"
 
   $env:PUBLISH_MODE = "never"
   $env:LOCAL_BUILD_NUMBER = $localBuildNumber
+  $env:LOCAL_BUILD_DATE = node -e "process.stdout.write(require('./src/buildInfo').formatBuildDate())"
+  if ($LASTEXITCODE -ne 0) { throw "Builddatum konnte nicht ermittelt werden." }
   Write-Host "Erzeuge lokalen Windows-Build Nr. $localBuildNumber..."
   Invoke-NativeCommand { node ".\scripts\release-with-icon.js" } "Windows-Build"
   Set-Content -LiteralPath $buildNumberPath -Value $localBuildNumber -NoNewline
@@ -58,6 +62,8 @@ try {
     Format-Table -AutoSize
 }
 finally {
+  if ($null -eq $previousLocalBuildDate) { Remove-Item Env:LOCAL_BUILD_DATE -ErrorAction SilentlyContinue }
+  else { $env:LOCAL_BUILD_DATE = $previousLocalBuildDate }
   if ($null -eq $previousPublishMode) {
     Remove-Item Env:PUBLISH_MODE -ErrorAction SilentlyContinue
   }

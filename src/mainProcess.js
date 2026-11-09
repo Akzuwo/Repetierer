@@ -126,14 +126,13 @@ ipcMain.on('quit', (event, args) => {
 
 // app version
 ipcMain.on('get-version', (event, args) => {
-	let displayVersion = app.getVersion();
+	let metadata={version:app.getVersion()};
 	try {
-		const packageData = JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'));
-		if (packageData.localBuildNumber) displayVersion += ` (Build ${packageData.localBuildNumber})`;
+		metadata={...JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8')),version:app.getVersion()};
 	} catch (error) {
 		// Die Versionsnummer bleibt auch ohne optionale lokale Build-Metadaten verfügbar.
 	}
-	event.sender.send('version', displayVersion);
+	event.sender.send('version',app.getVersion(),require('./buildInfo').getBuildInfo(metadata));
 });
 
 ipcMain.on('get-update-news', (event, args) => {

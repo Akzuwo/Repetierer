@@ -10,6 +10,8 @@ const pause = ms => new Promise(resolve => setTimeout(resolve,ms));
 const output = path.join(__dirname,'..','.ui-polish-smoke'); fs.mkdirSync(output,{recursive:true});
 app.setPath('userData',fs.mkdtempSync(path.join(os.tmpdir(),'repetierer-debug-ui-')));
 let win, errors = [], writes = 0;
+const sentMails=[];let failMail=false;
+require('nodemailer').createTransport=()=>({sendMail:async message=>{if(failMail){const error=new Error('not exposed');error.code='EAUTH';throw error;}sentMails.push(message);return {accepted:[message.to]};}});
 const evaluate = code => win.webContents.executeJavaScript(code,true);
 async function waitFor(code) {for(let i=0;i<150;i++){try {if(await evaluate(code))return;}catch{} await pause(40);} console.error(await evaluate(`({phase:document.getElementById('content').dataset.pageMotion,context:window.getRepetiererAiContext?.(),header:document.getElementById('session-header').className,end:document.getElementById('end-session-btn').disabled,modal:document.getElementById('session-end-modal').className})`));throw new Error('Timeout: '+code);}
 async function shot(name) {console.log('DEBUG capture:',name);await pause(650);win.webContents.invalidate();await pause(100);fs.writeFileSync(path.join(output,name+'.png'),(await win.webContents.capturePage()).toPNG());}
@@ -66,12 +68,12 @@ async function main() {
   assert.equal(nativeSave.result.success,true);assert.equal(nativeSave.result.persons[0].name,'Editor B geändert');assert.equal(nativeSave.meta.requestId,742);
   assert.equal(nativeProgram.getCurrentClass(),undefined);assert.equal(nativeProgram.getClassPersons('Editor A')[0].name,'Editor A');
   console.log('EDITOR_MAIN_IPC_PASS: independent class read/save, real workbook, request metadata, no repetition selection');
-  // The requested three-action menu replaces the former scenario catalogue.
+  // Three message actions plus the requested update and mail tools.
   // Full app/dialog scenarios remain covered by test:ui and focused checks.
   await evaluate("window.debugDocumentSentinel='same-document';document.getElementById('debug-launcher').click()");await pause(500);
-  assert.deepEqual(await evaluate("[...document.querySelectorAll('#debug-panel button')].map(b=>b.textContent)"),['Nachricht','Warnung','Fehler']);
+  assert.deepEqual(await evaluate("[...document.querySelectorAll('#debug-panel button')].map(b=>b.textContent)"),['Nachricht','Warnung','Fehler','Fake Update','Update mit Neustart','Testmail senden']);
   assert.equal(await evaluate("document.querySelectorAll('#debug-actions button').length"),1);
-  assert.equal(await evaluate("document.querySelectorAll('#debug-panel input').length"),0);
+  assert.equal(await evaluate("document.querySelectorAll('#debug-panel input').length"),1);
   await shot('debug-three-actions');
   await evaluate("document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))");
   await waitFor("getComputedStyle(document.getElementById('debug-panel')).display==='none'");
@@ -84,11 +86,33 @@ async function main() {
   }
   assert.equal(nativeProgram.getClassPersons('Editor B')[0].name,'Editor B geändert');
   await evaluate("document.getElementById('debug-launcher').click()");await pause(500);
-  await evaluate("document.querySelector('#debug-panel button:last-child').focus()");
+  await evaluate("document.getElementById('debug-mail-send').focus()");
   win.webContents.sendInputEvent({type:'keyDown',keyCode:'Tab'});win.webContents.sendInputEvent({type:'keyUp',keyCode:'Tab'});
   await waitFor("document.activeElement===document.querySelector('#debug-panel button')");
+  // The form goes through the real IPC, config validation and production template.
+  fs.writeFileSync(require('../src/storage').getPaths().integrationEnvPath,[
+    'BREVO_SMTP_HOST=smtp.example.ch','BREVO_SMTP_PORT=587','BREVO_SMTP_USER=fixture-user',
+    'BREVO_SMTP_PASSWORD=fixture-only','BREVO_FROM_EMAIL=no-reply@example.ch','BREVO_FROM_NAME=Fixture'
+  ].join('\n'));
+  await evaluate(`notify.clear();document.getElementById('debug-mail-recipient').value='demo@example.ch'`);
+  await mouseClick('#debug-mail-send');await waitFor(`notify.getActive().some(n=>n.type==='success')`);
+  assert.equal(sentMails.length,1);assert.equal(sentMails[0].to,'demo@example.ch');assert.match(sentMails[0].html,/<table/);
+  failMail=true;await evaluate(`notify.clear()`);await mouseClick('#debug-mail-send');await waitFor(`notify.getActive().some(n=>n.type==='error')`);
+  assert.equal(sentMails.length,1);assert.equal(await evaluate(`document.getElementById('debug-mail-send').disabled`),false);
+  await shot('debug-menu-mail');
+  await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))`);await pause(500);
+  // Preview approval completes locally; cancellation cannot leave an armed restart.
+  await evaluate(`document.getElementById('debug-launcher').click()`);await pause(450);
+  await mouseClick('[data-debug-scenario="update-preview"]');await waitFor(`document.getElementById('update-panel').classList.contains('modal-open')`);await pause(450);
+  assert.equal(await evaluate(`document.getElementById('update-title').innerText`),'Fake Update');
+  await mouseClick('#update-primary-btn');await waitFor(`notify.getActive().some(n=>n.title==='Fake Update')`);
+  assert.equal(nativeProgram.getClassPersons('Editor B')[0].name,'Editor B geändert');
+  const debugFlagIndex=process.argv.indexOf('--debug');process.argv.splice(debugFlagIndex,1);
+  const blocked=await evaluate(`require('electron').ipcRenderer.invoke('debug:send-test-mail',{recipient:'demo@example.ch'})`);
+  assert.equal(blocked.ok,false);assert.match(blocked.error.message,/nur im Debug/);assert.equal(sentMails.length,1);
+  process.argv.push('--debug');
   assert.deepEqual(errors,[],'No renderer errors');
-  console.log('DEBUG_UI_PASS: real startup, normal-mode gate, exactly three native message actions, no reload/demo state, workbook unchanged, keyboard focus');
+  console.log('DEBUG_UI_PASS: real startup, normal-mode gate, three message actions, update preview, testmail success/error with local SMTP interception, no reload/demo state, workbook unchanged, keyboard focus');
 }
 const watchdog=setTimeout(()=>{console.error('Debug UI check timed out');app.exit(1);},120000);
 main().then(()=>{clearTimeout(watchdog);app.exit(0);}).catch(error=>{console.error(error);clearTimeout(watchdog);app.exit(1);});

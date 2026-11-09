@@ -168,6 +168,17 @@ function setDrawerOpen(open) {
 	const scrim = document.getElementById('drawer-scrim');
 	const toggle = document.getElementById('drawer-toggle');
 	const bars = toggle.querySelectorAll('span');
+	// Layout positions exclude the animated transforms, including during reversal.
+	const centers = Array.from(bars, bar => {
+		const bounds = bar.getBoundingClientRect();
+		return bounds.y + bounds.height / 2 - Number(gsap.getProperty(bar, 'y'));
+	});
+	const topOffset = centers[1] - centers[0], bottomOffset = centers[1] - centers[2];
+	const finishBars = () => {
+		gsap.set(bars[0], {y:open ? topOffset : 0, rotation:open ? 45 : 0});
+		gsap.set(bars[1], {opacity:open ? 0 : 1, scaleX:open ? 0 : 1});
+		gsap.set(bars[2], {y:open ? bottomOffset : 0, rotation:open ? -45 : 0});
+	};
 	const openingFromRest = open && !animations.has(drawer) && !drawer.classList.contains('drawer-open');
 	cancel(drawer);
 	gsap.set(drawer, { x: gsap.getProperty(drawer, 'x'), xPercent: gsap.getProperty(drawer, 'xPercent') });
@@ -184,11 +195,12 @@ function setDrawerOpen(open) {
 	animate(drawer, timeline => {
 		timeline.to(drawer, { xPercent: open ? 0 : -100, x: open ? 0 : -24, scaleX: open ? 1 : .975, transformOrigin: 'left center', duration: open ? .56 : .38, ease: open ? 'power3.out' : 'power2.inOut' }, 0)
 			.to(scrim, { opacity: open ? 1 : 0, duration: open ? .4 : .32, ease: 'power2.inOut' }, 0)
-			.to(bars[0], { y: open ? '.47rem' : 0, rotation: open ? 45 : 0, duration: .3 }, 0)
+			.to(bars[0], { y: open ? topOffset : 0, rotation: open ? 45 : 0, duration: .3 }, 0)
 			.to(bars[1], { opacity: open ? 0 : 1, scaleX: open ? 0 : 1, duration: .2 }, 0)
-			.to(bars[2], { y: open ? '-.47rem' : 0, rotation: open ? -45 : 0, duration: .3 }, 0);
+			.to(bars[2], { y: open ? bottomOffset : 0, rotation: open ? -45 : 0, duration: .3 }, 0);
 	}, () => {
-		gsap.set([drawer, ...bars], { clearProps: 'transform,opacity' });
+		gsap.set(drawer, { clearProps: 'transform,opacity' });
+		finishBars();
 		gsap.set(scrim, { clearProps: 'opacity' });
 		delete drawer.dataset.motionState;
 	});

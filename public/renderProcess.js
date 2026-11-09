@@ -583,6 +583,7 @@ _updatePrimaryBtn.addEventListener('click', () => {
 });
 
 _updateSecondaryBtn.addEventListener('click', () => {
+	ipcRenderer.send('debug-update-cancel');
 	hideUpdatePanel();
 });
 
@@ -816,8 +817,10 @@ ipcRenderer.on('joker-migration-failed', (event, result) => {
 	});
 });
 
-ipcRenderer.on('version', (event, appVersion) => {
-	document.getElementById("version").innerText = "v" + appVersion;
+ipcRenderer.on('version', (event, appVersion, buildInfo) => {
+	document.getElementById('version').innerText = 'Version ' + appVersion;
+	const info=buildInfo || require('../src/buildInfo').getBuildInfo(require('../package.json'));
+	document.getElementById('build-number').innerText = 'Build ' + info.build;
 });
 
 ipcRenderer.on('update-news-data', (event, payload) => {
@@ -2265,9 +2268,9 @@ function handleUpdateStatus(payload) {
 			break;
 		case 'available':
 			showUpdatePanel({
-				title: `Version ${payload.version} ist verfügbar`,
-				detail: 'Eine neue Version von Repetierer kann installiert werden.',
-				primaryText: `Aktualisieren auf Version ${payload.version}`,
+				title: payload.simulated ? 'Fake Update' : `Version ${payload.version} ist verfügbar`,
+				detail: payload.simulated ? (payload.simulationMode==='restart' ? 'Download und Installation werden simuliert. Danach startet die App wirklich neu. Bitte speichere offene Änderungen vorher.' : 'Vorschau des Update-Modals. Es wird nichts heruntergeladen oder installiert.') : 'Eine neue Version von Repetierer kann installiert werden.',
+				primaryText: payload.simulated ? (payload.simulationMode==='restart' ? 'Simulieren und neustarten' : 'Vorschau testen') : `Aktualisieren auf Version ${payload.version}`,
 				secondaryText: 'Später',
 				primaryVisible: true,
 				secondaryVisible: true,
@@ -2317,13 +2320,17 @@ function handleUpdateStatus(payload) {
 			break;
 		case 'installed':
 			showUpdatePanel({
-				title: 'Update erfolgreich installiert',
-				detail: `Repetierer läuft jetzt mit Version ${payload.version}.`,
+				title: payload.simulated ? 'Update-Simulation abgeschlossen' : 'Update erfolgreich installiert',
+				detail: payload.simulated ? 'Die App wurde erfolgreich neu gestartet. Version und Daten bleiben erhalten.' : `Repetierer läuft jetzt mit Version ${payload.version}.`,
 				primaryText: 'OK',
 				primaryVisible: false,
 				secondaryText: 'Schließen',
 				secondaryVisible: true
 			});
+			break;
+		case 'simulated-preview':
+			hideUpdatePanel();
+			notify.info('Die Vorschau ist abgeschlossen.',{title:'Fake Update'});
 			break;
 		case 'error':
 			showUpdatePanel({
