@@ -12,17 +12,52 @@ const {
 	validateAssessmentConfig,
 	validateBrevoConfig
 } = require('../src/assessment/integrationConfig.js');
+const {exportIntegrationFile,parsePortableConfig,readIntegrationValues} = require('../src/assessment/integrationConfig.js');
 
-const assessmentEnv = `ASSESSMENT_FORM_URL=https://docs.google.com/forms/d/e/example/viewform\nASSESSMENT_API_URL=https://script.google.com/macros/s/example/exec\nASSESSMENT_API_KEY=long-secret-key\nASSESSMENT_ROUND_FIELD_ID=entry.123456\n`;
+const teacherToken = 'rt_' + 'a'.repeat(43);
+const assessmentEnv = `ASSESSMENT_API_URL=https://timolu.ch/app/services/repetierer/api\nASSESSMENT_TEACHER_TOKEN=${teacherToken}\n`;
 const brevoEnv = `BREVO_SMTP_HOST=smtp-relay.brevo.com\nBREVO_SMTP_PORT=587\nBREVO_SMTP_USER=user@example.ch\nBREVO_SMTP_PASSWORD="secret value"\nBREVO_FROM_EMAIL=teacher@example.ch\nBREVO_FROM_NAME=Herr Schaufelberger\n`;
 
+test('ein portables Paket überträgt SMTP und Cloudflare zusammen und behält die Quelldatei', async () => {
+	const dir=fs.mkdtempSync(path.join(os.tmpdir(),'repetierer-bundle-'));
+	const file=path.join(dir,'teacher.repetierer'),internal=path.join(dir,'internal.env');
+	const values=parseEnv(assessmentEnv+brevoEnv); values.ASSESSMENT_TEACHER_TOKEN='encrypted:bG9jYWw=';
+	exportIntegrationFile(file,values,{revealTeacherToken:()=>teacherToken});
+	const before=fs.readFileSync(file); assert.equal(parsePortableConfig(before).ASSESSMENT_TEACHER_TOKEN,teacherToken);
+	let verified=false;
+	const result=await importIntegrationEnv(file,internal,{protectTeacherToken:token=>'encrypted:'+Buffer.from(token).toString('base64'),verify:async ({assessment,brevo})=>{assert.equal(assessment.teacherToken,teacherToken);assert.equal(brevo.password,'secret value');verified=true;}});
+	assert.ok(verified);assert.equal(result.originalDeleted,false);assert.deepEqual(fs.readFileSync(file),before);
+	assert.equal(readBrevoConfig(internal).fromEmail,'teacher@example.ch');assert.match(readAssessmentConfig(internal).teacherToken,/^encrypted:/);
+	assert.equal(Object.keys(readIntegrationValues(internal)).length,8);
+});
+test('ungültige und gerätegebundene Pakete verändern die bestehende Konfiguration nicht', async () => {
+	const dir=fs.mkdtempSync(path.join(os.tmpdir(),'repetierer-bundle-invalid-')),file=path.join(dir,'invalid.repetierer'),internal=path.join(dir,'internal.env');
+	fs.writeFileSync(internal,assessmentEnv+brevoEnv);const before=fs.readFileSync(internal);
+	for(const bundle of [{format:'repetierer-settings',version:2,values:parseEnv(assessmentEnv+brevoEnv)},{format:'repetierer-settings',version:1,values:parseEnv(assessmentEnv)},{format:'repetierer-settings',version:1,values:{...parseEnv(assessmentEnv+brevoEnv),ASSESSMENT_TEACHER_TOKEN:'encrypted:abc='}}]) {
+		fs.writeFileSync(file,JSON.stringify(bundle));await assert.rejects(importIntegrationEnv(file,internal));assert.deepEqual(fs.readFileSync(internal),before);assert.ok(fs.existsSync(file));
+	}
+});
+test('Paketexport benötigt beide Verbindungen und exportiert keine fremden Schlüssel',()=>{
+	assert.throws(()=>exportIntegrationFile('unused.repetierer',parseEnv(assessmentEnv)),/Fehlende/);
+	assert.throws(()=>parsePortableConfig(JSON.stringify({format:'repetierer-settings',version:1,values:{...parseEnv(assessmentEnv+brevoEnv),COMMAND:'run me'}})),/unbekannte/);
+});
+test('fehlgeschlagene API-Prüfung oder lokaler Schlüsselspeicher bewahren vorhandene Daten',async()=>{
+	const dir=fs.mkdtempSync(path.join(os.tmpdir(),'repetierer-bundle-verify-')),file=path.join(dir,'teacher.repetierer'),internal=path.join(dir,'internal.env');
+	exportIntegrationFile(file,{...parseEnv(assessmentEnv+brevoEnv),PRIVATE_ADMIN_KEY:'never-export'});
+	assert.equal(fs.readFileSync(file,'utf8').includes('never-export'),false);
+	fs.writeFileSync(internal,brevoEnv);const before=fs.readFileSync(internal),source=fs.readFileSync(file);
+	for(const options of [{verify:async()=>{throw new Error('offline');}},{protectTeacherToken:()=>{throw new Error('keyring unavailable');}}]) {
+		await assert.rejects(importIntegrationEnv(file,internal,options));assert.deepEqual(fs.readFileSync(internal),before);assert.deepEqual(fs.readFileSync(file),source);
+	}
+});
+
 test('parst nur Key/Value, validiert beide Gruppen und baut einen vorbefüllten Rundenlink', () => {
-	assert.equal(validateAssessmentConfig(parseEnv(assessmentEnv)).roundFieldId, 'entry.123456');
+	assert.equal(validateAssessmentConfig(parseEnv(assessmentEnv)).fallbackApiUrl, 'https://akzuwo.ch/app/services/repetierer/api');
 	assert.equal(validateBrevoConfig(parseEnv(brevoEnv)).port, 587);
 	assert.throws(() => validateAssessmentConfig(parseEnv('ASSESSMENT_API_URL=https://example.ch')), /Fehlende/);
 	assert.throws(() => parseEnv('require("child_process")'), /Ungültige Zeile/);
 	const url = buildRoundFormUrl(validateAssessmentConfig(parseEnv(assessmentEnv)), 'assessment-3a-hs-a8f2d1');
-	assert.equal(new URL(url).searchParams.get('entry.123456'), 'assessment-3a-hs-a8f2d1');
+	assert.equal(new URL(url).searchParams.get('round'), 'assessment-3a-hs-a8f2d1');
 });
 
 test('führt Teilkonfigurationen zusammen und löscht das Original erst nach Verifikation', async () => {
@@ -36,7 +71,7 @@ test('führt Teilkonfigurationen zusammen und löscht das Original erst nach Ver
 	const result = await importIntegrationEnv(second, destination);
 	assert.equal(result.originalDeleted, true);
 	assert.equal(fs.existsSync(second), false);
-	assert.equal(readAssessmentConfig(destination).apiKey, 'long-secret-key');
+	assert.equal(readAssessmentConfig(destination).teacherToken, teacherToken);
 	assert.equal(readBrevoConfig(destination).fromEmail, 'teacher@example.ch');
 	fs.rmSync(dir, { recursive: true, force: true });
 });
@@ -47,7 +82,7 @@ test('liest alte Brevo-Dateien weiter und behält Originale bei Importfehlern', 
 	fs.writeFileSync(legacy, brevoEnv);
 	assert.equal(readBrevoConfig(path.join(dir, 'missing.env'), legacy).fromEmail, 'teacher@example.ch');
 	const invalid = path.join(dir, 'invalid.env');
-	fs.writeFileSync(invalid, 'ASSESSMENT_FORM_URL=http://unsafe.example');
+	fs.writeFileSync(invalid, 'ASSESSMENT_API_URL=http://unsafe.example');
 	await assert.rejects(importIntegrationEnv(invalid, path.join(dir, 'repetierer.env')));
 	assert.equal(fs.existsSync(invalid), true);
 	fs.rmSync(dir, { recursive: true, force: true });

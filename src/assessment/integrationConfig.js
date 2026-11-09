@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { isValidEmail } = require('./matching.js');
 
-const ASSESSMENT_KEYS = ['ASSESSMENT_FORM_URL', 'ASSESSMENT_API_URL', 'ASSESSMENT_API_KEY'];
+const ASSESSMENT_KEYS = ['ASSESSMENT_API_URL', 'ASSESSMENT_TEACHER_TOKEN'];
 const BREVO_KEYS = [
 	'BREVO_SMTP_HOST',
 	'BREVO_SMTP_PORT',
@@ -11,7 +11,7 @@ const BREVO_KEYS = [
 	'BREVO_FROM_EMAIL',
 	'BREVO_FROM_NAME'
 ];
-const KNOWN_KEYS = [...ASSESSMENT_KEYS, 'ASSESSMENT_ROUND_FIELD_ID', ...BREVO_KEYS];
+const KNOWN_KEYS = [...ASSESSMENT_KEYS, 'ASSESSMENT_FALLBACK_API_URL', ...BREVO_KEYS];
 
 function parseEnv(content) {
 	const values = {};
@@ -36,13 +36,19 @@ function parseEnv(content) {
 
 function validateAssessmentConfig(values) {
 	assertCompleteGroup(values, ASSESSMENT_KEYS, 'Mitmachnote');
-	const formUrl = validateHttpsUrl(values.ASSESSMENT_FORM_URL, 'ASSESSMENT_FORM_URL');
 	const apiUrl = validateHttpsUrl(values.ASSESSMENT_API_URL, 'ASSESSMENT_API_URL');
-	const apiKey = String(values.ASSESSMENT_API_KEY).trim();
-	if (apiKey.length < 8 || /[\r\n]/.test(apiKey)) throw configError('ASSESSMENT_API_KEY ist syntaktisch ungültig.');
-	const roundFieldId = String(values.ASSESSMENT_ROUND_FIELD_ID || '').trim();
-	if (roundFieldId && !/^entry\.\d+$/.test(roundFieldId)) throw configError('ASSESSMENT_ROUND_FIELD_ID muss ein Google-Forms-Feld wie entry.123456 sein.');
-	return { formUrl, apiUrl, apiKey, roundFieldId };
+	const url = new URL(apiUrl);
+	if (url.username || url.password || url.search || url.hash || !url.pathname.endsWith('/api')) throw configError('ASSESSMENT_API_URL muss auf /api enden und darf keine Zugangsdaten enthalten.');
+	const teacherToken = String(values.ASSESSMENT_TEACHER_TOKEN).trim();
+	if (!/^rt_[A-Za-z0-9_-]{43}$/.test(teacherToken) && !/^encrypted:[A-Za-z0-9+/=]+$/.test(teacherToken)) throw configError('ASSESSMENT_TEACHER_TOKEN ist syntaktisch ungültig.');
+	const fallbackApiUrl = values.ASSESSMENT_FALLBACK_API_URL
+		? validateHttpsUrl(values.ASSESSMENT_FALLBACK_API_URL, 'ASSESSMENT_FALLBACK_API_URL')
+		: apiUrl === 'https://timolu.ch/app/services/repetierer/api' ? 'https://akzuwo.ch/app/services/repetierer/api' : null;
+	if (fallbackApiUrl) {
+		const fallback = new URL(fallbackApiUrl);
+		if (fallback.username || fallback.password || fallback.search || fallback.hash || !fallback.pathname.endsWith('/api')) throw configError('Ungültige Fallback-API-Adresse.');
+	}
+	return { formUrl: apiUrl.slice(0, -3), apiUrl, fallbackApiUrl, teacherToken };
 }
 
 function validateBrevoConfig(values) {
@@ -74,6 +80,14 @@ function readIntegrationValues(integrationPath, legacyBrevoPath) {
 	return values;
 }
 
+function cleanIntegrationConfig(integrationPath, legacyBrevoPath) {
+	if (!integrationPath || !fs.existsSync(integrationPath)) return;
+	const previous = readIntegrationValues(integrationPath, legacyBrevoPath);
+	const values = pickKnown(previous);
+	if (!values.ASSESSMENT_TEACHER_TOKEN) { delete values.ASSESSMENT_API_URL; delete values.ASSESSMENT_FALLBACK_API_URL; }
+	if (JSON.stringify(previous) !== JSON.stringify(values)) atomicWrite(integrationPath, serializeValues(values));
+}
+
 function readAssessmentConfig(integrationPath, legacyBrevoPath) {
 	const values = readIntegrationValues(integrationPath, legacyBrevoPath);
 	return hasAny(values, ASSESSMENT_KEYS) ? validateAssessmentConfig(values) : null;
@@ -94,20 +108,23 @@ async function importIntegrationEnv(sourcePath, destinationPath, options = {}) {
 	} catch (error) {
 		throw configError('Die ausgewählte .env-Datei konnte nicht gelesen werden.');
 	}
-	const imported = parseEnv(original);
-	const hasAssessment = hasAny(imported, ASSESSMENT_KEYS) || Object.hasOwn(imported, 'ASSESSMENT_ROUND_FIELD_ID');
+	if (Buffer.byteLength(original, 'utf8') > 262144) throw configError('Die Konfigurationsdatei ist zu gross.');
+	const portable = path.extname(source).toLowerCase() === '.repetierer';
+	const imported = portable ? parsePortableConfig(original) : parseEnv(original);
+	const hasAssessment = hasAny(imported, ASSESSMENT_KEYS);
 	const hasBrevo = hasAny(imported, BREVO_KEYS);
 	if (!hasAssessment && !hasBrevo) throw configError('Die .env-Datei enthält keine unterstützte Mitmachnoten- oder Brevo-Konfiguration.');
 	if (hasAssessment) validateAssessmentConfig(imported);
 	if (hasBrevo) validateBrevoConfig(imported);
 
 	const current = options.currentValues || readIntegrationValues(destination, options.legacyBrevoPath);
-	const merged = Object.assign({}, current, pickKnown(imported));
+	const merged = Object.assign({}, pickKnown(current), pickKnown(imported));
 	validateConfiguredGroups(merged);
 	if (options.verify) await options.verify({
 		assessment: hasAny(merged, ASSESSMENT_KEYS) ? validateAssessmentConfig(merged) : null,
 		brevo: hasAny(merged, BREVO_KEYS) ? validateBrevoConfig(merged) : null
 	});
+	if (hasAssessment && options.protectTeacherToken) merged.ASSESSMENT_TEACHER_TOKEN = options.protectTeacherToken(imported.ASSESSMENT_TEACHER_TOKEN);
 
 	fs.mkdirSync(path.dirname(destination), { recursive: true });
 	const temporary = `${destination}.${process.pid}.${Date.now()}.tmp`;
@@ -125,6 +142,7 @@ async function importIntegrationEnv(sourcePath, destinationPath, options = {}) {
 	let originalDeleted = false;
 	let deleteError = null;
 	try {
+		if (portable || options.preserveSource) return { configured: publicIntegrationStatus(merged), originalDeleted: false, deleteError: null };
 		fs.unlinkSync(source);
 		originalDeleted = true;
 	} catch (error) {
@@ -133,8 +151,32 @@ async function importIntegrationEnv(sourcePath, destinationPath, options = {}) {
 	return { configured: publicIntegrationStatus(merged), originalDeleted, deleteError };
 }
 
+function parsePortableConfig(content) {
+	let bundle;
+	try { bundle = JSON.parse(String(content).replace(/^\uFEFF/, '')); } catch { throw configError('Die .repetierer-Datei ist kein gültiges Konfigurationspaket.'); }
+	if (!bundle || bundle.format !== 'repetierer-settings' || bundle.version !== 1 || !bundle.values || Array.isArray(bundle.values) || typeof bundle.values !== 'object') throw configError('Unbekanntes .repetierer-Format oder nicht unterstützte Version.');
+	if (Object.keys(bundle.values).some(key => !KNOWN_KEYS.includes(key) || typeof bundle.values[key] !== 'string')) throw configError('Das Paket enthält unbekannte oder ungültige Einstellungen.');
+	const values = pickKnown(bundle.values);
+	validateAssessmentConfig(values); validateBrevoConfig(values);
+	if (values.ASSESSMENT_TEACHER_TOKEN.startsWith('encrypted:')) throw configError('Dieses Paket enthält einen gerätegebundenen Zugang. Bitte über «Paket exportieren» neu erstellen.');
+	return values;
+}
+
+function exportIntegrationFile(destinationPath, values, options = {}) {
+	const exported = pickKnown(values);
+	if (exported.ASSESSMENT_TEACHER_TOKEN?.startsWith('encrypted:')) {
+		if (!options.revealTeacherToken) throw configError('Der lokale Lehrerzugang konnte nicht für das Paket geöffnet werden.');
+		exported.ASSESSMENT_TEACHER_TOKEN = options.revealTeacherToken(exported.ASSESSMENT_TEACHER_TOKEN);
+	}
+	// A package always contains both connections and only portable credentials.
+	const content = JSON.stringify({format:'repetierer-settings', version:1, values:exported}, null, 2) + '\n';
+	parsePortableConfig(content);
+	atomicWrite(destinationPath, content);
+	return { exported: true, filePath: destinationPath };
+}
+
 function removeConfigGroup(integrationPath, legacyBrevoPath, group) {
-	const removeKeys = group === 'brevo' ? BREVO_KEYS : [...ASSESSMENT_KEYS, 'ASSESSMENT_ROUND_FIELD_ID'];
+	const removeKeys = group === 'brevo' ? BREVO_KEYS : [...ASSESSMENT_KEYS, 'ASSESSMENT_FALLBACK_API_URL'];
 	const values = readIntegrationValues(integrationPath, legacyBrevoPath);
 	for (const key of removeKeys) delete values[key];
 	if (group === 'brevo' && legacyBrevoPath && fs.existsSync(legacyBrevoPath)) fs.unlinkSync(legacyBrevoPath);
@@ -146,11 +188,11 @@ function removeConfigGroup(integrationPath, legacyBrevoPath, group) {
 }
 
 function publicAssessmentConfig(config) {
-	return config ? { configured: true, formUrl: config.formUrl, apiUrl: config.apiUrl } : { configured: false };
+	return config ? { configured: true, formUrl: config.formUrl, apiUrl: config.apiUrl, fallbackApiUrl: config.fallbackApiUrl } : { configured: false };
 }
 
 function publicBrevoConfig(config) {
-	return config ? { configured: true, host: config.host, port: config.port, fromEmail: config.fromEmail, fromName: config.fromName } : { configured: false };
+	return config ? { configured: true, host: config.host, port: config.port, ...require('./senderIdentity') } : { configured: false };
 }
 
 function publicIntegrationStatus(values) {
@@ -161,19 +203,9 @@ function publicIntegrationStatus(values) {
 }
 
 function buildRoundFormUrl(config, externalRoundId) {
-	if (!config.roundFieldId) throw configError('Das Feld für die Beurteilungsrunde wurde im Formular noch nicht erkannt.');
 	const url = new URL(config.formUrl);
-	url.searchParams.set(config.roundFieldId, externalRoundId);
+	url.searchParams.set('round', externalRoundId);
 	return url.toString();
-}
-
-function saveAssessmentRoundFieldId(integrationPath, legacyBrevoPath, roundFieldId) {
-	if (!/^entry\.\d+$/.test(String(roundFieldId || ''))) throw configError('Das erkannte Formularfeld ist ungültig.');
-	const values = readIntegrationValues(integrationPath, legacyBrevoPath);
-	values.ASSESSMENT_ROUND_FIELD_ID = roundFieldId;
-	validateConfiguredGroups(values);
-	atomicWrite(integrationPath, serializeValues(values));
-	assertEquivalent(values, readIntegrationValues(integrationPath));
 }
 
 function validateConfiguredGroups(values) {
@@ -237,8 +269,11 @@ function configError(message) {
 module.exports = {
 	ASSESSMENT_KEYS,
 	BREVO_KEYS,
+	cleanIntegrationConfig,
 	buildRoundFormUrl,
 	importIntegrationEnv,
+	exportIntegrationFile,
+	parsePortableConfig,
 	parseEnv,
 	publicAssessmentConfig,
 	publicBrevoConfig,
@@ -246,7 +281,6 @@ module.exports = {
 	readBrevoConfig,
 	readIntegrationValues,
 	removeConfigGroup,
-	saveAssessmentRoundFieldId,
 	validateAssessmentConfig,
 	validateBrevoConfig
 };

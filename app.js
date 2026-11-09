@@ -1,12 +1,17 @@
 const {BrowserWindow, app, ipcMain} = require('electron');
 const fs = require('fs');
 const path = require('path');
+if (!app.isPackaged && process.env.REPETIERER_DEV_USER_DATA) {
+	const devUserData = path.resolve(process.env.REPETIERER_DEV_USER_DATA);
+	fs.mkdirSync(devUserData, { recursive: true });
+	app.setPath('userData', devUserData);
+}
 require('./src/mainProcess.js');
 
 let mainWindow;
 let splashWindow;
 let autoUpdater;
-const isDebugMode = process.argv.includes('--dev-mode');
+const isDebugMode = require('./src/debugFlags').isDebugMode(process.argv);
 const mainWindowSize = { width: 1100, height: 800 };
 const startupWindowSize = { width: 560, height: 260 };
 let updateDownloadApproved = false;
@@ -30,6 +35,8 @@ function getWindowPreferences() {
 		contextIsolation: false,
 		spellcheck: false,
 		devTools: isDebugMode,
+		additionalArguments: isDebugMode ? ['--repetierer-debug'] : [],
+		offscreen: !app.isPackaged && process.env.REPETIERER_UI_TEST === '1',
 		backgroundThrottling: true
 	};
 }
@@ -48,7 +55,7 @@ function createSplashWindow() {
 	});
 
 	console.log('Splash erstellt');
-	splashWindow.loadFile('public/splash.html');
+	splashWindow.loadFile(path.join(__dirname, 'public', 'splash.html'));
 	splashWindow.on('closed', () => {
 		splashWindow = null;
 	});
@@ -70,8 +77,9 @@ function createMainWindow() {
 		webPreferences: getWindowPreferences(),
 	});
 
+	require('./src/notifications').registerWindow(mainWindow);
 	console.log('MainWindow erstellt');
-	mainWindow.loadFile('public/index.html');
+	mainWindow.loadFile(path.join(__dirname, 'public', 'index.html'));
 	mainWindow.once('ready-to-show', () => {
 		if (!mainWindow || mainWindow.isDestroyed()) return;
 		console.log('MainWindow ready');
@@ -114,7 +122,7 @@ function checkForUpdatesWithConsent() {
 	if (updateCheckStarted) return;
 	updateCheckStarted = true;
 
-	if (!app.isPackaged) {
+	if (!app.isPackaged || isDebugMode) {
 		console.log('Update check skipped in development mode.');
 		return;
 	}

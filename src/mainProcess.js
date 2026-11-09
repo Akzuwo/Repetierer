@@ -7,13 +7,19 @@ const { readReleaseNotesForVersion, stripReleaseNotesHeader } = require('./relea
 const { ANALYTICS_ENDPOINT, ANALYTICS_APP_ID, getAnalyticsApiKey } = require('./analyticsConfig.js');
 const { registerAssessmentHandlers } = require('./assessment/mainAssessment.js');
 const { createTeachingSessionStore } = require('./teachingSessions.js');
-const isDebugMode = process.argv.includes('--dev-mode');
+const { createOllamaService } = require('./ai/ollamaService.js');
+const {createAiIntegration} = require('./ai/integration');
+const { createAiToolRegistry } = require('./ai/toolRegistry.js');
+const { createAiAssistantService } = require('./ai/assistantService.js');
+const isDebugMode = require('./debugFlags').isDebugMode(process.argv);
 const sessionEntries = [];
 let lastUndoEntry;
 let lastRedoEntry;
 let programModule;
 let ExcelJSModule;
 let teachingSessionStore;
+const ollamaService = createAiIntegration({service:createOllamaService(),getEnabled:()=>getAppSettings().aiIntegrationEnabled,setEnabled:enabled=>require('./storage').setAiIntegrationEnabled(enabled)});
+const aiAssistants = new WeakMap();
 const MAX_REPORT_COMMENT_LENGTH = 4000;
 const MAX_REPORT_LOG_LENGTH = 200000;
 
@@ -31,6 +37,76 @@ function getTeachingSessionStore() {
 	if (!teachingSessionStore) teachingSessionStore = createTeachingSessionStore(getPaths().teachingSessionsPath);
 	return teachingSessionStore;
 }
+
+function getAiAssistant(sender) {
+	const existing = aiAssistants.get(sender);
+	if (existing) return existing;
+	let uiContext = {};
+	const assistant = createAiAssistantService({
+		ollama: ollamaService,
+		onActivity: activity => sender.send('ai-activity', activity),
+		makeRegistry: () => createAiToolRegistry({
+			program: getProgram(), sessions: getTeachingSessionStore(),
+			getUiContext: () => uiContext,
+			notifyNavigation: command => sender.send('ai-navigate', command),
+			notifyWrite: (type, session) => {
+			if (type === 'participation') {
+				logEvent('Mitarbeit per lokaler KI erfasst', { sessionId: session.id });
+				sender.send('participation-entry-saved', session);
+			}
+			},
+			commitGrade: (classId, studentId, grade) => new Promise((resolve, reject) => {
+				const selected = getProgram().selectSpecificPerson(studentId);
+				if (!selected) return reject(new Error('Person kann nicht für eine Repetition ausgewählt werden.'));
+				getProgram().saveGrade(grade, (error, entry) => {
+					if (error || !entry) return reject(new Error('Repetitionsnote konnte nicht gespeichert werden.'));
+					const saved = handleExcelBackupEntry({ sender }, entry);
+					if (!saved) return reject(new Error('Repetitionsnote konnte nicht gespeichert werden.'));
+					recordActiveSessionRepetition(entry);
+					sender.send('finished', undefined);
+					sender.send('repetition-saved', {type:'grade',excelWriteSucceeded:entry.excelWriteSucceeded});
+					resolve({ saved: true, pendingExcel: !entry.excelWriteSucceeded, classId, studentId, grade });
+				});
+			})
+		})
+	});
+	const holder = { assistant, setContext: value => { uiContext = sanitizeAiContext(value); } };
+	aiAssistants.set(sender, holder);
+	return holder;
+}
+
+function sanitizeAiContext(value) {
+	if (!value || typeof value !== 'object') return {};
+	return {
+		page: ['repetition', 'participation', 'evaluation', 'statistics', 'student'].includes(value.page) ? value.page : 'repetition',
+		classId: typeof value.classId === 'string' ? value.classId.slice(0, 80) : null,
+		studentId: Number.isInteger(value.studentId) ? value.studentId : null,
+		sessionId: typeof value.sessionId === 'string' ? value.sessionId.slice(0, 100) : null
+	};
+}
+
+ipcMain.handle('ai:status', () => ollamaService.status());
+ipcMain.handle('ai:setup', async (event,payload) => {
+	if(payload?.confirmed!==true)return {state:'cancelled',message:'Die Einrichtung wurde nicht bestätigt.'};
+	try { return await ollamaService.setup(progress => event.sender.send('ai-setup-progress', progress)); }
+	catch (error) { return { state: 'error', message: error.message }; }
+});
+ipcMain.handle('ai:remove', event => {
+	const result=ollamaService.remove();
+	aiAssistants.get(event.sender)?.assistant.reset();
+	for(const window of BrowserWindow.getAllWindows())window.webContents.send('ai-integration-changed',result);
+	return result;
+});
+ipcMain.handle('ai:ask', async (event, payload) => {
+	ollamaService.requireEnabled();
+	const holder = getAiAssistant(event.sender);
+	holder.setContext(payload && payload.context);
+	const result=await holder.assistant.ask(payload && payload.text);
+	ollamaService.requireEnabled();
+	return result;
+});
+ipcMain.handle('ai:confirm', (event, payload) => {ollamaService.requireEnabled();return getAiAssistant(event.sender).assistant.decide(payload && payload.token, !!(payload && payload.approved));});
+ipcMain.handle('ai:reset', event => { getAiAssistant(event.sender).assistant.reset(); return { ok: true }; });
 
 logEvent('App gestartet', { version: app.getVersion() });
 
@@ -150,7 +226,7 @@ ipcMain.on('start', (event, args) => {
 	}
 	const selectedPerson = getProgram().selectPerson();
 	if (selectedPerson) {
-		event.sender.send('name', selectedPerson, getSelectionNames());
+		event.sender.send('name', selectedPerson, getSelectionNames(), getProgram().getSelectedPerson());
 	} else {
 		event.sender.send('no-person-available');
 	}
@@ -211,6 +287,7 @@ ipcMain.on('end-teaching-session', (event, sessionId) => {
 	}
 	const result = getTeachingSessionStore().endSession(sessionId);
 	if (result.success) {
+		getProgram().cancelRepetitionTiming();
 		getProgram().setAbsences([], () => {});
 		logEvent('Unterrichts-Session beendet', { sessionId, className: active.className });
 		event.sender.send('teaching-session-ended', result.session);
@@ -245,8 +322,13 @@ ipcMain.on('get-persons', (event, args) => {
 });
 
 ipcMain.on('get-editor-persons', (event, args) => {
-	const persons = getProgram().getEditorPersons();
-	event.sender.send('editor-persons-data', persons);
+	const program = getProgram();
+	const className = args?.className || program.getCurrentClass();
+	const meta = {className, requestId:args?.requestId, filePath:program.getCurrentFilePath()};
+	if (!meta.filePath || !(program.getClasses() || []).includes(className)) {
+		event.sender.send('editor-persons-load-failed', {reason:'no-class-selected'}, meta); return;
+	}
+	event.sender.send('editor-persons-data', program.getClassPersons(className), meta);
 });
 
 ipcMain.on('get-class-statistics', (event, args) => {
@@ -268,16 +350,19 @@ ipcMain.on('save-absences', (event, absentIds) => {
 	});
 });
 
-ipcMain.on('save-editor-persons', (event, editorPersons) => {
-	getProgram().saveEditorPersons(editorPersons, result => {
+ipcMain.on('save-editor-persons', (event, editorPersons, args) => {
+	const program = getProgram(), className = args?.className || program.getCurrentClass();
+	const meta = {className, requestId:args?.requestId, filePath:program.getCurrentFilePath()};
+	if (args?.filePath && args.filePath !== meta.filePath) {event.sender.send('editor-persons-save-failed', {reason:'stale-file'}, meta); return;}
+	program.saveEditorPersons(editorPersons, result => {
 		if (result && result.success) {
 			logEvent('Excel Personen bearbeitet', { count: editorPersons ? editorPersons.length : 0 });
-			event.sender.send('editor-persons-saved', result);
+			event.sender.send('editor-persons-saved', {...result, persons:program.getClassPersons(className)}, meta);
 		} else {
 			logEvent('Excel Personen bearbeiten fehlgeschlagen', result || {});
-			event.sender.send('editor-persons-save-failed', result || { success: false, reason: 'unknown' });
+			event.sender.send('editor-persons-save-failed', result || { success: false, reason: 'unknown' }, meta);
 		}
-	});
+	}, className);
 });
 
 // get probability list
@@ -314,7 +399,7 @@ ipcMain.on('confirm-class-list-import', (event, args) => {
 ipcMain.on('select-person', (event, personId) => {
 	const result = getProgram().selectSpecificPerson(personId);
 	if (result) {
-		event.sender.send('name', result, getSelectionNames());
+		event.sender.send('name', result, getSelectionNames(), getProgram().getSelectedPerson());
 	}
 });
 
@@ -325,12 +410,14 @@ function getSelectionNames() {
 registerAssessmentHandlers({ getProgram, getPaths });
 
 // ok
+ipcMain.on('repetition-timing-start', (_event, token) => { getProgram().startRepetitionTiming(token); });
+ipcMain.on('repetition-timing-cancel', () => { getProgram().cancelRepetitionTiming(); });
 ipcMain.on('ok', (event, args) => {
 	getProgram().saveGrade(args, (result, backupEntry) => {
 		const wasSaved = handleExcelBackupEntry(event, backupEntry);
 		if (wasSaved) recordActiveSessionRepetition(backupEntry);
 		event.sender.send('finished', result);
-		if (wasSaved) event.sender.send('repetition-saved');
+		if (wasSaved) event.sender.send('repetition-saved', {type:'grade',excelWriteSucceeded:backupEntry.excelWriteSucceeded});
 	});
 });
 
@@ -340,7 +427,7 @@ ipcMain.on('joker', (event, args) => {
 		const wasSaved = handleExcelBackupEntry(event, backupEntry);
 		if (wasSaved) recordActiveSessionRepetition(backupEntry);
 		event.sender.send('finished', result);
-		if (wasSaved) event.sender.send('repetition-saved');
+		if (wasSaved) event.sender.send('repetition-saved', {type:'joker',excelWriteSucceeded:backupEntry.excelWriteSucceeded});
 	});
 });
 
@@ -361,10 +448,15 @@ ipcMain.on('get-logs', (event, args) => {
 });
 
 ipcMain.on('get-report-preview', (event, args) => {
+	if (!require('./featureFlags').problemReportsEnabled) return;
 	event.sender.send('report-preview-data', buildReportPayload(''));
 });
 
 ipcMain.on('send-problem-report', async (event, args) => {
+	if (!require('./featureFlags').problemReportsEnabled) {
+		event.sender.send('problem-report-result', {ok:false, error:'feature-disabled'});
+		return;
+	}
 	const comment = args && typeof args.comment === 'string' ? args.comment : '';
 	const payload = buildReportPayload(comment.slice(0, MAX_REPORT_COMMENT_LENGTH));
 	const headers = {
@@ -466,12 +558,22 @@ ipcMain.on('run-joker-migration', (event, args) => {
 		if (result && result.success) {
 			logEvent('Joker-Migration abgeschlossen', { migratedCells: result.migratedCells });
 			event.sender.send('joker-migration-done', result);
-			event.sender.send('classes', result.worksheets, getExcelFilePath());
+			sendClassesOrJokerMigration(event, result.worksheets, getExcelFilePath());
 		} else {
 			logEvent('Joker-Migration fehlgeschlagen', result || {});
 			event.sender.send('joker-migration-failed', result || { success: false, reason: 'unknown' });
 		}
 	});
+});
+
+ipcMain.on('run-joker-date-migration', (event, fingerprint) => {
+ getProgram().migrateJokerDates(fingerprint, result => {
+  event.sender.send('joker-date-migration-result',result);
+  if(result.success) event.sender.send('classes',result.worksheets,getProgram().getCurrentFilePath());
+ });
+});
+ipcMain.on('skip-joker-date-migration', event => {
+ event.sender.send('classes',getProgram().getClasses(),getProgram().getCurrentFilePath());
 });
 
 ipcMain.on('run-extra-joker-migration', (event, args) => {
@@ -1126,6 +1228,7 @@ function fillImportedWorksheet(worksheet, names) {
 		column.width = 16;
 	});
 	worksheet.getColumn(1).width = 28;
+ require('./jokerDates').migrateWorksheet(worksheet);
 }
 
 function sanitizeWorksheetName(name) {
@@ -1209,7 +1312,7 @@ function reloadExcelFile(event) {
 		if (result && result.success) {
 			logEvent('Excel neu geladen', { filePath: result.filePath, className: result.className });
 			sendClassesOrJokerMigration(event, result.worksheets, result.filePath);
-			if (!getProgram().getJokerMigrationStatus().needsMigration) {
+			if (!getProgram().getJokerMigrationStatus().needsMigration && !getProgram().getJokerDateMigrationStatus().needsMigration) {
 				event.sender.send('excel-reloaded', result);
 			}
 			event.sender.send('pending-excel-status', getPendingExcelEntries().length);
@@ -1233,5 +1336,7 @@ function sendClassesOrJokerMigration(event, worksheets, filePath) {
 		return;
 	}
 
-	event.sender.send('classes', worksheets, filePath);
+ const dateStatus=getProgram().getJokerDateMigrationStatus();
+ if(dateStatus.needsMigration) { event.sender.send('joker-date-migration-required',dateStatus,filePath);return; }
+ event.sender.send('classes', worksheets, filePath);
 }

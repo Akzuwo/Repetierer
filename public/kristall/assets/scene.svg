@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1200" viewBox="0 0 1920 1200">
+  <defs>
+    <linearGradient id="base" x2="1" y2="1"><stop stop-color="#163b38"/><stop offset=".5" stop-color="#244b47"/><stop offset="1" stop-color="#102e30"/></linearGradient>
+    <radialGradient id="light"><stop stop-color="#5d9d89" stop-opacity=".68"/><stop offset="1" stop-color="#5d9d89" stop-opacity="0"/></radialGradient>
+    <linearGradient id="fold" x1="0" y1="0" x2=".3" y2="1"><stop stop-color="#82bda7" stop-opacity=".38"/><stop offset=".16" stop-color="#477d71" stop-opacity=".12"/><stop offset="1" stop-color="#0b292a" stop-opacity=".5"/></linearGradient>
+    <linearGradient id="edge"><stop stop-color="#a7d2bc" stop-opacity="0"/><stop offset=".55" stop-color="#a7d2bc" stop-opacity=".23"/><stop offset="1" stop-color="#a7d2bc" stop-opacity="0"/></linearGradient>
+  </defs>
+  <path fill="url(#base)" d="M0 0h1920v1200H0z"/>
+  <ellipse cx="1500" cy="240" rx="1000" ry="740" fill="url(#light)"/>
+  <path d="M-240 980C120 240 650 1090 1170 450S1850-100 2140 80L2120 1400H-240Z" fill="url(#fold)"/>
+  <path d="M-240 980C120 240 650 1090 1170 450S1850-100 2140 80" fill="none" stroke="url(#edge)" stroke-width="2"/>
+  <path d="M-160 1160C400 680 730 1340 1350 780S2040 340 2180 490L2100 1400H-160Z" fill="url(#fold)" opacity=".65"/>
+  <path d="M-160 1160C400 680 730 1340 1350 780S2040 340 2180 490" fill="none" stroke="url(#edge)" stroke-width="1.5"/>
+</svg>

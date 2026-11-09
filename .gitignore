@@ -1,4 +1,11 @@
 # Logs
+.wrangler/
+.cloudflare-private/
+.cloudflare-test/
+.smoke-user-data/
+docs/ui-audit/
+docs/ui-audit.zip
+*.cpuprofile
 logs
 *.log
 npm-debug.log*
@@ -118,7 +125,50 @@ dist
 builds
 .local-build-number
 .session-smoke/
+.ui-polish-smoke/
+.ai-prototype-profile/
 release_notes.md
 
 # Local importer test files
 importer-samples/
+
+# Local Kristall material diagnostics
+.kristall-check/
+
+# Local template authoring and original preservation
+.joker-date-work/
+
+# Private Cloudflare backend, infrastructure and operator tooling (local only)
+/cloudflare/
+/issue-handler/
+/scripts/cloudflare-*
+/test/cloudflareE2E.test.js
+/docs/cloudflare-deployment.md
+/.github/workflows/cloudflare*.yml
+/.github/workflows/cloudflare*.yaml
+
+# Local credentials, portable integration exports and runtime/user data
+.env.*
+*.env
+*.repetierer
+*.pem
+*.key
+*.pfx
+*.p12
+settings.json
+backup.json
+migrations.json
+unterrichtssessions.json
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.xlsx
+*.xls
+*.csv
+!/Excel Template.xlsx
+
+# Additional local diagnostics and generated exports
+.publish-audit/
+*.patch
+*.dmp

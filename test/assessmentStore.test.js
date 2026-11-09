@@ -21,7 +21,8 @@ test('lädt fehlende Alt-Daten rückwärtskompatibel und speichert eine Runde', 
 	const context = reloaded.getClassContext(files.workbook, '3a', students);
 	assert.equal(reloaded.data.schemaVersion, SCHEMA_VERSION);
 	assert.equal(context.rounds[0].id, round.id);
-	assert.match(context.rounds[0].externalRoundId, /^assessment-3a-hs-2026-[a-f0-9]{6}$/);
+	assert.match(context.rounds[0].externalRoundId, /^[a-f0-9-]{36}$/);
+	assert.equal(context.rounds[0].cloudStatus, 'pending');
 	assert.equal(context.rounds[0].criteria.length, 7);
 	assert.deepEqual(context.rounds[0].criteria[0].scaleLabels, ['(Fast) nie', 'Ab und zu', 'Manchmal', 'Häufig', 'Sehr häufig']);
 	assert.deepEqual(context.rounds[0].criteria.at(-1).scaleLabels, ['Mangelhaft', 'Genügend', 'Recht', 'Gut', 'Sehr gut']);
@@ -33,7 +34,7 @@ test('migriert eine alte Runde ohne Formularmetadaten oder Bewertungsverlust', (
 	const files = fixture();
 	fs.writeFileSync(files.dataPath, JSON.stringify({ schemaVersion: 1, workbooks: { old: { classes: { c: {
 		id: 'class-old', name: '3a', students: [{ id: 'student-1', name: 'Anna Müller', active: true }], rounds: [{
-			id: 'round-abcdef', title: 'HS 2025', createdAt: '2025-08-01T00:00:00Z', form: { formId: 'old-google-form' },
+			id: 'round-abcdef', title: 'HS 2025', createdAt: '2025-08-01T00:00:00Z', form: { formId: 'old-form' },
 			criteria: [{ id: 'participation', label: 'Aktive Beteiligung' }], assessments: { 'student-1': {
 				studentId: 'student-1', studentEmail: 'anna@example.ch', studentAnswers: { participation: 4 },
 				studentComment: '', submittedAt: '2025-09-01T00:00:00Z', responseId: 'legacy-response', mailStatus: 'not_sent'
@@ -77,11 +78,16 @@ test('synchronisiert Antworten lokal und speichert Lehrerwerte getrennt', () => 
 	}]);
 	const context = store.getClassContext(files.workbook, '3a', students);
 	const anna = context.students.find(student => student.name === 'Anna Müller');
-	store.saveTeacherAssessment(files.workbook, '3a', students, round.id, anna.id, answers(3), 'Lehrerkommentar');
+	store.saveTeacherAssessment(files.workbook, '3a', students, round.id, anna.id, answers(3), 'Lehrerkommentar', { participation_frequency: '  Gute Beteiligung  ', overall_participation: '' });
 	const reloaded = new AssessmentStore(files.dataPath);
 	const stored = reloaded.getRound(files.workbook, '3a', students, round.id).round.assessments[anna.id];
 	assert.equal(stored.studentAnswers.participation_frequency, 4);
 	assert.equal(stored.teacherAnswers.participation_frequency, 3);
+	assert.deepEqual(stored.teacherCriterionComments, { participation_frequency: 'Gute Beteiligung' });
+	assert.throws(() => reloaded.saveTeacherAssessment(files.workbook, '3a', students, round.id, anna.id, answers(2), 'Änderung', { participation_frequency: 'x'.repeat(2001) }), /höchstens 2000/);
+	assert.equal(reloaded.getRound(files.workbook, '3a', students, round.id).round.assessments[anna.id].teacherAnswers.participation_frequency, 3);
+	reloaded.saveTeacherAssessment(files.workbook, '3a', students, round.id, anna.id, answers(3), 'Lehrerkommentar');
+	assert.deepEqual(reloaded.getRound(files.workbook, '3a', students, round.id).round.assessments[anna.id].teacherCriterionComments, { participation_frequency: 'Gute Beteiligung' });
 	assert.equal(stored.studentAdditionalQuality, 'Spezifisches Fachwissen');
 	assert.equal(stored.studentEmail, 'anna@example.ch');
 	fs.rmSync(files.dir, { recursive: true, force: true });

@@ -9,5 +9,19 @@
       "Modals optisch an den dunklen App-Look angepasst",
       "Abwesenheiten werden nach jedem Tag automatisch zurückgesetzt"
     ]
+  },
+    "7.0.0": {
+    "title": "Grosses Update mit neuem Design und neuen Features",
+    "changes": [
+      "Neues Liquid Kristall Design mit verbesserter User Experience",
+      "Neues Session basiertes System",
+      "Neue Mündlich Beurteilung mit Notenempfehlung",
+      "Neues Selbstbeurteilungsfeature für Schüler",
+      "Automatischer Mail Versand der Mündlich Beurteilungen",
+      "Neue optionale lokale KI Assistenz",
+      "Neue Intro Animation beim Appstart",
+      "Performance Verbesserungen",
+      "Joker Datum wird nun im Excel angezeigt"
+    ]
   }
 }

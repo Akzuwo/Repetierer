@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kristall — Materialreferenz</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" type="module"></script>
+</head>
+<body>
+  <div class="wallpaper" aria-hidden="true"></div>
+  <canvas id="glass-canvas" aria-hidden="true"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="example">
+    <header>
+      <nav class="top-nav glass" data-glass="pill" aria-label="Materialnavigation">
+        <span class="nav-selection liquid-marker glass" data-glass="pill" aria-hidden="true"></span>
+        <button class="nav-tab" data-key="one" aria-current="page">Übersicht</button>
+        <button class="nav-tab" data-key="two">Sammlung</button>
+        <button class="nav-tab" data-key="three">Einstellungen</button>
+      </nav>
+      <button class="icon-button glass" data-glass="circle" aria-label="Beispielaktion">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h5m4 0h7M4 17h9m4 0h3"/><circle cx="11" cy="7" r="2.5"/><circle cx="15" cy="17" r="2.5"/></svg>
+      </button>
+    </header>
+    <main class="example-grid">
+      <section class="card glass" data-glass="panel" aria-labelledby="reference-title">
+        <h1 id="reference-title">Kristall</h1><p>Klares Glas. Weiche Bewegung.</p>
+        <label class="inline-slider"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4L19 5"/></svg><input id="brightness" type="range" min="0" max="100" value="100" aria-label="Helligkeit"><output id="brightness-value">100%</output></label>
+        <label class="inline-slider"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4 5 9H2v6h3l6 5Zm4 4a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg><input id="volume" type="range" min="0" max="100" value="35" aria-label="Lautstärke-Beispiel"><output id="volume-value">35%</output></label>
+        <div class="water-row">
+          <svg class="water-wave" viewBox="0 0 110 30" aria-hidden="true">
+            <g class="water-current back"><path d="M0 12Q27.5 3 55 12T110 12T165 12T220 12V36H0Z"/><path class="water-line" d="M0 12Q27.5 3 55 12T110 12T165 12T220 12"/></g>
+            <g class="water-current"><path d="M0 16Q27.5 7 55 16T110 16T165 16T220 16V36H0Z"/><path class="water-line" d="M0 16Q27.5 7 55 16T110 16T165 16T220 16"/></g>
+            <g class="water-current front"><path d="M0 21Q27.5 14 55 21T110 21T165 21T220 21V36H0Z"/><path class="water-line" d="M0 21Q27.5 14 55 21T110 21T165 21T220 21"/></g>
+          </svg>
+          <button id="water-toggle" class="icon-button glass" data-glass="circle" aria-label="Wasserbewegung starten" aria-pressed="false"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path id="play-path" d="m6 4 12 8-12 8Z" fill="currentColor" stroke="none"/></svg></button>
+        </div>
+      </section>
+      <section class="floating-panel glass" data-glass="panel" aria-labelledby="options-title">
+        <h2 id="options-title">Liquid Controls</h2>
+        <label class="switch-row" for="option"><span>Option</span><span class="liquid-switch"><input id="option" class="switch-input" type="checkbox" checked><span class="switch-track" aria-hidden="true"></span><span class="switch-thumb liquid-marker glass" data-glass="pill" aria-hidden="true"></span></span></label>
+        <label class="switch-row" for="small-option"><span>Kleine Variante</span><span class="mini-switch"><input id="small-option" class="switch-input" type="checkbox"><span class="switch-track" aria-hidden="true"></span><span class="switch-thumb liquid-marker glass" data-glass="pill" aria-hidden="true"></span></span></label>
+        <label class="material-slider" for="fine"><span>Feinregler <output id="fine-value">42%</output></span><input id="fine" type="range" min="0" max="100" value="42"></label>
+        <p class="small">Die Option-Schalter und die Lautstärke dienen hier der Materialprüfung. Das Beispiel erzeugt kein Audio.</p>
+      </section>
+    </main>
+    <nav class="dock glass" data-glass="pill" aria-label="Schnellnavigation">
+      <span class="dock-selection liquid-marker glass" data-glass="pill" aria-hidden="true"></span>
+      <button class="dock-button" data-key="one" aria-label="Übersicht" aria-current="page"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-6v-7h-4v7H4a1 1 0 0 1-1-1Z"/></svg></button>
+      <button class="dock-button" data-key="two" aria-label="Sammlung"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="6" height="6" rx="1.7"/><rect x="14.5" y="3.5" width="6" height="6" rx="1.7"/><rect x="3.5" y="14.5" width="6" height="6" rx="1.7"/><rect x="14.5" y="14.5" width="6" height="6" rx="1.7"/></svg></button>
+      <button class="dock-button" data-key="three" aria-label="Einstellungen"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h5m4 0h7M4 17h9m4 0h3"/><circle cx="11" cy="7" r="2.5"/><circle cx="15" cy="17" r="2.5"/></svg></button>
+    </nav>
+    <p class="small status" id="renderer-status" role="status">Material wird geladen.</p>
+  </div>
+</body>
+</html>

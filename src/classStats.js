@@ -1,3 +1,26 @@
+const path = require('node:path');
+function withRepetitionDurations(stats, entries, filePath) {
+	const normalize = value => {
+		const resolved = path.resolve(String(value));
+		return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+	};
+	const expected = filePath ? normalize(filePath) : null;
+	const groups = new Map();
+	for (const entry of entries) {
+		if (!expected || !entry.filePath || normalize(entry.filePath) !== expected || entry.type !== 'grade') continue;
+		if (typeof entry.durationMs !== 'number' || !Number.isFinite(entry.durationMs) || entry.durationMs < 0) continue;
+		// Queued Excel writes are already accepted and saved locally by the app.
+		if (!entry.excelWriteSucceeded && !['excel-locked', 'excel-write-failed'].includes(entry.excelWriteReason)) continue;
+		const group = groups.get(entry.className) || {total:0, count:0};
+		group.total += entry.durationMs;
+		group.count++;
+		groups.set(entry.className, group);
+	}
+	return stats.map(stat => {
+		const group = groups.get(stat.className);
+		return {...stat, averageRepetitionDurationMs: group ? group.total / group.count : null, timedRepetitionsCount: group?.count || 0};
+	});
+}
 function buildClassStatistics(workbook) {
 	if (!workbook || !Array.isArray(workbook.worksheets)) return [];
 
@@ -95,5 +118,6 @@ function roundToTwo(value) {
 }
 
 module.exports = {
+	withRepetitionDurations,
 	buildClassStatistics: buildClassStatistics
 };

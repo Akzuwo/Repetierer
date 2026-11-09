@@ -1,3 +1,4 @@
+const {normalizeDuration: normalizeNotificationDuration} = require('./notificationPolicy');
 const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
@@ -10,6 +11,7 @@ const defaultAppSettings = {
 	neverSelectedBoostFactor: 3,
 	visualEffectsEnabled: false,
 	wiggersRuleEnabled: true,
+	notificationDurationSeconds: 6,
 	wiggersRuleDurationMinutes: 120
 };
 const MAX_BACKUP_PREVIEW_ENTRIES = 100;
@@ -143,6 +145,8 @@ function getAppSettings() {
 	const settings = getSettings();
 	return Object.assign({}, defaultAppSettings, {
 		theme: normalizeTheme(settings.theme),
+		aiIntegrationEnabled: settings.aiIntegrationEnabled !== false,
+		notificationDurationSeconds: normalizeNotificationDuration(settings.notificationDurationSeconds),
 		extraJokerAfterThreeGrades: !!settings.extraJokerAfterThreeGrades,
 		probabilityDecreaseFactor: normalizeFactor(settings.probabilityDecreaseFactor, defaultAppSettings.probabilityDecreaseFactor),
 		boostNeverSelected: !!settings.boostNeverSelected,
@@ -157,6 +161,7 @@ function saveAppSettings(settings) {
 	const wiggersRuleEnabled = settings.wiggersRuleEnabled !== false;
 	saveSettings({
 		theme: normalizeTheme(settings.theme),
+		notificationDurationSeconds: normalizeNotificationDuration(settings.notificationDurationSeconds),
 		extraJokerAfterThreeGrades: !!settings.extraJokerAfterThreeGrades,
 		probabilityDecreaseFactor: normalizeFactor(settings.probabilityDecreaseFactor, defaultAppSettings.probabilityDecreaseFactor),
 		boostNeverSelected: !!settings.boostNeverSelected,
@@ -167,6 +172,8 @@ function saveAppSettings(settings) {
 		...(wiggersRuleEnabled ? {} : { wiggersRulePenalties: {} })
 	});
 }
+
+function setAiIntegrationEnabled(enabled) {saveSettings({aiIntegrationEnabled:enabled === true});}
 
 function normalizeTheme(value) {
 	return value === 'classic' ? 'classic' : defaultAppSettings.theme;
@@ -286,6 +293,7 @@ function getLogs() {
 }
 
 module.exports = {
+	setAiIntegrationEnabled,
 	getBackup,
 	getBackupPreview,
 	getAppSettings,

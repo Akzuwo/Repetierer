@@ -10,12 +10,22 @@
   "main": "app.js",
   "scripts": {
     "build:css": "tailwindcss -c tailwind.config.js -i ./public/tailwind.input.css -o ./public/tailwind.css --minify",
-    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "build:ui-vendor": "node scripts/build-ui-vendor.js",
+    "test": "node scripts/run-tests.cjs",
+    "test:ui": "node scripts/ui-polish-smoke.js",
+    "test:notifications": "node --test test/notifications.test.js && node scripts/liquid-refinement-focused.cjs --notifications",
+    "test:debug": "node scripts/debug-ui-check.cjs",
+    "test:debug:exe": "node scripts/debug-exe-check.cjs",
+    "test:integrations": "node --test test/assessmentLifecycle.test.js test/aiIntegration.test.js && node scripts/integration-lifecycle-ui-check.cjs",
+    "test:stats": "node --test test/repetitionDuration.test.js && node scripts/liquid-refinement-focused.cjs --stats-drawer",
+    "test:kristall": "node scripts/kristall-reference-check.cjs && node scripts/kristall-ui-check.cjs",
     "start": "npm run build:css && electron . ",
+    "start:debug": "electron . --debug-mode",
     "build": "electron-builder",
     "build:local": "powershell -ExecutionPolicy Bypass -File ./build-local.ps1",
     "release": "electron-builder -p=always",
-    "release:ci": "node scripts/release-with-icon.js"
+    "release:ci": "node scripts/release-with-icon.js",
+    "test:repository": "node scripts/check-repository.cjs"
   },
   "build": {
     "appId": "net.srpnt3.repetierer",
@@ -30,8 +40,19 @@
       "public/splash.html",
       "public/splash.js",
       "public/renderProcess.js",
+      "public/notifications.js",
+      "public/jokerDateMigration.js",
       "public/assessmentRenderer.js",
+      "public/aiRenderer.js",
+      "public/visualFeedback.js",
+      "public/uiMotion.js",
+      "public/debugMode.js",
+      "public/scrollEffects.js",
+      "public/customSelect.js",
+      "public/excelEditorPage.js",
+      "public/vendor/**/*",
       "public/style.css",
+      "public/kristall/**/*",
       "public/tailwind.css",
       "public/icons/icon.ico",
       "public/icons/icon.png",
@@ -90,12 +111,17 @@
     "nodemailer": "^9.1.1"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261013.1",
     "autoprefixer": "^10.4.20",
     "electron": "^41.3.0",
     "electron-builder": "^26.5.0",
     "electron-packager": "^15.2.0",
+    "esbuild": "0.28.2",
+    "gsap": "3.15.0",
     "postcss": "^8.4.49",
     "rcedit": "^2.3.0",
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "^3.4.17",
+    "thinking-orbs": "0.3.2",
+    "wrangler": "^4.150.0"
   }
 }

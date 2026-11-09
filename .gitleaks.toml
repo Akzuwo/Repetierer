@@ -1,0 +1,16 @@
+title = "Repetierer public source"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "repetierer-teacher-token"
+description = "Actual assessment application access token"
+regex = '''\brt_[A-Za-z0-9_-]{43}\b'''
+keywords = ["rt_"]
+
+[[rules]]
+id = "brevo-smtp-token"
+description = "Brevo SMTP credential"
+regex = '''\bxsmtpsib-[A-Za-z0-9_-]{20,}\b'''
+keywords = ["xsmtpsib-"]

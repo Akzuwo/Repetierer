@@ -15,10 +15,13 @@ function data() {
 
 test('escaped HTML enthält keine ungefilterten Schülerdaten', () => {
 	const { classRecord, round } = data();
+	round.assessments.a.teacherCriterionComments = { c: 'Gut <script>alert(1)</script> & weiter so' };
 	const message = buildResultMessage({ student: classRecord.students[0], assessment: round.assessments.a, round, sender: { fromName: 'Lehrer', fromEmail: 'lehrer@example.ch' } });
 	assert.match(message.html, /Anna &lt;Müller&gt;/);
 	assert.match(message.html, /&lt;b&gt;Fachwissen&lt;\/b&gt;/);
 	assert.doesNotMatch(message.html, /<script>/);
+	assert.match(message.text, /Kommentar Lehrer: Gut <script>alert\(1\)<\/script> & weiter so/);
+	assert.match(message.html, /Gut &lt;script&gt;alert\(1\)&lt;\/script&gt; &amp; weiter so/);
 	assert.equal(escapeHtml('A&B'), 'A&amp;B');
 	assert.throws(() => buildResultMessage({ student: classRecord.students[0], assessment: { studentEmail: 'x' }, round, sender: {} }), /ungültig/);
 });
@@ -57,4 +60,21 @@ test('SMTP-Adapter übergibt Brevo-Konfiguration und Nachrichten an Nodemailer',
 	await mailer.send({ to: 'anna@example.ch' });
 	assert.equal(transportOptions.auth.pass, 'p');
 	assert.equal(sentMessage.to, 'anna@example.ch');
+});
+
+test('Resultatmails use only the fixed sender, even with an old Gmail configuration', async () => {
+	const {classRecord, round} = data();
+	const oldSender = {fromName:'Alter Lehrername', fromEmail:'timowigger8@gmail.com'};
+	const message = buildResultMessage({student:classRecord.students[0],assessment:round.assessments.a,round,sender:oldSender});
+	assert.deepEqual(message.from, {name:'Philosophie Mündlich beurteilung',address:'no-reply@akzuwo.ch'});
+	assert.match(message.text, /Freundliche Grüsse\nPhilosophie Mündlich beurteilung$/);
+	const visible = require('../src/assessment/integrationConfig').publicBrevoConfig({host:'smtp-relay.brevo.com',port:587,...oldSender});
+	assert.equal(visible.fromEmail, 'no-reply@akzuwo.ch');
+	assert.equal(visible.fromName, 'Philosophie Mündlich beurteilung');
+	// Compose a real MIME message and SMTP envelope without contacting a server.
+	const result = await require('nodemailer').createTransport({streamTransport:true,buffer:true,newline:'unix'}).sendMail(message);
+	assert.equal(result.envelope.from, 'no-reply@akzuwo.ch');
+	assert.deepEqual(result.envelope.to, ['anna@example.ch']);
+	assert.match(result.message.toString(), /<no-reply@akzuwo\.ch>/);
+	assert.doesNotMatch(result.message.toString(), /timowigger8@gmail\.com|Alter Lehrername/);
 });
