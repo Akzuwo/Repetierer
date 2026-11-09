@@ -163,7 +163,10 @@ ipcMain.on('get-debug-mode', (event, args) => {
 // settings
 ipcMain.on('get-settings', (event,args) => {
  const program=getProgram(),filePath=program.getCurrentFilePath(),classes=program.getClasses()||[];
- const className=classes.includes(args?.className)?args.className:program.getCurrentClass()||classes[0]||'';
+ const active=getTeachingSessionStore().getActiveSession();
+ const sameFile=!active?.filePath || require('./storage').getFileIdentifier(active.filePath)===require('./storage').getFileIdentifier(filePath);
+ const defaultClass=sameFile && classes.includes(active?.className)?active.className:'';
+ const className=typeof args?.className==='string'?(classes.includes(args.className)?args.className:''):defaultClass;
  event.sender.send('settings-data',require('./storage').getClassSettings(filePath,className),getPaths(),program.getExtraJokerMigrationStatus(className),{filePath,className,classes});
 });
 ipcMain.on('get-ui-settings', event=>event.sender.send('ui-settings',getProgram().getCurrentSettings()));

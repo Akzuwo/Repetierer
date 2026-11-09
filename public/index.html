@@ -208,7 +208,8 @@
 				<h2 id="settings-heading" tabindex="-1">Einstellungen</h2>
 				<button class="btn-2 settings-back" id="settings-back-btn">Zurück</button>
 			</div>
-			<div class="settings-scope-tabs" role="tablist" aria-label="Einstellungsbereich"><button type="button" class="btn-1" id="settings-global-tab" role="tab" aria-selected="true" aria-controls="settings-global-fields">Global</button><button type="button" class="btn-2" id="settings-class-tab" role="tab" aria-selected="false" aria-controls="settings-class-fields">Klasse</button></div>
+
+<div id="settings-class-picker" class="update-hidden"><label class="setting-field">Klasse<select id="settings-class-select" data-custom-select></select></label></div>
 <div class="settings-scroll-area">
 				<div id="settings-global-fields" role="tabpanel" aria-labelledby="settings-global-tab"><div class="ai-settings-section">
 					<div class="ai-settings-heading"><h3>Lokale KI</h3><button type="button" class="help-button mini-help-button" id="ai-info-btn" title="So funktioniert die lokale KI: Einrichtung, Datenschutz und Bestätigung von Änderungen. Erklärung öffnen." aria-label="Erklärung zur KI-Integration öffnen">?</button></div>
@@ -254,7 +255,7 @@
 						<button class="btn-danger update-hidden" id="brevo-remove-btn">Credentials entfernen</button>
 					</div>
 				</div></div>
-<div id="settings-class-fields" role="tabpanel" aria-labelledby="settings-class-tab" class="update-hidden"><label class="setting-field">Klasse<select id="settings-class-select" data-custom-select></select></label><p id="settings-class-hint">Bitte zuerst eine Datei laden.</p><fieldset id="settings-class-rules"><h3 class="settings-section-heading">Hausaufgaben vorführen</h3>
+<div id="settings-class-fields" role="tabpanel" aria-labelledby="settings-class-tab" class="update-hidden"><p id="settings-class-hint">Bitte zuerst eine Datei laden.</p><fieldset id="settings-class-rules"><h3 class="settings-section-heading">Hausaufgaben vorführen</h3>
         <label class="setting-row setting-toggle"><span class="setting-copy">Freiwillige Hausaufgaben vorführen<small>Als zusätzlichen Bereich im Session-Dock anzeigen.</small></span><input class="toggle-input" type="checkbox" role="switch" id="homework-enabled-setting" checked><span class="toggle-switch" aria-hidden="true"></span></label>
         <label class="setting-field setting-range"><span class="setting-range-heading"><span id="homework-joker-setting-label">Ein Extra-Joker nach jeweils</span><output id="homework-joker-setting-value" for="homework-joker-setting" aria-hidden="true">2 Vorführungen</output></span><input type="range" id="homework-joker-setting" min="1" max="20" step="1" value="2" aria-labelledby="homework-joker-setting-label"></label>
         <label class="setting-field setting-range"><span class="setting-range-heading"><span id="homework-weight-setting-label">Gewicht gegenüber einer Repetition</span><output id="homework-weight-setting-value" for="homework-weight-setting" aria-hidden="true">1.2×</output></span><input type="range" id="homework-weight-setting" min="0.1" max="5" step="0.1" value="1.2" aria-labelledby="homework-weight-setting-label"></label>
@@ -309,6 +310,7 @@
 	</section>
 	</div>
 
+	<div class="session-tabs settings-scope-tabs" id="settings-navdock" role="tablist" aria-label="Einstellungsbereich"><button type="button" class="btn-1" id="settings-global-tab" role="tab" aria-selected="true" aria-controls="settings-global-fields">Global</button><button type="button" class="btn-2" id="settings-class-tab" role="tab" aria-selected="false" tabindex="-1" aria-controls="settings-class-fields">Klasse</button></div>
 	<div id="session-chrome">
 		<div class="session-header update-hidden" id="session-header">
 			<div class="session-meta">
@@ -316,8 +318,9 @@
 			</div>
 			<div class="session-tabs">
 				<button class="btn-1" id="session-participation-tab">Mitarbeit</button>
-				<button class="btn-2" id="session-repetition-tab">Repetition</button>
+
                 <button class="btn-2" id="session-homework-tab">Hausaufgaben</button>
+                <button class="btn-2" id="session-repetition-tab">Repetition</button>
 			</div>
 		</div>
 			<button class="btn-2 session-end-button" id="end-session-btn">Session beenden</button>

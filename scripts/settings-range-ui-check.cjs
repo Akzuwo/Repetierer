@@ -7,6 +7,7 @@ module.exports=async function({win,evaluate,waitFor,shot,pause}){
  win.showInactive();await waitFor(`document.visibilityState==='visible'`);
  await evaluate(`document.getElementById('settings-btn').click()`);
  await waitFor(`!document.getElementById('settings-view').classList.contains('update-hidden') && !document.getElementById('content').dataset.pageMotion`);
+ assert.equal(await evaluate(`document.getElementById('settings-navdock').parentElement.id`),'container');
  assert.equal(await evaluate(`document.querySelectorAll('#settings-view input[type=range]').length`),6);
  assert.equal(await evaluate(`document.querySelectorAll('#settings-view input[type=number]').length`),0);
  await evaluate(`document.getElementById('settings-class-tab').click()`);

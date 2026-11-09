@@ -10,9 +10,11 @@ body .homework-stage p { color:var(--text-muted); }
 body #homework-grade-form { display:flex; align-items:center; gap:22px; margin-top:24px; }
 body #homework-grade-input { width:130px; min-height:52px; border:0; border-bottom:1px solid #ffffff88; border-radius:0; background:none; box-shadow:none; font-size:24px; }
 body #homework-grade-input:focus-visible { outline:none; box-shadow:none; border-bottom-color:#fff; }
-body .settings-scope-tabs { display:flex; gap:20px; flex-shrink:0; padding:0 6px 12px; }
-body .settings-scope-tabs button { border:0; background:none; box-shadow:none; padding:8px 2px; min-height:40px; color:var(--text-muted); }
-body .settings-scope-tabs [aria-selected="true"] { color:#fff; }
+body #settings-navdock { display:none; position:absolute; z-index:12; bottom:18px; left:50%; transform:translateX(-50%); width:max-content; max-width:calc(100% - 32px); height:56px !important; padding:5px; }
+body #container:has(#content.settings-active) #settings-navdock { display:flex; }
+body #settings-navdock button { min-width:132px; padding-inline:26px; font-size:15px; }
+body #settings-class-picker { flex:0 0 auto; margin-bottom:14px; }
+body #settings-class-picker .setting-field { margin:0; padding-top:0; border:0; }
 body #settings-class-rules { border:0; padding:0; margin:0; min-width:0; }
 body #settings-class-hint, body .homework-settings-note { color:var(--text-muted); font-size:13px; line-height:1.5; margin:12px 0 20px; }
 body #settings-class-rules:disabled { opacity:.5; }
@@ -389,7 +391,7 @@ body #session-empty-view #class-list button.class-selected { color: #fff; font-w
 html:not([data-renderer="webgl"]) body #session-empty-view #class-list button.class-selected { background: rgba(220,243,235,.104); }
 /* Live page pop: only the content moves; the glass follows measured bounds. */
 body #content { transform-origin: 50% 0; }
-body #content.settings-active { display: flex; min-height: 0; padding: 20px 32px 24px; }
+body #content.settings-active { display: flex; min-height: 0; padding: 20px 32px 104px; }
 body #settings-view { width: 100%; max-width: 920px; height: 100%; min-height: 0; margin: 0 auto; -webkit-app-region: no-drag; app-region: no-drag; }
 body #settings-view .settings-content { width: 100%; max-width: none; height: 100%; max-height: none; min-height: 0; margin: 0; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; }
 body #settings-view .settings-header { flex: 0 0 auto; margin: 0 0 20px; align-items: center; gap: 16px; }

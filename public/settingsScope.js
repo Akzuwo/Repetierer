@@ -1,14 +1,18 @@
 const {ipcRenderer}=require('electron');
+const motion=require('./uiMotion');
 const select=document.getElementById('settings-class-select'),hint=document.getElementById('settings-class-hint'),rules=document.getElementById('settings-class-rules');
 let context={className:'',filePath:''},dirty=false;
 window.getSettingsScopeContext=()=>context;
 function tab(name,focus=false) {
+ const panel=document.getElementById(`settings-${name}-fields`),wasHidden=panel.classList.contains('update-hidden');
+ document.getElementById('settings-class-picker').classList.toggle('update-hidden',name!=='class');
  for(const key of ['global','class']) {
   const button=document.getElementById(`settings-${key}-tab`),active=key===name;
   button.classList.toggle('btn-1',active);button.classList.toggle('btn-2',!active);button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;
   document.getElementById(`settings-${key}-fields`).classList.toggle('update-hidden',!active);
   if(active && focus)button.focus();
  }
+ if(wasHidden)motion.revealView(panel);
  window.repetiererKristall?.refresh();
 }
 for(const name of ['global','class']) {
@@ -19,9 +23,10 @@ for(const name of ['global','class']) {
 ipcRenderer.on('settings-data',(_event,_settings,_paths,_migration,value)=>{
  context={filePath:value?.filePath||'',className:value?.className||''};dirty=false;
  select.replaceChildren();
+ const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='Klasse auswählen';select.append(placeholder);
  for(const name of value?.classes||[]){const option=document.createElement('option');option.value=option.textContent=name;select.append(option);}
- select.value=context.className;select.disabled=!context.className;rules.disabled=!context.className;
- hint.textContent=context.className?'Diese Regeln gelten nur für diese Klasse und werden lokal in der App gespeichert.':'Bitte zuerst eine Exceldatei mit Klassen laden. Die globalen Einstellungen bleiben verfügbar.';
+ select.value=context.className;select.disabled=!(value?.classes?.length);rules.disabled=!context.className;
+ hint.textContent=context.className?'Diese Regeln gelten nur für diese Klasse und werden lokal in der App gespeichert.':value?.classes?.length?'Bitte oben eine Klasse auswählen.':'Bitte zuerst eine Exceldatei mit Klassen laden. Die globalen Einstellungen bleiben verfügbar.';
  select.dispatchEvent(new Event('change',{bubbles:false}));
  window.repetiererKristall?.refresh();
 });
