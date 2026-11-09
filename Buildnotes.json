@@ -24,7 +24,9 @@
       "Joker Datum wird nun im Excel angezeigt",
       "Version und Buildnummer werden getrennt angezeigt",
       "Debug-Menü mit Updatevorschau, Neustartsimulation und Testmail",
-      "Menü-Animation zwischen Hamburger und X korrigiert"
+      "Menü-Animation zwischen Hamburger und X korrigiert",
+      "Hausaufgaben vorführen mit Noten, Gewichtung und konfigurierbarem Extra-Joker",
+      "Globale und klassenspezifische Einstellungen getrennt, Klassenregeln bleiben lokal in der App"
     ]
   }
 }

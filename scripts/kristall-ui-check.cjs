@@ -16,7 +16,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 ipcMain.handle('ai:status', () => ({ state: 'ready', message: 'Bereit' }));
 ipcMain.handle('assessment:config-status', () => ({ ok: true, data: { configured: false } }));
 ipcMain.handle('assessment:brevo-status', () => ({ ok: true, data: { configured: false } }));
-ipcMain.on('get-settings', event => event.reply('settings-data', { theme: 'midnight', probabilityDecreaseFactor: .8, neverSelectedBoostFactor: 1.5, wiggersRuleDurationMinutes: 30 }, {}, {}));
+ipcMain.on('get-settings', event => event.reply('settings-data', { theme: 'midnight', probabilityDecreaseFactor: .8, neverSelectedBoostFactor: 1.5, wiggersRuleDurationMinutes: 30 }, {}, {}, {filePath:'fixture.xlsx',className:'Demo',classes:['Demo']}));
 ipcMain.on('version', event => event.reply('version', '7.0.0'));
 ipcMain.on('load-saved-file', event => event.reply('saved-file-missing', ''));
 ipcMain.on('get-active-teaching-session', event => event.reply('active-teaching-session-data', null));
@@ -48,6 +48,7 @@ async function main() {
   await until(`!document.getElementById('settings-view').classList.contains('update-hidden')`);
   await pause(600);
   await shot('app-settings-desktop');
+  await evaluate(`document.getElementById('settings-class-tab').click();document.getElementById('extra-joker-setting').scrollIntoView({block:'center'})`);await pause(250);
   // Native keyboard activation must change both the checkbox and the lens.
   const start = await evaluate(`document.getElementById('extra-joker-setting').checked`);
   await evaluate(`document.getElementById('extra-joker-setting').focus()`);

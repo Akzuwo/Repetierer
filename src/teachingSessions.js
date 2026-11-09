@@ -25,7 +25,7 @@ function createTeachingSessionStore(filePath) {
 		return sessions.slice().reverse().find(session => !session.endedAt) || null;
 	}
 
-	function startSession(className, persons, absentIds) {
+	function startSession(className, persons, absentIds, filePath) {
 		if (!className || !Array.isArray(persons) || persons.length === 0) {
 			return { success: false, reason: 'invalid-session-data' };
 		}
@@ -37,13 +37,15 @@ function createTeachingSessionStore(filePath) {
 		const session = {
 			id: createId(),
 			className: String(className),
+			...(filePath ? {filePath:String(filePath)} : {}),
 			startedAt,
 			date: startedAt,
 			endedAt: null,
 			presentStudents: snapshots.filter(person => !absentIdSet.has(normalizeId(person.id))),
 			absentStudents: snapshots.filter(person => absentIdSet.has(normalizeId(person.id))),
 			participationEntries: [],
-			repetitionEntries: []
+			repetitionEntries: [],
+			homeworkEntries: []
 		};
 		const data = readData();
 		data.sessions.push(session);
@@ -92,6 +94,22 @@ function createTeachingSessionStore(filePath) {
 		});
 	}
 
+ function setHomeworkUndone(homeworkId,undone) {
+  if(!homeworkId)return;
+  const data=readData();let changed=false;
+  for(const session of data.sessions)for(const entry of session.homeworkEntries||[])if(entry.homeworkId===homeworkId){entry.undone=undone;changed=true;}
+  if(changed)writeData(data);
+ }
+
+ function addHomework(sessionId,entry) {
+  return updateSession(sessionId,session=>{
+   if(!session.presentStudents.some(p=>p.id===entry.personId))return false;
+   session.homeworkEntries ||= [];
+   if(session.homeworkEntries.some(e=>e.homeworkId===entry.homeworkId))return false;
+   session.homeworkEntries.push({...entry,timestamp:new Date().toISOString()});return true;
+  });
+ }
+
 	function updateSession(sessionId, mutator) {
 		const data = readData();
 		const session = data.sessions.find(candidate => candidate.id === sessionId);
@@ -139,7 +157,7 @@ function createTeachingSessionStore(filePath) {
 		})).sort((a, b) => a.studentName.localeCompare(b.studentName, 'de'));
 	}
 
-	return { readData, getActiveSession, startSession, endSession, addParticipation, addRepetition, getParticipationSummary };
+	return { setHomeworkUndone, addHomework, readData, getActiveSession, startSession, endSession, addParticipation, addRepetition, getParticipationSummary };
 }
 
 function createSummaryRow(className, person) {

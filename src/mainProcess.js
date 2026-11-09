@@ -161,22 +161,25 @@ ipcMain.on('get-debug-mode', (event, args) => {
 });
 
 // settings
-ipcMain.on('get-settings', (event, args) => {
-	event.sender.send('settings-data', getAppSettings(), getPaths(), getProgram().getExtraJokerMigrationStatus());
+ipcMain.on('get-settings', (event,args) => {
+ const program=getProgram(),filePath=program.getCurrentFilePath(),classes=program.getClasses()||[];
+ const className=classes.includes(args?.className)?args.className:program.getCurrentClass()||classes[0]||'';
+ event.sender.send('settings-data',require('./storage').getClassSettings(filePath,className),getPaths(),program.getExtraJokerMigrationStatus(className),{filePath,className,classes});
 });
-
-ipcMain.on('get-ui-settings', (event, args) => {
-	event.sender.send('ui-settings', getAppSettings());
-});
-
-ipcMain.on('save-settings', (event, settings) => {
-	saveAppSettings(settings || {});
-	if (!settings || settings.wiggersRuleEnabled === false) {
-		clearWiggersRulePenalties();
-		getProgram().clearWiggersRulePenalties();
-	}
-	logEvent('Einstellungen gespeichert');
-	event.sender.send('settings-saved', getAppSettings());
+ipcMain.on('get-ui-settings', event=>event.sender.send('ui-settings',getProgram().getCurrentSettings()));
+ipcMain.on('save-settings', (event,settings) => {
+ const program=getProgram();
+ try {
+ if(settings?.scope==='combined') {
+  const filePath=program.getCurrentFilePath(),className=settings.className||'';
+  if((className && (!(program.getClasses()||[]).includes(className)||filePath!==settings.filePath)) || (!className && settings.filePath && settings.filePath!==filePath)) {
+   event.sender.send('settings-save-failed','Die geladene Datei oder Klasse hat sich geändert. Bitte die Einstellungen erneut öffnen.');return;
+  }
+  require('./storage').saveScopedSettings(settings,filePath,className);
+ } else saveAppSettings(settings||{});
+ program.clearWiggersRulePenalties();
+ logEvent('Einstellungen gespeichert');event.sender.send('settings-saved',program.getCurrentSettings());
+ } catch {event.sender.send('settings-save-failed','Die Einstellungen konnten nicht gespeichert werden. Bitte die Schreibrechte des App-Profils prüfen.');}
 });
 
 // file
@@ -213,6 +216,7 @@ ipcMain.on('load-saved-file', (event, args) => {
 // class
 ipcMain.on('class', (event, args) => {
 	getProgram().setClass(args, result => {
+		event.sender.send('ui-settings',getProgram().getCurrentSettings());
 		event.sender.send('ready', result);
 	});
 });
@@ -268,7 +272,7 @@ ipcMain.on('start-teaching-session', (event, args) => {
 			event.sender.send('teaching-session-start-failed', absenceResult || { reason: 'absence-save-failed' });
 			return;
 		}
-		const result = getTeachingSessionStore().startSession(className, persons, absentIds);
+		const result = getTeachingSessionStore().startSession(className, persons, absentIds,getProgram().getCurrentFilePath());
 		if (result.success) {
 			logEvent('Unterrichts-Session gestartet', { sessionId: result.session.id, className, present: result.session.presentStudents.length, absent: result.session.absentStudents.length });
 			event.sender.send('teaching-session-started', result.session);
@@ -331,7 +335,8 @@ ipcMain.on('get-editor-persons', (event, args) => {
 });
 
 ipcMain.on('get-class-statistics', (event, args) => {
-	event.sender.send('class-statistics-data', getProgram().getClassStatistics());
+	try {event.sender.send('class-statistics-data',getProgram().getClassStatistics());}
+	catch(error){require('./notifications').error('Die Statistik konnte nicht gelesen werden. '+error.message,{title:'Statistik',target:event.sender});event.sender.send('class-statistics-data',[]);}
 });
 
 ipcMain.on('get-absence-persons', (event, args) => {
@@ -407,6 +412,35 @@ function getSelectionNames() {
 }
 
 registerAssessmentHandlers({ getProgram, getPaths });
+
+let homeworkBusy=false;
+ipcMain.handle('homework:status',()=>{
+ try{return getProgram().getHomeworkStatus();}catch(error){return {error:error.message};}
+});
+ipcMain.handle('homework:prepare',async(_event,fingerprint)=>{
+ if(homeworkBusy)return {success:false,error:'Bitte warte, bis die laufende Aktion abgeschlossen ist.'};
+ if(!getProgram().getCurrentSettings().homeworkEnabled)return {success:false,error:'Hausaufgaben sind deaktiviert.'};
+ homeworkBusy=true;
+ try{return await new Promise(resolve=>getProgram().migrateHomework(fingerprint,resolve));}finally{homeworkBusy=false;}
+});
+ipcMain.handle('homework:persons',()=>{
+ try{return {success:true,persons:getProgram().getHomeworkPersons()};}catch(error){return {success:false,error:error.message};}
+});
+ipcMain.handle('homework:save',async(event,args)=>{
+ const session=getTeachingSessionStore().getActiveSession();
+ const identify=require('./storage').getFileIdentifier;
+ if(session?.filePath && identify(session.filePath)!==identify(getProgram().getCurrentFilePath()))return {success:false,error:'Die Session gehört zu einer anderen Exceldatei. Bitte die Session beenden und für diese Datei neu starten.'};
+ if(homeworkBusy || !session || session.id!==args?.sessionId || session.className!==getProgram().getCurrentClass() || !session.presentStudents.some(p=>p.id===args.personId) || !getProgram().getCurrentSettings().homeworkEnabled)return {success:false,error:'Bitte eine anwesende Person in der aktiven Session auswählen.'};
+ homeworkBusy=true;
+ try {
+  return await new Promise(resolve=>getProgram().saveHomework(args.personId,args.grade,entry=>{
+   if(!entry)return resolve({success:false,error:'Ungültige Note oder Person.'});
+   const accepted=handleExcelBackupEntry(event,entry);
+   if(accepted)getTeachingSessionStore().addHomework(session.id,entry);
+   resolve({success:accepted,entry,error:entry.excelWriteError});
+  }));
+ } catch(error){return {success:false,error:error.message};}finally{homeworkBusy=false;}
+});
 
 // ok
 ipcMain.on('repetition-timing-start', (_event, token) => { getProgram().startRepetitionTiming(token); });
@@ -518,7 +552,10 @@ ipcMain.on('flush-pending-excel', (event, args) => {
 
 	getProgram().applyPendingExcelEntries(pendingEntries, result => {
 		if (result && result.success) {
+			const appliedBackupIds=require('./storage').markPendingExcelApplied(result.applied||[]);
+			for(const entry of sessionEntries)if(appliedBackupIds.has(entry.id)){entry.excelWriteSucceeded=true;delete entry.excelWriteReason;delete entry.pendingEntryId;}
 			removePendingExcelEntries(result.applied || []);
+			event.sender.send('undo-status',getUndoStatus());
 			logEvent('Excel aktualisiert', { applied: result.applied || [] });
 		} else {
 			logEvent(result && result.reason === 'excel-locked' ? 'Konflikt erkannt' : 'Fehler beim Schreiben', result || {});
@@ -576,6 +613,8 @@ ipcMain.on('skip-joker-date-migration', event => {
 });
 
 ipcMain.on('run-extra-joker-migration', (event, args) => {
+	const className=args?.className||getProgram().getCurrentClass();
+	if(!className || !(getProgram().getClasses()||[]).includes(className) || (args?.filePath && args.filePath!==getProgram().getCurrentFilePath())) {event.sender.send('extra-joker-migration-failed',{reason:'no-class-selected'});return;}
 	logEvent('Extra-Joker-Migration gestartet', { filePath: getProgram().getCurrentFilePath() });
 	getProgram().migrateExtraJokersAfterThree(result => {
 		if (result && result.success) {
@@ -589,7 +628,7 @@ ipcMain.on('run-extra-joker-migration', (event, args) => {
 
 		logEvent('Extra-Joker-Migration nicht durchgefuehrt', result || {});
 		event.sender.send('extra-joker-migration-failed', result || { success: false, reason: 'unknown' });
-	});
+	},className);
 });
 
 ipcMain.on('cancel-joker-migration', (event, args) => {
@@ -672,6 +711,7 @@ function undoLastAction(event) {
 		lastRedoEntry = entry;
 		logEvent('Letzte Aktion rückgängig gemacht', { type: entry.type, personName: entry.personName, pendingOnly: true });
 		event.sender.send('pending-excel-status', getPendingExcelEntries().length);
+		getTeachingSessionStore().setHomeworkUndone(entry.homeworkId,true);
 		event.sender.send('undo-completed', { success: true, entry: entry, pendingOnly: true });
 		event.sender.send('undo-status', getUndoStatus());
 		event.sender.send('redo-status', getRedoStatus());
@@ -685,7 +725,8 @@ function undoLastAction(event) {
 			lastUndoEntry = sessionEntries[sessionEntries.length - 1];
 			lastRedoEntry = entry;
 			logEvent('Letzte Aktion rückgängig gemacht', { type: entry.type, personName: entry.personName });
-			event.sender.send('undo-completed', { success: true, entry: entry });
+			getTeachingSessionStore().setHomeworkUndone(entry.homeworkId,true);
+		event.sender.send('undo-completed', { success: true, entry: entry });
 			event.sender.send('undo-status', getUndoStatus());
 			event.sender.send('redo-status', getRedoStatus());
 			return;
@@ -720,6 +761,7 @@ function redoLastAction(event) {
 		getProgram().activateWiggersRuleForEntry(sessionEntry);
 		logEvent('Letzte Aktion erneut angewendet', { type: entry.type, personName: entry.personName, pendingOnly: true });
 		event.sender.send('pending-excel-status', getPendingExcelEntries().length);
+		getTeachingSessionStore().setHomeworkUndone(entry.homeworkId,false);
 		event.sender.send('redo-completed', { success: true, entry: sessionEntry, pendingOnly: true });
 		event.sender.send('undo-status', getUndoStatus());
 		event.sender.send('redo-status', getRedoStatus());
@@ -737,7 +779,8 @@ function redoLastAction(event) {
 			lastUndoEntry = storedBackupEntry;
 			lastRedoEntry = null;
 			logEvent('Letzte Aktion erneut angewendet', { type: entry.type, personName: entry.personName });
-			event.sender.send('redo-completed', { success: true, entry: storedBackupEntry });
+			getTeachingSessionStore().setHomeworkUndone(entry.homeworkId,false);
+		event.sender.send('redo-completed', { success: true, entry: storedBackupEntry });
 			event.sender.send('undo-status', getUndoStatus());
 			event.sender.send('redo-status', getRedoStatus());
 			return;
@@ -760,7 +803,8 @@ function redoLastAction(event) {
 			logEvent('Redo als Pending gespeichert', { type: entry.type, personName: entry.personName, reason: result.reason });
 			event.sender.send('excel-write-pending', pendingEntry);
 			event.sender.send('pending-excel-status', getPendingExcelEntries().length);
-			event.sender.send('redo-completed', { success: true, entry: sessionEntry, pendingOnly: true });
+			getTeachingSessionStore().setHomeworkUndone(entry.homeworkId,false);
+		event.sender.send('redo-completed', { success: true, entry: sessionEntry, pendingOnly: true });
 			event.sender.send('undo-status', getUndoStatus());
 			event.sender.send('redo-status', getRedoStatus());
 			return;
@@ -846,7 +890,7 @@ function buildProtocolCsv(entries) {
 		entry.date || '',
 		entry.className || '',
 		entry.personName || '',
-		entry.type === 'joker' ? 'Joker' : 'Note',
+		entry.type === 'joker' ? 'Joker' : entry.type==='homework' ? 'Hausaufgaben' : 'Note',
 		entry.type === 'grade' ? entry.grade : '',
 		entry.excelWriteSucceeded ? 'Excel gespeichert' : 'Excel offen',
 		entry.filePath || ''
@@ -889,7 +933,7 @@ function buildProtocolHtml(entries) {
 			<td>${escapeHtml(entry.date || '')}</td>
 			<td>${escapeHtml(entry.className || '')}</td>
 			<td>${escapeHtml(entry.personName || '')}</td>
-			<td>${escapeHtml(entry.type === 'joker' ? 'Joker' : 'Note')}</td>
+			<td>${escapeHtml(entry.type === 'joker' ? 'Joker' : entry.type==='homework' ? 'Hausaufgaben' : 'Note')}</td>
 			<td>${escapeHtml(entry.type === 'grade' ? entry.grade : '')}</td>
 			<td>${escapeHtml(entry.excelWriteSucceeded ? 'Excel gespeichert' : 'Excel offen')}</td>
 		</tr>
@@ -1228,6 +1272,7 @@ function fillImportedWorksheet(worksheet, names) {
 	});
 	worksheet.getColumn(1).width = 28;
  require('./jokerDates').migrateWorksheet(worksheet);
+ if(getAppSettings().homeworkEnabled)require('./homework').migrateWorksheet(worksheet);
 }
 
 function sanitizeWorksheetName(name) {

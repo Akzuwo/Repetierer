@@ -162,7 +162,11 @@
 				<div id="participation-summary-list"></div>
 			</div>
 		</div>
-		<section class="update-hidden" id="stats-view" aria-labelledby="stats-heading">
+		<section class="neum update-hidden" id="homework-view" aria-labelledby="homework-heading">
+      <div class="participation-heading"><h2 id="homework-heading">Hausaufgaben vorführen</h2><div class="button-row"><button type="button" class="btn-2" id="homework-undo-btn" disabled>Undo</button><button type="button" class="btn-2" id="homework-redo-btn" disabled>Redo</button></div></div>
+      <div id="homework-body"></div>
+    </section>
+    <section class="update-hidden" id="stats-view" aria-labelledby="stats-heading">
 	        <div class="stats-header">
                 <div><h2 id="stats-heading">Statistiken</h2><p>Repetition im Überblick</p></div>
                 <div class="stats-header-actions"><button class="btn-2" id="stats-back-btn">Zurück</button><div class="stats-class-picker update-hidden" id="stats-class-picker"><span>Klasse</span><select data-custom-select id="stats-class-select" aria-label="Statistik einer Klasse anzeigen"></select></div></div>
@@ -204,8 +208,9 @@
 				<h2 id="settings-heading" tabindex="-1">Einstellungen</h2>
 				<button class="btn-2 settings-back" id="settings-back-btn">Zurück</button>
 			</div>
-			<div class="settings-scroll-area">
-				<div class="ai-settings-section">
+			<div class="settings-scope-tabs" role="tablist" aria-label="Einstellungsbereich"><button type="button" class="btn-1" id="settings-global-tab" role="tab" aria-selected="true" aria-controls="settings-global-fields">Global</button><button type="button" class="btn-2" id="settings-class-tab" role="tab" aria-selected="false" aria-controls="settings-class-fields">Klasse</button></div>
+<div class="settings-scroll-area">
+				<div id="settings-global-fields" role="tabpanel" aria-labelledby="settings-global-tab"><div class="ai-settings-section">
 					<div class="ai-settings-heading"><h3>Lokale KI</h3><button type="button" class="help-button mini-help-button" id="ai-info-btn" title="So funktioniert die lokale KI: Einrichtung, Datenschutz und Bestätigung von Änderungen. Erklärung öffnen." aria-label="Erklärung zur KI-Integration öffnen">?</button></div>
 					<p>Der Assistent läuft mit Ollama auf diesem Gerät. Schülerdaten werden nicht an eine Cloud-KI gesendet.</p>
 					<p id="ai-setup-status" role="status">Status wird geprüft …</p>
@@ -214,7 +219,47 @@
 					<button class="btn-danger update-hidden" type="button" id="ai-remove-btn">KI-Integration entfernen</button>
 				</div>
 				<p id="settings-location"></p>
-				<h3 class="settings-section-heading">Weitere Optionen</h3>
+				<label class="setting-row setting-toggle">
+					<span class="setting-copy">
+						Zusätzliche visuelle Effekte
+						<small>Aktiviert Titelanimation, Namensauswahl mit Konfetti und die Speicherbestätigung.</small>
+					</span>
+					<input class="toggle-input" type="checkbox" id="visual-effects-setting" role="switch">
+					<span class="toggle-switch" aria-hidden="true"></span>
+				</label>
+<label class="setting-field setting-range">
+                    <span class="setting-range-heading"><span id="notification-duration-setting-label">Anzeigedauer der Benachrichtigungen</span><output id="notification-duration-setting-value" for="notification-duration-setting" aria-hidden="true">6 Sek.</output></span>
+                    <input id="notification-duration-setting" type="range" min="2" max="8" step="1" value="6" aria-labelledby="notification-duration-setting-label">
+                </label>
+<h3 class="settings-section-heading">Integrationen</h3>
+                <div class="integration-package">
+                  <p>Eine Datei für Cloudflare API und SMTP. Beim Import werden beide Verbindungen übernommen.</p>
+                  <div class="button-row"><button class="btn-1" id="integration-package-import-btn">.repetierer importieren</button><button class="btn-2" id="integration-package-export-btn">Paket exportieren</button></div>
+                  <small>Das exportierte Paket enthält Zugangsdaten. Teile es nur mit der vorgesehenen Lehrperson.</small>
+                  <p id="integration-package-status" role="status"></p>
+                </div>
+				<div class="setting-action assessment-integration-setting">
+					<span>Cloudflare API · Mitmachnote<small id="assessment-config-status">Umfrage: Nicht eingerichtet</small><small id="assessment-api-status">API: Nicht geprüft</small></span>
+					<div class="integration-actions">
+						<button class="btn-2 update-hidden" id="assessment-config-import-btn">Konfiguration importieren</button>
+						<button class="btn-2 update-hidden" id="assessment-api-test-btn">Verbindung testen</button>
+						<button class="btn-danger update-hidden" id="assessment-config-remove-btn">Konfiguration entfernen</button>
+					</div>
+				</div>
+				<div class="setting-action assessment-integration-setting">
+					<span>Brevo SMTP<small id="brevo-status">Nicht eingerichtet</small></span>
+					<div class="integration-actions">
+						<button class="btn-2 update-hidden" id="brevo-import-btn">Konfiguration importieren</button>
+						<button class="btn-2 update-hidden" id="brevo-test-btn">Verbindung testen</button>
+						<button class="btn-danger update-hidden" id="brevo-remove-btn">Credentials entfernen</button>
+					</div>
+				</div></div>
+<div id="settings-class-fields" role="tabpanel" aria-labelledby="settings-class-tab" class="update-hidden"><label class="setting-field">Klasse<select id="settings-class-select" data-custom-select></select></label><p id="settings-class-hint">Bitte zuerst eine Datei laden.</p><fieldset id="settings-class-rules"><h3 class="settings-section-heading">Hausaufgaben vorführen</h3>
+        <label class="setting-row setting-toggle"><span class="setting-copy">Freiwillige Hausaufgaben vorführen<small>Als zusätzlichen Bereich im Session-Dock anzeigen.</small></span><input class="toggle-input" type="checkbox" role="switch" id="homework-enabled-setting" checked><span class="toggle-switch" aria-hidden="true"></span></label>
+        <label class="setting-field setting-range"><span class="setting-range-heading"><span id="homework-joker-setting-label">Ein Extra-Joker nach jeweils</span><output id="homework-joker-setting-value" for="homework-joker-setting" aria-hidden="true">2 Vorführungen</output></span><input type="range" id="homework-joker-setting" min="1" max="20" step="1" value="2" aria-labelledby="homework-joker-setting-label"></label>
+        <label class="setting-field setting-range"><span class="setting-range-heading"><span id="homework-weight-setting-label">Gewicht gegenüber einer Repetition</span><output id="homework-weight-setting-value" for="homework-weight-setting" aria-hidden="true">1.2×</output></span><input type="range" id="homework-weight-setting" min="0.1" max="5" step="0.1" value="1.2" aria-labelledby="homework-weight-setting-label"></label>
+        <p class="homework-settings-note">Das Gewicht gilt für neue Noten. Bestehende Noten und Joker bleiben beim Deaktivieren erhalten.</p>
+        <h3 class="settings-section-heading">Repetition</h3>
 				<label class="setting-row setting-toggle">
 					<span class="setting-copy">Extra Joker ab 3 Noten</span>
 					<input class="toggle-input" type="checkbox" id="extra-joker-setting" role="switch">
@@ -240,14 +285,7 @@
 					<span class="setting-range-heading"><span id="never-selected-boost-factor-setting-label">Boost-Faktor</span><output id="never-selected-boost-factor-setting-value" for="never-selected-boost-factor-setting" aria-hidden="true">3.0×</output></span>
 					<input id="never-selected-boost-factor-setting" type="range" min="1.1" max="10" step="0.1" value="3" aria-labelledby="never-selected-boost-factor-setting-label">
 				</label>
-				<label class="setting-row setting-toggle">
-					<span class="setting-copy">
-						Zusätzliche visuelle Effekte
-						<small>Aktiviert Titelanimation, Namensauswahl mit Konfetti und die Speicherbestätigung.</small>
-					</span>
-					<input class="toggle-input" type="checkbox" id="visual-effects-setting" role="switch">
-					<span class="toggle-switch" aria-hidden="true"></span>
-				</label>
+
 				<label class="setting-row setting-toggle">
 					<span class="setting-copy">
 						Wiggersche Regel aktivieren
@@ -260,33 +298,8 @@
 					<span class="setting-range-heading"><span id="wiggers-rule-duration-setting-label">Wiggers-Dauer in Minuten</span><output id="wiggers-rule-duration-setting-value" for="wiggers-rule-duration-setting" aria-hidden="true">120 Min.</output></span>
 					<input id="wiggers-rule-duration-setting" type="range" min="1" max="480" step="1" value="120" aria-labelledby="wiggers-rule-duration-setting-label">
 				</label>
-				<label class="setting-field setting-range">
-                    <span class="setting-range-heading"><span id="notification-duration-setting-label">Anzeigedauer der Benachrichtigungen</span><output id="notification-duration-setting-value" for="notification-duration-setting" aria-hidden="true">6 Sek.</output></span>
-                    <input id="notification-duration-setting" type="range" min="2" max="8" step="1" value="6" aria-labelledby="notification-duration-setting-label">
-                </label>
-                <h3 class="settings-section-heading">Integrationen</h3>
-                <div class="integration-package">
-                  <p>Eine Datei für Cloudflare API und SMTP. Beim Import werden beide Verbindungen übernommen.</p>
-                  <div class="button-row"><button class="btn-1" id="integration-package-import-btn">.repetierer importieren</button><button class="btn-2" id="integration-package-export-btn">Paket exportieren</button></div>
-                  <small>Das exportierte Paket enthält Zugangsdaten. Teile es nur mit der vorgesehenen Lehrperson.</small>
-                  <p id="integration-package-status" role="status"></p>
-                </div>
-				<div class="setting-action assessment-integration-setting">
-					<span>Cloudflare API · Mitmachnote<small id="assessment-config-status">Umfrage: Nicht eingerichtet</small><small id="assessment-api-status">API: Nicht geprüft</small></span>
-					<div class="integration-actions">
-						<button class="btn-2 update-hidden" id="assessment-config-import-btn">Konfiguration importieren</button>
-						<button class="btn-2 update-hidden" id="assessment-api-test-btn">Verbindung testen</button>
-						<button class="btn-danger update-hidden" id="assessment-config-remove-btn">Konfiguration entfernen</button>
-					</div>
-				</div>
-				<div class="setting-action assessment-integration-setting">
-					<span>Brevo SMTP<small id="brevo-status">Nicht eingerichtet</small></span>
-					<div class="integration-actions">
-						<button class="btn-2 update-hidden" id="brevo-import-btn">Konfiguration importieren</button>
-						<button class="btn-2 update-hidden" id="brevo-test-btn">Verbindung testen</button>
-						<button class="btn-danger update-hidden" id="brevo-remove-btn">Credentials entfernen</button>
-					</div>
-				</div>
+
+                </fieldset></div>
 			</div>
 			<div class="settings-page-actions">
 				<button class="btn-2" id="close-settings-modal">Verwerfen</button>
@@ -304,6 +317,7 @@
 			<div class="session-tabs">
 				<button class="btn-1" id="session-participation-tab">Mitarbeit</button>
 				<button class="btn-2" id="session-repetition-tab">Repetition</button>
+                <button class="btn-2" id="session-homework-tab">Hausaufgaben</button>
 			</div>
 		</div>
 			<button class="btn-2 session-end-button" id="end-session-btn">Session beenden</button>
@@ -619,6 +633,8 @@
 	require('./renderProcess.js');
 	require('./excelEditorPage.js').initExcelEditor();
 	require('./jokerDateMigration.js');
+	require('./homeworkPage.js');
+	require('./settingsScope.js');
 	require('./assessmentRenderer.js');
 	require('./aiRenderer.js');
 </script>

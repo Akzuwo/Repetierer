@@ -121,7 +121,7 @@ function initKristall() {
     document.querySelectorAll(controlSelector).forEach(element => {
       if (element.classList.contains('liquid-select-native')) return;
       if (element.closest('#excel-editor-list') || element.matches('#excel-editor-name, #excel-editor-joker, #excel-editor-add-btn')) return;
-      if (element.matches('#grade-input, #ai-input, #ai-send-btn, #ai-info-btn, #participation-summary-btn, #settings-back-btn, #excel-editor-close-btn, .modal-close-action') || element.closest('#title-bar, #drawer, .session-tabs, .drawer-tabs')) return;
+      if (element.matches('#homework-grade-input, #grade-input, #ai-input, #ai-send-btn, #ai-info-btn, #participation-summary-btn, #settings-back-btn, #excel-editor-close-btn, .modal-close-action') || element.closest('#title-bar, #drawer, .session-tabs, .drawer-tabs, .settings-scope-tabs')) return;
       mark(element, element.matches('.ico, .help-button, .history-btn') ? 'circle' : 'pill');
       if (!controls.has(element) && element.matches('button')) {
         const controller = new LiquidSurface(element, clock);

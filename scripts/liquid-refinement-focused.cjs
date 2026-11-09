@@ -19,7 +19,7 @@ if(process.argv.includes('--assessment-polish')) {
 }
 ipcMain.handle('assessment:config-export',()=>ok(require('../src/assessment/integrationConfig').exportIntegrationFile(bundleFixture,values)));
 ipcMain.handle('assessment:config-import',async()=>{require('../src/assessment/integrationConfig').exportIntegrationFile(bundleFixture,values);return ok(await require('../src/assessment/integrationConfig').importIntegrationEnv(bundleFixture,path.join(app.getPath('userData'),'imported.env')));});
-ipcMain.on('get-settings',event=>event.reply('settings-data',{theme:'midnight',probabilityDecreaseFactor:1.8,neverSelectedBoostFactor:1.5,visualEffectsEnabled:true,wiggersRuleDurationMinutes:30},{},{}));
+ipcMain.on('get-settings',event=>event.reply('settings-data',{theme:'midnight',probabilityDecreaseFactor:1.8,neverSelectedBoostFactor:1.5,visualEffectsEnabled:true,wiggersRuleDurationMinutes:30},{},{},{filePath:'fixture.xlsx',className:'Demo',classes:['Demo']}));
 ipcMain.on('load-saved-file',event=>event.reply('saved-file-missing',''));
 ipcMain.on('get-active-teaching-session',event=>event.reply('active-teaching-session-data',null));
 const evaluate=code=>win.webContents.executeJavaScript(code,true);

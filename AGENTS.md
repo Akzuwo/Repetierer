@@ -25,6 +25,7 @@ Gemeinsame Bewegung in `uiMotion.js`, wiederholbare Scrollbewegung in `scrollEff
 ## Prüfung
 
 - Logik: `node --test --test-concurrency=1` mit den betroffenen `test/*.test.js`. `npm test` prüft den gesamten öffentlichen Appbereich. Die privaten Cloudflare-Backendtests sind nicht Teil des Git-Index.
+- Hausaufgaben und Klasseneinstellungen: `npm run test:homework`. Regeln bleiben ausschliesslich im App-Profil; bestehende Notengewichte und Daten beim Deaktivieren erhalten.
 - Meldungen: `npm run test:notifications`.
 - Desktopabläufe: `npm run test:ui`; Debug-Einstieg: `npm run test:debug`.
 - Änderungen am Material/Renderer: `npm run test:kristall`.

@@ -50,10 +50,10 @@ module.exports=async function({win,evaluate,waitFor,shot,pause,bundleFixture}) {
  assert.equal(await evaluate(`!!document.querySelector('#settings-back-btn svg')`),false);
  assert.equal(await evaluate(`document.getElementById('probability-factor-setting').type`),'range');
  await evaluate(`document.querySelector('#settings-view .settings-scroll-area').scrollTop=440`);await pause(120);
- assert.ok(await evaluate(`[...document.querySelector('.settings-scroll-area').children].some(e=>Math.abs(parseFloat(e.style.translate.split(' ')[1]))>30 && Number(e.style.opacity)<.5)`),'Scroll entries fly out at the viewport edges');
+ assert.ok(await evaluate(`[...document.querySelector('#settings-global-fields').children].some(e=>Math.abs(parseFloat(e.style.translate.split(' ')[1]))>30 && Number(e.style.opacity)<.5)`),'Scroll entries fly out at the viewport edges');
  await evaluate(`document.querySelector('#settings-view .settings-scroll-area').scrollTop=180`);await pause(120);
  await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
- assert.equal(await evaluate(`[...document.querySelector('.settings-scroll-area').children].some(e=>!!e.style.translate)`),false,'Reduced motion clears scroll movement');
+ assert.equal(await evaluate(`[...document.querySelector('#settings-global-fields').children].some(e=>!!e.style.translate)`),false,'Reduced motion clears scroll movement');
  await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
  await evaluate(`document.getElementById('integration-package-import-btn').click()`);
  await waitFor(`notify.getActive().some(n=>n.text.includes('importiert')) && !document.getElementById('integration-package-export-btn').disabled`);

@@ -16,6 +16,7 @@
     "test": "node scripts/run-tests.cjs",
     "test:ui": "node scripts/ui-polish-smoke.js",
     "test:notifications": "node --test test/notifications.test.js && node scripts/liquid-refinement-focused.cjs --notifications",
+    "test:homework": "node --test test/homework.test.js && node scripts/homework-ui-check.cjs",
     "test:debug": "node scripts/debug-ui-check.cjs",
     "test:debug:exe": "node scripts/debug-exe-check.cjs",
     "test:integrations": "node --test test/assessmentLifecycle.test.js test/aiIntegration.test.js && node scripts/integration-lifecycle-ui-check.cjs",

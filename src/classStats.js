@@ -46,7 +46,11 @@ function buildWorksheetStatistics(worksheet) {
 	}
 
 	const repetitionsTotal = persons.reduce((sum, person) => sum + person.repetitions, 0);
-	const validGrades = persons.flatMap(person => person.validGrades);
+	const weightedGrades=[];
+	for(let row=6;row<=30 && getCellValue(worksheet.getCell(row,1));row++){
+		for(let column=2;column<=7;column++){const grade=parseGrade(getCellValue(worksheet.getCell(row,column)));if(grade!==null)weightedGrades.push({grade,weight:1});}
+		weightedGrades.push(...require('./homework').history(worksheet,row));
+	}
 	const topRepetitions = Math.max(...persons.map(person => person.repetitions));
 	const topPersons = persons.filter(person => person.repetitions === topRepetitions);
 
@@ -54,7 +58,8 @@ function buildWorksheetStatistics(worksheet) {
 		className: worksheet.name || 'Klasse',
 		personCount: persons.length,
 		repetitionsTotal: repetitionsTotal,
-		averageGrade: validGrades.length > 0 ? roundToTwo(validGrades.reduce((sum, grade) => sum + grade, 0) / validGrades.length) : null,
+		homeworkTotal:weightedGrades.filter(e=>e.weight!==undefined && e.id!==undefined).length,
+		averageGrade: weightedGrades.length > 0 ? roundToTwo(weightedGrades.reduce((sum,e)=>sum+e.grade*e.weight,0)/weightedGrades.reduce((sum,e)=>sum+e.weight,0)) : null,
 		topRepetitionPerson: topPersons.length > 0 ? {
 			name: topPersons[0].name,
 			repetitions: topPersons[0].repetitions

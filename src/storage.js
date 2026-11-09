@@ -5,6 +5,9 @@ const path = require('path');
 
 const defaultAppSettings = {
 	theme: 'midnight',
+	homeworkEnabled:true,
+	homeworkJokerThreshold:2,
+	homeworkWeight:1.2,
 	extraJokerAfterThreeGrades: false,
 	probabilityDecreaseFactor: 3,
 	boostNeverSelected: false,
@@ -141,9 +144,11 @@ function getFileIdentifier(filePath) {
 	return process.platform === 'win32' ? resolvedPath.toLowerCase() : resolvedPath;
 }
 
-function getAppSettings() {
-	const settings = getSettings();
+function getAppSettings(settings = getSettings()) {
 	return Object.assign({}, defaultAppSettings, {
+		homeworkEnabled:settings.homeworkEnabled !== false,
+		homeworkJokerThreshold:Number.isInteger(Number(settings.homeworkJokerThreshold)) && Number(settings.homeworkJokerThreshold)>=1 && Number(settings.homeworkJokerThreshold)<=20 ? Number(settings.homeworkJokerThreshold) : 2,
+		homeworkWeight:Number.isFinite(Number(settings.homeworkWeight)) && Number(settings.homeworkWeight)>=.1 && Number(settings.homeworkWeight)<=5 ? Math.round(Number(settings.homeworkWeight)*10)/10 : 1.2,
 		theme: normalizeTheme(settings.theme),
 		aiIntegrationEnabled: settings.aiIntegrationEnabled !== false,
 		notificationDurationSeconds: normalizeNotificationDuration(settings.notificationDurationSeconds),
@@ -157,9 +162,31 @@ function getAppSettings() {
 	});
 }
 
+const CLASS_SETTING_KEYS=['extraJokerAfterThreeGrades','probabilityDecreaseFactor','boostNeverSelected','neverSelectedBoostFactor','wiggersRuleEnabled','wiggersRuleDurationMinutes','homeworkEnabled','homeworkJokerThreshold','homeworkWeight'];
+const GLOBAL_SETTING_KEYS=['theme','visualEffectsEnabled','notificationDurationSeconds'];
+function classSettingsKey(filePath,className) {return JSON.stringify([getFileIdentifier(filePath),className]);}
+function getClassSettings(filePath,className) {
+ const settings=getSettings(),key=classSettingsKey(filePath,className);
+ const rules=filePath&&className&&Object.hasOwn(settings.classSettings||{},key)?settings.classSettings[key]:{};
+ return getAppSettings({...settings,...rules});
+}
+function saveScopedSettings(settings,filePath,className) {
+ const persisted=getSettings(), normalized=getAppSettings({...persisted,...settings});
+ const changes=Object.fromEntries(GLOBAL_SETTING_KEYS.map(key=>[key,normalized[key]]));
+ if(filePath && className) {
+  const rules=getAppSettings({...getClassSettings(filePath,className),...settings});
+  changes.classSettings={...persisted.classSettings,[classSettingsKey(filePath,className)]:Object.fromEntries(CLASS_SETTING_KEYS.map(key=>[key,rules[key]]))};
+  if(!rules.wiggersRuleEnabled)changes.wiggersRulePenalties=Object.fromEntries(Object.entries(persisted.wiggersRulePenalties||{}).filter(([key])=>!key.startsWith(`${filePath}::${className}::`)));
+ }
+ saveSettings(changes);
+}
+
 function saveAppSettings(settings) {
 	const wiggersRuleEnabled = settings.wiggersRuleEnabled !== false;
 	saveSettings({
+		homeworkEnabled:settings.homeworkEnabled !== false,
+		homeworkJokerThreshold:Number.isInteger(Number(settings.homeworkJokerThreshold)) && Number(settings.homeworkJokerThreshold)>=1 && Number(settings.homeworkJokerThreshold)<=20 ? Number(settings.homeworkJokerThreshold) : 2,
+		homeworkWeight:Number.isFinite(Number(settings.homeworkWeight)) && Number(settings.homeworkWeight)>=.1 && Number(settings.homeworkWeight)<=5 ? Math.round(Number(settings.homeworkWeight)*10)/10 : 1.2,
 		theme: normalizeTheme(settings.theme),
 		notificationDurationSeconds: normalizeNotificationDuration(settings.notificationDurationSeconds),
 		extraJokerAfterThreeGrades: !!settings.extraJokerAfterThreeGrades,
@@ -250,6 +277,13 @@ function removePendingExcelEntries(ids) {
 	writeJson(getPaths().backupPath, backup);
 }
 
+function markPendingExcelApplied(ids) {
+ const backup=getBackup(),applied=new Set(ids),entries=backup.pendingExcelEntries.filter(entry=>applied.has(entry.id));
+ const backupIds=new Set(entries.map(entry=>entry.backupEntryId));
+ for(const entry of backup.entries)if(backupIds.has(entry.id)){entry.excelWriteSucceeded=true;delete entry.excelWriteReason;delete entry.excelWriteError;}
+ writeJson(getPaths().backupPath,backup);return backupIds;
+}
+
 function removeBackupEntries(ids) {
 	const idSet = new Set(ids || []);
 	const backup = getBackup();
@@ -293,6 +327,9 @@ function getLogs() {
 }
 
 module.exports = {
+ getFileIdentifier,
+ markPendingExcelApplied,
+ getClassSettings,saveScopedSettings,CLASS_SETTING_KEYS,GLOBAL_SETTING_KEYS,
 	setAiIntegrationEnabled,
 	getBackup,
 	getBackupPreview,

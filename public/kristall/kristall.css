@@ -1,5 +1,21 @@
 /* Kristall 1.3: the material constants live in glass.js, geometry in motion.js.
    This sheet maps the existing product onto that material without changing data. */
+body #homework-view { grid-area:2 / 1 / 3 / 2; margin-top:54px; padding:26px; min-height:0; display:flex; flex-direction:column; }
+body #homework-view h2 { font-size:30px; font-weight:600; }
+body #homework-body { min-height:0; flex:1; display:flex; flex-direction:column; gap:18px; }
+body #homework-student-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); align-content:start; gap:16px; min-height:0; overflow:auto; padding:8px 4px 24px; scrollbar-width:none; }
+body .homework-stage { display:flex; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:22px; padding:10px 24px 24px; }
+body .homework-stage h1 { font-size:clamp(28px,4vw,50px); text-align:center; overflow-wrap:anywhere; }
+body .homework-stage p { color:var(--text-muted); }
+body #homework-grade-form { display:flex; align-items:center; gap:22px; margin-top:24px; }
+body #homework-grade-input { width:130px; min-height:52px; border:0; border-bottom:1px solid #ffffff88; border-radius:0; background:none; box-shadow:none; font-size:24px; }
+body #homework-grade-input:focus-visible { outline:none; box-shadow:none; border-bottom-color:#fff; }
+body .settings-scope-tabs { display:flex; gap:20px; flex-shrink:0; padding:0 6px 12px; }
+body .settings-scope-tabs button { border:0; background:none; box-shadow:none; padding:8px 2px; min-height:40px; color:var(--text-muted); }
+body .settings-scope-tabs [aria-selected="true"] { color:#fff; }
+body #settings-class-rules { border:0; padding:0; margin:0; min-width:0; }
+body #settings-class-hint, body .homework-settings-note { color:var(--text-muted); font-size:13px; line-height:1.5; margin:12px 0 20px; }
+body #settings-class-rules:disabled { opacity:.5; }
 body .ai-settings-heading { display:flex; align-items:center; gap:14px; }
 body .ai-settings-heading h3 { margin:0; }
 body #ai-info-btn { background:none; border:0; outline:0; box-shadow:none; border-radius:0; color:var(--text-muted); -webkit-app-region:no-drag; app-region:no-drag; }

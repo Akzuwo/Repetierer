@@ -82,6 +82,10 @@ const _sessionClassName = document.getElementById('session-class-name');
 const _sessionParticipationTab = document.getElementById('session-participation-tab');
 const _sessionRepetitionTab = document.getElementById('session-repetition-tab');
 const _endSessionBtn = document.getElementById('end-session-btn');
+const _homeworkView=document.getElementById('homework-view');
+const _sessionHomeworkTab=document.getElementById('session-homework-tab');
+let homeworkEnabled=true;
+window.getHomeworkSession=()=>activeTeachingSession;
 const _participationView = document.getElementById('participation-view');
 const _participationStudentList = document.getElementById('participation-student-list');
 const _participationSummaryBtn = document.getElementById('participation-summary-btn');
@@ -166,15 +170,21 @@ const _visualEffectsSetting = document.getElementById('visual-effects-setting');
 const _wiggersRuleSetting = document.getElementById('wiggers-rule-setting');
 const _wiggersRuleDurationSetting = document.getElementById('wiggers-rule-duration-setting');
 const _notificationDurationSetting = document.getElementById('notification-duration-setting');
-const settingsRanges = [_notificationDurationSetting, _probabilityFactorSetting, _neverSelectedBoostFactorSetting, _wiggersRuleDurationSetting];
+const homeworkToggle=document.getElementById('homework-enabled-setting');
+const homeworkJokerSetting=document.getElementById('homework-joker-setting');
+const homeworkWeightSetting=document.getElementById('homework-weight-setting');
+const updateHomeworkFields=()=>{homeworkJokerSetting.disabled=homeworkWeightSetting.disabled=!homeworkToggle.checked;};
+homeworkToggle.addEventListener('change',updateHomeworkFields);
+const settingsRanges = [homeworkJokerSetting,homeworkWeightSetting,_notificationDurationSetting, _probabilityFactorSetting, _neverSelectedBoostFactorSetting, _wiggersRuleDurationSetting];
 const factorFormat = new Intl.NumberFormat('de-CH', {minimumFractionDigits:1, maximumFractionDigits:1});
 function updateSettingsRangeValue(input) {
 	const value = input.valueAsNumber;
 	const minutes = input === _wiggersRuleDurationSetting;
 	const seconds = input === _notificationDurationSetting;
-	const formatted = seconds ? `${value} Sek.` : minutes ? `${value} Min.` : `${factorFormat.format(value)}×`;
+	const threshold=input===homeworkJokerSetting;
+	const formatted = threshold ? `${value} ${value===1?'Vorführung':'Vorführungen'}` : seconds ? `${value} Sek.` : minutes ? `${value} Min.` : `${factorFormat.format(value)}×`;
 	document.getElementById(`${input.id}-value`).value = formatted;
-	input.setAttribute('aria-valuetext', seconds ? `${value} Sekunden` : minutes ? `${value} ${value === 1 ? 'Minute' : 'Minuten'}` : `${factorFormat.format(value)}-fach`);
+	input.setAttribute('aria-valuetext', threshold ? formatted : seconds ? `${value} Sekunden` : minutes ? `${value} ${value === 1 ? 'Minute' : 'Minuten'}` : `${factorFormat.format(value)}-fach`);
 }
 for (const input of settingsRanges) {
 	input.addEventListener('input', () => updateSettingsRangeValue(input));
@@ -510,6 +520,8 @@ _saveSettingsBtn.addEventListener('click', () => {
 
 	ipcRenderer.send('save-settings', {
 		theme: 'midnight',
+		scope:'combined',...window.getSettingsScopeContext?.(),
+		homeworkEnabled:homeworkToggle.checked,homeworkJokerThreshold:Number(homeworkJokerSetting.value),homeworkWeight:Number(homeworkWeightSetting.value),
 		extraJokerAfterThreeGrades: _extraJokerSetting.checked,
 		probabilityDecreaseFactor: probabilityDecreaseFactor,
 		boostNeverSelected: _boostNeverSelectedSetting.checked,
@@ -534,7 +546,7 @@ _extraJokerMigrationBtn.addEventListener('click', () => {
 
 	disableElement(_extraJokerMigrationBtn);
 	_extraJokerMigrationBtn.disabled = true;
-	ipcRenderer.send('run-extra-joker-migration');
+	ipcRenderer.send('run-extra-joker-migration',window.getSettingsScopeContext?.());
 });
 
 _closeSettingsModal.addEventListener('click', () => {
@@ -658,6 +670,7 @@ _confirmSessionStartBtn.addEventListener('click', () => {
 	ipcRenderer.send('start-teaching-session', { className: sessionSetup.className, absentIds: sessionSetupAbsentIds });
 });
 
+_sessionHomeworkTab.addEventListener('click',uiMotion.pageHandler(()=>showSessionArea('homework')));
 _sessionParticipationTab.addEventListener('click', uiMotion.pageHandler(() => showSessionArea('participation')));
 _sessionRepetitionTab.addEventListener('click', uiMotion.pageHandler(() => showSessionArea('repetition')));
 _endSessionBtn.addEventListener('click', () => {
@@ -838,6 +851,7 @@ ipcRenderer.on('debug-mode', (event, isDebugMode) => {
 });
 
 ipcRenderer.on('settings-data', (event, settings, paths, migrationStatus) => {
+ homeworkToggle.checked=settings.homeworkEnabled!==false;homeworkJokerSetting.value=settings.homeworkJokerThreshold||2;homeworkWeightSetting.value=settings.homeworkWeight||1.2;updateHomeworkFields();
 	_extraJokerSetting.checked = !!settings.extraJokerAfterThreeGrades;
 	_probabilityFactorSetting.value = settings.probabilityDecreaseFactor;
 	_boostNeverSelectedSetting.checked = !!settings.boostNeverSelected;
@@ -884,7 +898,15 @@ ipcRenderer.on('window-restored', () => {
 	animateRestore();
 });
 
+function applyHomeworkSettings(settings) {
+ homeworkEnabled=settings?.homeworkEnabled!==false;
+ _sessionHomeworkTab.classList.toggle('update-hidden',!homeworkEnabled);
+ if(!homeworkEnabled && activeSessionArea==='homework') {activeSessionArea='participation';renderTeachingSessionView();}
+ window.applyHomeworkSettings?.(settings);
+}
+ipcRenderer.on('settings-save-failed',(_event,message)=>{notify.error(message,{title:'Einstellungen nicht gespeichert'});ipcRenderer.send('get-settings');});
 ipcRenderer.on('settings-saved', (event, settings) => {
+ applyHomeworkSettings(settings);
 	notify.configure(settings);
 	notify.success('Deine Einstellungen wurden gespeichert.', {title:'Einstellungen'});
 	applyTheme(settings && settings.theme);
@@ -892,6 +914,7 @@ ipcRenderer.on('settings-saved', (event, settings) => {
 });
 
 ipcRenderer.on('ui-settings', (event, settings) => {
+ applyHomeworkSettings(settings);
 	applyTheme(settings && settings.theme);
 	updateVisualEffects(settings && settings.visualEffectsEnabled);
 });
@@ -1541,7 +1564,7 @@ function renderTeachingSessionView() {
 	if (assessmentView && !assessmentView.classList.contains('update-hidden')) return;
 	if (_statsView && !_statsView.classList.contains('update-hidden')) return;
 	const isActive = !!activeTeachingSession;
-	const destination = isActive ? (activeSessionArea === 'repetition' ? _repetition : _participationView) : (sessionSetup ? _sessionAttendanceView : _sessionEmptyView);
+	const destination = isActive ? (activeSessionArea==='homework' && homeworkEnabled ? _homeworkView : activeSessionArea === 'repetition' ? _repetition : _participationView) : (sessionSetup ? _sessionAttendanceView : _sessionEmptyView);
 	if (destination.classList.contains('update-hidden') && uiMotion.beginPageChange(() => { renderTeachingSessionView(); })) return;
 	const homeWasHidden = _sessionEmptyView.classList.contains('update-hidden');
 	_contentToggleSessionClass(isActive);
@@ -1553,6 +1576,7 @@ function renderTeachingSessionView() {
 	_sessionEmptyView.classList.toggle('update-hidden', isActive || !!sessionSetup);
  _sessionAttendanceView.classList.toggle('update-hidden', isActive || !sessionSetup);
 	if (!isActive) {
+		_homeworkView.classList.add('update-hidden');
 		_participationView.classList.add('update-hidden');
 		_repetition.classList.add('update-hidden');
 		renderSessionStartState();
@@ -1607,17 +1631,17 @@ function _contentToggleSessionClass(isActive) {
 
 function showSessionArea(area) {
 	if (!activeTeachingSession) return;
-	activeSessionArea = area === 'repetition' ? 'repetition' : 'participation';
-	const participationActive = activeSessionArea === 'participation';
-	const nextView = participationActive ? _participationView : _repetition;
-	const viewWasHidden = nextView.classList.contains('update-hidden');
-	_participationView.classList.toggle('update-hidden', !participationActive);
-	_repetition.classList.toggle('update-hidden', participationActive);
-	_sessionParticipationTab.className = participationActive ? 'btn-1' : 'btn-2';
-	_sessionRepetitionTab.className = participationActive ? 'btn-2' : 'btn-1';
-	_sessionParticipationTab.setAttribute('aria-pressed', String(participationActive));
-	_sessionRepetitionTab.setAttribute('aria-pressed', String(!participationActive));
-	if (viewWasHidden) uiMotion.revealView(nextView);
+ activeSessionArea=area==='homework' && homeworkEnabled ? 'homework' : area==='repetition' ? 'repetition' : 'participation';
+ const views={participation:_participationView,repetition:_repetition,homework:_homeworkView};
+ const tabs={participation:_sessionParticipationTab,repetition:_sessionRepetitionTab,homework:_sessionHomeworkTab};
+ const nextView=views[activeSessionArea],viewWasHidden=nextView.classList.contains('update-hidden');
+ for(const key of Object.keys(views)) {
+  views[key].classList.toggle('update-hidden',key!==activeSessionArea);
+  tabs[key].classList.toggle('btn-1',key===activeSessionArea);tabs[key].classList.toggle('btn-2',key!==activeSessionArea);
+  tabs[key].setAttribute('aria-pressed',String(key===activeSessionArea));
+ }
+ if(activeSessionArea==='homework')window.renderHomework?.(activeTeachingSession);
+ if(viewWasHidden)uiMotion.revealView(nextView);
 }
 
 function renderParticipationStudents() {
@@ -1923,6 +1947,7 @@ function openStatsView() {
 	document.getElementById('assessment-nav-btn').removeAttribute('aria-current');
 	document.getElementById('assessment-view').classList.add('update-hidden');
 	_sessionHeader.classList.add('update-hidden');
+	_homeworkView.classList.add('update-hidden');
 	_participationView.classList.add('update-hidden');
 	_sessionEmptyView.classList.add('update-hidden');
  _sessionAttendanceView.classList.add('update-hidden');
@@ -2072,7 +2097,7 @@ function createStatsClassCard(classStats) {
 	card.appendChild(heading);
 
 	const rows = [
-		['Ø Note', formatDecimal(classStats.averageGrade), 'Notenskala 1–6'],
+		['Ø Note', formatDecimal(classStats.averageGrade), classStats.homeworkTotal ? 'Repetition und Hausaufgaben gewichtet' : 'Notenskala 1–6'],
 		['Repetitionen', formatInteger(classStats.repetitionsTotal), 'In der Excel-Datei erfasst'],
 		['Ø Repetitionsdauer', formatRepetitionDuration(classStats.averageRepetitionDurationMs), 'Minuten : Sekunden'],
 		['Ø pro Person', formatDecimal(classStats.averageRepetitionsPerPerson), 'Repetitionen']

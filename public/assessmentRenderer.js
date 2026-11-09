@@ -162,6 +162,7 @@ async function openAssessment() {
 	elements.stats.classList.add('update-hidden');
 	elements.sessionHeader.classList.add('update-hidden');
 	elements.participation.classList.add('update-hidden');
+ document.getElementById('homework-view').classList.add('update-hidden');
 	elements.sessionEmpty.classList.add('update-hidden');
  document.getElementById('session-attendance-view').classList.add('update-hidden');
 	elements.view.classList.remove('update-hidden');

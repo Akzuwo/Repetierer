@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('node:crypto');
 const jokerDates = require('./jokerDates');
+const homework = require('./homework');
 const { spawnSync } = require('child_process');
 const { buildClassStatistics } = require('./classStats.js');
 let f;
@@ -100,13 +101,22 @@ function read_grade_history(clss, personId) {
 		if (grade === null || grade === undefined || grade === '') continue;
 		grades.push({ grade: Number(grade), date: worksheet.getCell(row, index + 11).value || null, position: index + 1 });
 	}
-	return { studentId: personId, studentName: String(name), classId: clss, grades };
+	return { studentId: personId, studentName: String(name), classId: clss, grades, homeworkGrades:homework.history(worksheet,row), weightedAverage:homework.weightedAverage(worksheet,row) };
 }
 
 function get_class_names() {
 	return wb ? wb.worksheets.filter(sheet => sheet.getCell('A1').value === 'repetierer').map(sheet => sheet.name) : [];
 }
 
+function getHomeworkStatus(className) {
+ if(!wb||!f)return {needsMigration:false,sheets:[],hasFile:false};
+ const sheets=wb.worksheets.filter(s=>s.getCell('A1').value==='repetierer' && (!className||s.name===className)).map(homework.inspect);
+ return {hasFile:true,needsMigration:sheets.some(s=>s.needsMigration),sheets,fingerprint:crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex')};
+}
+function read_homework(clss) {
+ const sheet=wb?.getWorksheet(clss);if(!sheet||sheet.getCell('A1').value!=='repetierer')return [];
+ return (read_editor_persons(clss)||[]).map(person=>({...person,homework:homework.history(sheet,person.id+6),weightedAverage:homework.weightedAverage(sheet,person.id+6)}));
+}
 function read_class_statistics() {
 	return buildClassStatistics(wb);
 }
@@ -210,6 +220,7 @@ function getWindowsFileLockStatus(targetPath) {
 }
 
 function writeWorkbook(clss, callback, result) {
+	wb.calcProperties.fullCalcOnLoad=true;
 	const lockStatus = getFileLockStatus(f);
 	if (lockStatus.locked) {
 		callback(undefined, Object.assign({}, result, {
@@ -309,7 +320,7 @@ function migrate_jokers(callback) {
 		});
 }
 
-function award_extra_jokers_after_three(callback) {
+function award_extra_jokers_after_three(callback,className) {
 	if (!wb || !f) {
 		callback({ success: false, reason: 'no-file-selected', updatedPersons: 0 });
 		return;
@@ -317,7 +328,7 @@ function award_extra_jokers_after_three(callback) {
 
 	let updatedPersons = 0;
 	wb.worksheets.forEach(worksheet => {
-		if (!worksheet || worksheet.getCell('A1').value !== 'repetierer') return;
+		if (!worksheet || worksheet.getCell('A1').value !== 'repetierer' || (className && worksheet.name!==className)) return;
 
 		for (let row = 6; row <= 30; row++) {
 			if (!worksheet.getCell('A' + row).value) break;
@@ -377,6 +388,7 @@ function write_grade(clss, person, grade, callback, awardExtraJoker) {
 		const jokerCell = ws.getCell('H' + (person.id + 6));
 		jokerCell.value = Number(jokerCell.value || 0) + 1;
 	}
+	homework.refreshFormulas(ws);
 	writeWorkbook(clss, callback, { type: 'grade' });
 }
 function write_joker(clss, person, callback) {
@@ -458,6 +470,7 @@ function edit_persons(clss, editorPersons, callback) {
 		worksheet.getCell('H' + targetRow).value = person.joker;
 	});
 
+	homework.refreshFormulas(worksheet);
 	writeWorkbook(clss, callback, { type: 'edit-persons' });
 }
 
@@ -479,13 +492,18 @@ function apply_entries(clss, entries, callback) {
 	}
 
 	const applied = [];
-	entries.forEach(entry => {
+	const originalModel = structuredClone(wb.model);
+	try { entries.forEach(entry => {
 		const entryWorksheet = wb.getWorksheet(entry.className || clss);
 		if (!entryWorksheet || entryWorksheet.getCell('A1').value !== 'repetierer') return;
 
 		const row = Number(entry.personId) + 6;
 		if (!Number.isFinite(row)) return;
 
+		if (entry.type === 'homework') {
+			if(String(entryWorksheet.getCell(row,1).value)!==entry.personName)throw new Error('Die Schülerzeile wurde verändert. Bitte die ausstehende Änderung prüfen.');
+			homework.append(entryWorksheet,row,entry);applied.push(entry.id);
+		}
 		if (entry.type === 'grade') {
 			const gradeIndex = countGradesForRow(entryWorksheet, row);
 			if (gradeIndex >= 6) return;
@@ -507,6 +525,8 @@ function apply_entries(clss, entries, callback) {
 			applied.push(entry.id);
 		}
 	});
+	for(const sheet of wb.worksheets) if(sheet.getCell('A1').value==='repetierer')homework.refreshFormulas(sheet);
+	} catch(error) {wb.model=originalModel;ws=wb.getWorksheet(clss);callback(undefined,{success:false,reason:'invalid-entry',error:error.message,applied:[]});return;}
 
 	if (applied.length === 0) {
 		callback(read(clss), { success: true, applied: [] });
@@ -543,6 +563,14 @@ function undo_entry(clss, entry, callback) {
 		return;
 	}
 
+	if (entry.type === 'homework') {
+		const before=structuredClone(wb.model);
+		try {
+			if(String(entryWorksheet.getCell(row,1).value)!==entry.personName)throw new Error('Die Schülerzeile wurde verändert.');
+			homework.undo(entryWorksheet,row,entry);
+		} catch(error) {wb.model=before;ws=wb.getWorksheet(clss);callback(undefined,{success:false,reason:'entry-mismatch',error:error.message});return;}
+		writeWorkbook(clss,callback,{type:'undo-homework'});return;
+	}
 	if (entry.type === 'grade') {
 		const gradeCount = countGradesForRow(entryWorksheet, row);
 		if (gradeCount <= 0) {
@@ -563,6 +591,7 @@ function undo_entry(clss, entry, callback) {
 			jokerCell.value = Math.max(0, Number(jokerCell.value || 0) - 1);
 		}
 
+		homework.refreshFormulas(entryWorksheet);
 		writeWorkbook(clss, callback, { type: 'undo-grade' });
 		return;
 	}
@@ -647,7 +676,38 @@ async function migrate_joker_dates(fingerprint, callback) {
  finally { if(tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath); }
 }
 
+async function migrate_homework(fingerprint, callback,className) {
+ let backupPath, tempPath;
+ const target=f;
+ try {
+  if(!target || !wb) throw new Error('Keine Excel-Datei geladen.');
+  const lock=getFileLockStatus(target);
+  if(lock.locked) return callback({success:false,reason:'excel-locked',error:lock.error});
+  const content=fs.readFileSync(target), digest=crypto.createHash('sha256').update(content).digest('hex');
+  if(!fingerprint || fingerprint!==digest) return callback({success:false,reason:'file-changed'});
+  const updated=new ExcelJS.Workbook(); await updated.xlsx.load(content);
+  const sheets=updated.worksheets.filter(sheet=>sheet.getCell('A1').value==='repetierer' && (!className||sheet.name===className));
+  const plans=sheets.map(homework.inspect).filter(plan=>plan.needsMigration);
+  if(!plans.length) return callback({success:true,alreadyMigrated:true,worksheets:updated.worksheets.map(sheet=>sheet.name)});
+  sheets.forEach(homework.migrateWorksheet);
+  backupPath=path.join(path.dirname(target),`${path.basename(target,path.extname(target))}.vor-hausaufgaben-${new Date().toISOString().replace(/[:.]/g,'-')}-${crypto.randomUUID().slice(0,8)}${path.extname(target)}`);
+  fs.copyFileSync(target,backupPath,fs.constants.COPYFILE_EXCL);
+  tempPath=path.join(path.dirname(target),`.hausaufgaben-${crypto.randomUUID()}.xlsx`);
+  await updated.xlsx.writeFile(tempPath);
+  const verification=new ExcelJS.Workbook();await verification.xlsx.readFile(tempPath);
+  if(verification.worksheets.filter(sheet=>sheet.getCell('A1').value==='repetierer' && (!className||sheet.name===className)).some(sheet=>homework.inspect(sheet).needsMigration)) throw new Error('Die erweiterten Spalten konnten nicht geprüft werden.');
+  const current=crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex');
+  if(current!==digest) return callback({success:false,reason:'file-changed',backupPath});
+  const finalLock=getFileLockStatus(target);
+  if(finalLock.locked) return callback({success:false,reason:'excel-locked',backupPath});
+  fs.renameSync(tempPath,target);tempPath=undefined;
+  init(target,worksheets=>callback({success:!!worksheets,worksheets,backupPath,migratedSheets:plans.length,columns:26}));
+ } catch(error) { callback({success:false,reason:'migration-failed',error:error.message,backupPath}); }
+ finally { if(tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath); }
+}
+
 module.exports = {
+ getHomeworkStatus,read_homework,migrate_homework,
  getJokerDateMigrationStatus,
  migrate_joker_dates,
 	init: init,

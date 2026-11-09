@@ -10,9 +10,12 @@ let absenceDate = getFormattedDate();
 const wiggersRulePenalties = new Map();
 const EXTRA_JOKER_MIGRATION_ID = 'extra-joker-after-three-existing-data';
 
+function getCurrentSettings() {return require('./storage').getClassSettings(filePath,cls);}
+
 // set the file
 function setFile(file, callback) {
 	repetitionTimer.cancel();
+	if(file!==filePath){cls=undefined;persons=undefined;person=undefined;}
 	filePath = file;
 	init(file, (r) => {
 		callback(r);
@@ -143,7 +146,7 @@ function selectPerson() {
 }
 
 function getWeightedPersons() {
-	const settings = getAppSettings();
+	const settings = getCurrentSettings();
 	const storedPenalties = getWiggersRulePenalties();
 	const decreaseFactor = settings.probabilityDecreaseFactor;
 
@@ -178,7 +181,7 @@ function getPersonResult(selectedPerson) {
 
 // save the new grade to the file
 function saveGrade(grade, callback) {
-	const settings = getAppSettings();
+	const settings = getCurrentSettings();
 	const awardExtraJoker = settings.extraJokerAfterThreeGrades && person.grades < 3 && person.grades + 1 >= 3;
 	const entry = {
 		type: 'grade',
@@ -201,6 +204,20 @@ function saveGrade(grade, callback) {
 			excelWriteReason: result && result.reason
 		})
 	}, awardExtraJoker);
+}
+
+function saveHomework(personId,grade,callback) {
+ const settings=getCurrentSettings(),reader=require('./excelReader');
+ const student=getClassPersons(cls).find(p=>p.id===personId);
+ if(!settings.homeworkEnabled || !student || !require('./homework').validGrade(grade))return callback(null);
+ const pending=require('./storage').getPendingExcelEntries().filter(e=>e.type==='homework' && e.filePath===filePath && e.className===cls);
+ const history=reader.read_homework(cls).find(p=>p.id===personId)?.homework||[];
+ const count=history.length+pending.filter(e=>e.personId===personId && !history.some(h=>h.id===e.homeworkId)).length;
+ const id=require('node:crypto').randomUUID();
+ const entry={id,homeworkId:id,type:'homework',className:cls,filePath,personId,personName:student.name,grade,weight:settings.homeworkWeight,awardExtraJoker:(count+1)%settings.homeworkJokerThreshold===0,date:getFormattedDate()};
+ const done=result=>{if(result.success)persons=read(cls);callback({...entry,excelWriteSucceeded:!!result.success,excelWriteReason:result.reason,excelWriteError:result.error});};
+ if(pending.length)return done({success:false,reason:'excel-locked',error:'Frühere Hausaufgabeneinträge warten noch auf Excel.'});
+ reader.apply_entries(cls,[entry],(_people,result)=>done(result));
 }
 
 // save the joker to the file
@@ -252,8 +269,9 @@ function migrateJokers(callback) {
 	});
 }
 
-function getExtraJokerMigrationStatus() {
-	const status = getFileMigrationStatus(filePath, EXTRA_JOKER_MIGRATION_ID);
+function getExtraJokerMigrationStatus(className=cls) {
+	const legacy=getFileMigrationStatus(filePath,EXTRA_JOKER_MIGRATION_ID);
+	const status = legacy.completed ? legacy : getFileMigrationStatus(filePath, EXTRA_JOKER_MIGRATION_ID+':'+className);
 	return {
 		hasFile: !!(status && status.hasFile),
 		completed: !!(status && status.completed),
@@ -261,8 +279,8 @@ function getExtraJokerMigrationStatus() {
 	};
 }
 
-function migrateExtraJokersAfterThree(callback) {
-	const status = getExtraJokerMigrationStatus();
+function migrateExtraJokersAfterThree(callback,className=cls) {
+	const status = getExtraJokerMigrationStatus(className);
 	if (!status.hasFile) {
 		callback({ success: false, reason: 'no-file-selected', updatedPersons: 0, status: status });
 		return;
@@ -274,19 +292,21 @@ function migrateExtraJokersAfterThree(callback) {
 
 	award_extra_jokers_after_three(result => {
 		if (result && result.success) {
-			markFileMigrationCompleted(filePath, EXTRA_JOKER_MIGRATION_ID, {
+			markFileMigrationCompleted(filePath, EXTRA_JOKER_MIGRATION_ID+':'+className, {
 				updatedPersons: result.updatedPersons || 0
 			});
 			if (cls) persons = read(cls);
-			callback(Object.assign({}, result, { status: getExtraJokerMigrationStatus() }));
+			callback(Object.assign({}, result, { status: getExtraJokerMigrationStatus(className) }));
 			return;
 		}
 
-		callback(result || { success: false, reason: 'unknown', updatedPersons: 0, status: getExtraJokerMigrationStatus() });
-	});
+		callback(result || { success: false, reason: 'unknown', updatedPersons: 0, status: getExtraJokerMigrationStatus(className) });
+	},className);
 }
 
+function sameWorkbook(entry) {const identify=require('./storage').getFileIdentifier;return !entry?.filePath || identify(entry.filePath)===identify(filePath);}
 function applyPendingExcelEntries(entries, callback) {
+ entries=(entries||[]).filter(sameWorkbook);
 	if (!cls) {
 		callback({ success: false, reason: 'no-class-selected', applied: [] });
 		return;
@@ -299,6 +319,7 @@ function applyPendingExcelEntries(entries, callback) {
 }
 
 function undoLastExcelEntry(entry, callback) {
+ if(!sameWorkbook(entry))return callback({success:false,reason:'other-workbook'});
 	if (!cls) {
 		callback({ success: false, reason: 'no-class-selected' });
 		return;
@@ -314,6 +335,7 @@ function undoLastExcelEntry(entry, callback) {
 }
 
 function redoExcelEntry(entry, callback) {
+ if(!sameWorkbook(entry))return callback({success:false,reason:'other-workbook',applied:[]});
 	if (!cls) {
 		callback({ success: false, reason: 'no-class-selected', applied: [] });
 		return;
@@ -395,7 +417,7 @@ function resetAbsencesIfDateChanged() {
 }
 
 function activateWiggersRule(personId) {
-	const settings = getAppSettings();
+	const settings = getCurrentSettings();
 	if (!settings.wiggersRuleEnabled) return;
 	const expiresAt = Date.now() + (settings.wiggersRuleDurationMinutes * 60 * 1000);
 	const key = getWiggersRuleKey(personId);
@@ -454,6 +476,11 @@ function getWiggersRuleKey(personId) {
 }
 
 module.exports = {
+ getCurrentSettings,
+ saveHomework,
+ getHomeworkStatus:()=>require('./excelReader').getHomeworkStatus(cls),
+ getHomeworkPersons:()=>require('./excelReader').read_homework(cls).map(person=>{const pending=require('./storage').getPendingExcelEntries().filter(e=>e.type==='homework' && e.filePath===filePath && e.className===cls && e.personId===person.id && !person.homework.some(h=>h.id===e.homeworkId));return {...person,homework:[...person.homework,...pending.map(e=>({...e,id:e.homeworkId,pending:true}))]};}),
+ migrateHomework:(fingerprint,callback)=>require('./excelReader').migrate_homework(fingerprint,result=>{if(result.success && cls)persons=read(cls);callback(result);},cls),
 	startRepetitionTiming: token => repetitionTimer.ready(token),
 	cancelRepetitionTiming: () => repetitionTimer.cancel(),
  getJokerDateMigrationStatus,
