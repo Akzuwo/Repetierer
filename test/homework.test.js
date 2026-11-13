@@ -23,12 +23,14 @@ test('class settings stay only in the app and are isolated by workbook and class
  assert.equal(await save(5),null);assert.deepEqual(fs.readFileSync(f.file),f.original,'Rules never modify Excel');
  storage.saveScopedSettings({homeworkEnabled:true,homeworkWeight:1.2,homeworkJokerThreshold:2},f.file,'3a');
 });
-test('first activation appends only selected class, exact backup, stale preview and locks are safe',async()=>{
- const f=await fixture(),plan=program.getHomeworkStatus();assert.equal(plan.needsMigration,true);assert.deepEqual(plan.sheets.map(s=>s.name),['3a']);assert.deepEqual(fs.readFileSync(f.file),f.original);
+test('first activation extends all classes once, exact backup, stale preview and locks are safe',async()=>{
+ const f=await fixture(),plan=program.getHomeworkStatus();assert.equal(plan.needsMigration,true);assert.deepEqual(plan.sheets.map(s=>s.name),['3a','3b']);assert.deepEqual(fs.readFileSync(f.file),f.original);
  assert.equal((await new Promise(r=>program.migrateHomework('stale',r))).reason,'file-changed');
  const lock=path.join(f.dir,'~$class.xlsx');fs.writeFileSync(lock,'lock');assert.equal((await migrate()).reason,'excel-locked');assert.deepEqual(fs.readFileSync(f.file),f.original);fs.unlinkSync(lock);
  const result=await migrate();assert.equal(result.success,true);assert.deepEqual(fs.readFileSync(result.backupPath),f.original);
- const book=await read(f.file),sheet=book.getWorksheet('3a');assert.equal(homework.layout(sheet).slots.length,6);assert.equal(homework.layout(sheet).average.column,42);assert.equal(sheet.getCell('AO6').value,'behalten');assert.equal(sheet.getCell('I6').formula,'AVERAGE(B6:G6)');assert.equal(homework.layout(book.getWorksheet('3b')).slots.length,0);
+ const book=await read(f.file),sheet=book.getWorksheet('3a');assert.equal(homework.layout(sheet).slots.length,6);assert.equal(homework.layout(sheet).average.column,42);assert.equal(sheet.getCell('AO6').value,'behalten');assert.equal(sheet.getCell('I6').formula,'AVERAGE(B6:G6)');assert.equal(homework.layout(book.getWorksheet('3b')).slots.length,6);
+ assert.equal(result.migratedSheets,2);assert.equal(book.getWorksheet('Notizen').getCell('A6').value,'Original');
+ await new Promise(r=>program.setClass('3b',r));assert.equal(program.getHomeworkStatus().needsMigration,false,'Next class needs no second dialog');
  const before=fs.readFileSync(f.file);assert.equal((await migrate()).alreadyMigrated,true);assert.deepEqual(fs.readFileSync(f.file),before);
 });
 test('each second presentation earns one joker, immutable weights, stable undo/redo IDs and expanding history',async()=>{
@@ -85,4 +87,18 @@ test('legacy class rules become defaults; global saves and another class preserv
  assert.equal(storage.getClassSettings(f.file,'3b').probabilityDecreaseFactor,4);assert.equal(storage.getClassSettings(f.file,'3b').homeworkJokerThreshold,2);
  const bytes=fs.readFileSync(f.file);storage.saveScopedSettings({notificationDurationSeconds:7},null,null);
  assert.equal(program.getCurrentSettings().probabilityDecreaseFactor,8);assert.equal(program.getCurrentSettings().notificationDurationSeconds,7);assert.deepEqual(fs.readFileSync(f.file),bytes);
+});
+
+
+test('workbook migration completes remaining classes and preserves existing homework entries',async()=>{
+ const f=await fixture(),book=await read(f.file),first=book.getWorksheet('3a');
+ homework.migrateWorksheet(first);homework.append(first,6,{id:'existing-homework',grade:5,weight:1.2,date:'13.11.2026'});
+ await book.xlsx.writeFile(f.file);await new Promise(r=>program.setFile(f.file,r));await new Promise(r=>program.setClass('3b',r));
+ const before=fs.readFileSync(f.file),result=await migrate();assert.equal(result.success,true);assert.equal(result.migratedSheets,1);
+ assert.deepEqual(fs.readFileSync(result.backupPath),before);
+ const updated=await read(f.file);assert.equal(homework.history(updated.getWorksheet('3a'),6)[0].id,'existing-homework');
+ assert.equal(homework.history(updated.getWorksheet('3a'),6)[0].grade,5);
+ assert.equal(homework.layout(updated.getWorksheet('3b')).slots.length,6);
+ assert.equal(updated.getWorksheet('3b').getCell('AO6').value,'behalten');
+ const stable=fs.readFileSync(f.file);assert.equal((await migrate()).alreadyMigrated,true);assert.deepEqual(fs.readFileSync(f.file),stable);
 });

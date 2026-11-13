@@ -4,7 +4,8 @@ const select=document.getElementById('settings-class-select'),hint=document.getE
 let context={className:'',filePath:''},dirty=false;
 window.getSettingsScopeContext=()=>context;
 function tab(name,focus=false) {
- const panel=document.getElementById(`settings-${name}-fields`),wasHidden=panel.classList.contains('update-hidden');
+ const panel=document.getElementById(`settings-${name}-fields`);
+ if((panel.classList.contains('update-hidden') || document.getElementById('content').dataset.pageMotion) && motion.beginPageChange(()=>tab(name,focus)))return;
  document.getElementById('settings-class-picker').classList.toggle('update-hidden',name!=='class');
  for(const key of ['global','class']) {
   const button=document.getElementById(`settings-${key}-tab`),active=key===name;
@@ -12,7 +13,7 @@ function tab(name,focus=false) {
   document.getElementById(`settings-${key}-fields`).classList.toggle('update-hidden',!active);
   if(active && focus)button.focus();
  }
- if(wasHidden)motion.revealView(panel);
+
  window.repetiererKristall?.refresh();
 }
 for(const name of ['global','class']) {

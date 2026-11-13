@@ -478,9 +478,9 @@ function getWiggersRuleKey(personId) {
 module.exports = {
  getCurrentSettings,
  saveHomework,
- getHomeworkStatus:()=>require('./excelReader').getHomeworkStatus(cls),
+ getHomeworkStatus:()=>require('./excelReader').getHomeworkStatus(),
  getHomeworkPersons:()=>require('./excelReader').read_homework(cls).map(person=>{const pending=require('./storage').getPendingExcelEntries().filter(e=>e.type==='homework' && e.filePath===filePath && e.className===cls && e.personId===person.id && !person.homework.some(h=>h.id===e.homeworkId));return {...person,homework:[...person.homework,...pending.map(e=>({...e,id:e.homeworkId,pending:true}))]};}),
- migrateHomework:(fingerprint,callback)=>require('./excelReader').migrate_homework(fingerprint,result=>{if(result.success && cls)persons=read(cls);callback(result);},cls),
+ migrateHomework:(fingerprint,callback)=>require('./excelReader').migrate_homework(fingerprint,result=>{if(result.success && cls)persons=read(cls);callback(result);}),
 	startRepetitionTiming: token => repetitionTimer.ready(token),
 	cancelRepetitionTiming: () => repetitionTimer.cancel(),
  getJokerDateMigrationStatus,

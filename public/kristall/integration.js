@@ -14,7 +14,7 @@ function initKristall() {
   const controls = new Map();
   const navigations = new Map();
   const dismissBindings = new WeakSet();
-  const panelSelector = '#title-bar, .modal-content, #drawer, #content > .neum:not(#participation-view), .session-tabs';
+  const panelSelector = '#title-bar, .modal-content, #drawer, #content > .neum:not(#participation-view):not(#homework-view), .homework-repetition-card, .session-tabs';
   const controlSelector = 'button, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]), select, textarea, .attendance-person, .assessment-round-card';
   const mark = (element, type = 'pill') => {
     if (!element.hasAttribute('data-glass')) {

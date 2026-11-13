@@ -28,7 +28,9 @@
       "Hausaufgaben vorführen mit Noten, Gewichtung und konfigurierbarem Extra-Joker",
       "Globale und klassenspezifische Einstellungen getrennt, Klassenregeln bleiben lokal in der App",
       "Klicksperre im Einstellungsdock und fehlende Renderer-Module in der EXE korrigiert",
-      "Electron und Abhängigkeiten aktualisiert, bekannte npm-Sicherheitslücken behoben"
+      "Electron und Abhängigkeiten aktualisiert, bekannte npm-Sicherheitslücken behoben",
+      "Hausaufgaben: Schülerauswahl wie Mitarbeit, Notenansicht wie Repetition und Rückkehr nach dem Speichern",
+      "Einstellungsbereiche mit gemeinsamer Seitenanimation; Excel-Erweiterung einmalig für alle Klassen"
     ]
   }
 }

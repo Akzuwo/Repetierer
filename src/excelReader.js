@@ -108,9 +108,9 @@ function get_class_names() {
 	return wb ? wb.worksheets.filter(sheet => sheet.getCell('A1').value === 'repetierer').map(sheet => sheet.name) : [];
 }
 
-function getHomeworkStatus(className) {
+function getHomeworkStatus() {
  if(!wb||!f)return {needsMigration:false,sheets:[],hasFile:false};
- const sheets=wb.worksheets.filter(s=>s.getCell('A1').value==='repetierer' && (!className||s.name===className)).map(homework.inspect);
+ const sheets=wb.worksheets.filter(s=>s.getCell('A1').value==='repetierer').map(homework.inspect);
  return {hasFile:true,needsMigration:sheets.some(s=>s.needsMigration),sheets,fingerprint:crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex')};
 }
 function read_homework(clss) {
@@ -676,7 +676,7 @@ async function migrate_joker_dates(fingerprint, callback) {
  finally { if(tempPath && fs.existsSync(tempPath)) fs.unlinkSync(tempPath); }
 }
 
-async function migrate_homework(fingerprint, callback,className) {
+async function migrate_homework(fingerprint, callback) {
  let backupPath, tempPath;
  const target=f;
  try {
@@ -686,7 +686,7 @@ async function migrate_homework(fingerprint, callback,className) {
   const content=fs.readFileSync(target), digest=crypto.createHash('sha256').update(content).digest('hex');
   if(!fingerprint || fingerprint!==digest) return callback({success:false,reason:'file-changed'});
   const updated=new ExcelJS.Workbook(); await updated.xlsx.load(content);
-  const sheets=updated.worksheets.filter(sheet=>sheet.getCell('A1').value==='repetierer' && (!className||sheet.name===className));
+  const sheets=updated.worksheets.filter(sheet=>sheet.getCell('A1').value==='repetierer');
   const plans=sheets.map(homework.inspect).filter(plan=>plan.needsMigration);
   if(!plans.length) return callback({success:true,alreadyMigrated:true,worksheets:updated.worksheets.map(sheet=>sheet.name)});
   sheets.forEach(homework.migrateWorksheet);
@@ -695,7 +695,7 @@ async function migrate_homework(fingerprint, callback,className) {
   tempPath=path.join(path.dirname(target),`.hausaufgaben-${crypto.randomUUID()}.xlsx`);
   await updated.xlsx.writeFile(tempPath);
   const verification=new ExcelJS.Workbook();await verification.xlsx.readFile(tempPath);
-  if(verification.worksheets.filter(sheet=>sheet.getCell('A1').value==='repetierer' && (!className||sheet.name===className)).some(sheet=>homework.inspect(sheet).needsMigration)) throw new Error('Die erweiterten Spalten konnten nicht geprüft werden.');
+  if(verification.worksheets.filter(sheet=>sheet.getCell('A1').value==='repetierer').some(sheet=>homework.inspect(sheet).needsMigration)) throw new Error('Die erweiterten Spalten konnten nicht geprüft werden.');
   const current=crypto.createHash('sha256').update(fs.readFileSync(target)).digest('hex');
   if(current!==digest) return callback({success:false,reason:'file-changed',backupPath});
   const finalLock=getFileLockStatus(target);

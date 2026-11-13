@@ -11,12 +11,15 @@ module.exports=async function({win,evaluate,waitFor,shot,pause}){
  assert.equal(await evaluate(`document.querySelectorAll('#settings-view input[type=range]').length`),6);
  assert.equal(await evaluate(`document.querySelectorAll('#settings-view input[type=number]').length`),0);
  await evaluate(`document.getElementById('settings-class-tab').click()`);
+ await waitFor(`!document.getElementById('content').dataset.pageMotion`);
  const focus=async id=>{await evaluate(`(()=>{const input=document.getElementById(${JSON.stringify(id)});input.scrollIntoView({block:'center',behavior:'instant'});input.focus();})()`);await pause(80);};
  const key=async(name,count=1)=>{for(let i=0;i<count;i++){win.webContents.sendInputEvent({type:'keyDown',keyCode:name});win.webContents.sendInputEvent({type:'keyUp',keyCode:name});}await pause(80);};
  const output=id=>evaluate(`document.getElementById(${JSON.stringify(id+'-value')}).value`);
  await evaluate(`document.getElementById('settings-global-tab').click()`);
+ await waitFor(`!document.getElementById('content').dataset.pageMotion`);
  await focus('notification-duration-setting');assert.equal(await output('notification-duration-setting'),'6 Sek.');await key('Home');assert.equal(await output('notification-duration-setting'),'2 Sek.');await key('End');assert.equal(await output('notification-duration-setting'),'8 Sek.');
  await evaluate(`document.getElementById('settings-class-tab').click()`);
+ await waitFor(`!document.getElementById('content').dataset.pageMotion`);
  await focus(ids[0]);await key('Right');
  assert.equal(await evaluate(`document.getElementById('${ids[0]}').value`),'1.9');assert.equal(await output(ids[0]),'1.9×');
  await key('Home');assert.equal(await evaluate(`document.getElementById('${ids[0]}').value`),'1.1');

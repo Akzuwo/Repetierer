@@ -464,7 +464,7 @@
 		grid-area: 1 / 1 / 2 / 2;
 	}
 
-	#repetition {
+	:is(#repetition,.homework-repetition-card) {
 		contain: paint;
 		grid-area: 1 / 2 / 2 / 3;
 		isolation: isolate;
@@ -496,7 +496,7 @@
 		animation: stats-panel-return .48s cubic-bezier(.16, 1, .3, 1) both;
 	}
 
-	#content #repetition.stats-panel-return {
+	#content :is(#repetition,.homework-repetition-card).stats-panel-return {
 		animation-delay: .045s;
 	}
 
@@ -898,7 +898,7 @@
 		transform: translateY(-0.08rem);
 	}
 
-	#name {
+	:is(#name,#homework-student-name) {
 		box-sizing: border-box;
 		line-height: 0.75;
 		max-width: 100%;
@@ -914,11 +914,11 @@
 		animation: name-pop 260ms ease-out;
 	}
 
-	#name.disabled {
+	:is(#name,#homework-student-name).disabled {
 		color: #414246;
 	}
 
-	#res {
+	:is(#res,#homework-grade-form) {
 		position: absolute;
 		width: calc(100% - 4rem);
 		left: 2rem;
@@ -928,18 +928,18 @@
 		justify-content: flex-end;
 	}
 
-	#res button {
+	:is(#res,#homework-grade-form) button {
 		margin-left: 1rem;
 	}
 
-	#grade {
+	:is(#grade,#homework-grade-field) {
 		position: absolute;
 		left: 0;
 		bottom: 0.75rem;
 		font-size: 1rem;
 	}
 
-	#grade input {
+	:is(#grade,#homework-grade-field) input {
 		margin-left: 1rem;
 		background-color: transparent;
 		border: none;
@@ -3058,20 +3058,20 @@
 	color: #fff;
 }
 
-#content.session-active #repetition,
-#participation-view {
+#content.session-active :is(#repetition,.homework-repetition-card),
+:is(#participation-view,#homework-view) {
 	grid-area: 2 / 1 / 3 / 2;
 	min-height: 0;
 }
 
-#participation-view { overflow: hidden; }
+:is(#participation-view,#homework-view) { overflow: hidden; }
 .participation-heading { justify-content: space-between; }
 .participation-heading h2 { margin: .2rem 0 0; }
 .participation-heading h3 { color: var(--accent); font-size: 1.5rem; }
 .participation-heading button { padding: .8rem 1.2rem; }
 .participation-help { color: #bfc0c4; margin: 1rem 0 1.2rem; }
 
-#participation-student-list,
+:is(#participation-student-list,#homework-student-list),
 #participation-summary-list {
 	-webkit-app-region: no-drag;
 	display: grid;
@@ -3082,7 +3082,7 @@
 	padding: .2rem .4rem .2rem 0;
 	scrollbar-width: none;
 }
-#participation-student-list::-webkit-scrollbar,
+:is(#participation-student-list,#homework-student-list)::-webkit-scrollbar,
 #participation-summary-list::-webkit-scrollbar { display: none; height: 0; width: 0; }
 
 .participation-student {
@@ -3331,19 +3331,19 @@ kbd { border: 1px solid var(--border-soft); border-radius: 3px; padding: 2px 4px
 .session-meta strong { color: #f5f5f5; font-size: 1rem; }
 .session-meta span:last-child { color: var(--text-muted); font-size: .82rem; }
 .session-live-dot { background: var(--status-success); box-shadow: none; }
-#content.session-active #repetition { align-items: center; }
+#content.session-active :is(#repetition,.homework-repetition-card) { align-items: center; }
 .repetition-header { align-self: stretch; }
 .repetition-header h2 { margin: 0; }
-#name { animation: name-pop .22s ease-out; line-height: 1.05; margin: auto 0 0; max-width: 100%; text-align: center; text-shadow: none; width: 100%; }
-#name:not(.disabled) { color: #f5f5f5; text-shadow: 0 0 24px rgba(var(--accent-rgb), .24); }
-#name.disabled { color: var(--text-dim); font-size: 2rem !important; font-weight: 400; }
+:is(#name,#homework-student-name) { animation: name-pop .22s ease-out; line-height: 1.05; margin: auto 0 0; max-width: 100%; text-align: center; text-shadow: none; width: 100%; }
+:is(#name,#homework-student-name):not(.disabled) { color: #f5f5f5; text-shadow: 0 0 24px rgba(var(--accent-rgb), .24); }
+:is(#name,#homework-student-name).disabled { color: var(--text-dim); font-size: 2rem !important; font-weight: 400; }
 .repetition-idle-hint { color: var(--text-muted); font-size: .9rem; line-height: 1.5; margin: var(--space-4) 0 auto; text-align: center; }
 .session-tabs .btn-1 { background: transparent; color: #f5f5f5; border-color: transparent; }
-#res { align-items: center; bottom: auto; gap: var(--space-2); justify-content: center; left: auto; margin: var(--space-8) 0 auto; position: relative; width: 100%; }
-#res button { margin-left: 0; }
-#res .btn-1 { border-color: var(--accent); color: #fff; }
-#grade { align-items: center; bottom: auto; display: flex; gap: var(--space-2); position: relative; }
-#grade input { background: var(--surface-control); border: 1px solid var(--border-soft); border-radius: var(--control-radius); height: var(--control-height); margin-left: 0; min-height: var(--control-height); width: 4rem; }
+:is(#res,#homework-grade-form) { align-items: center; bottom: auto; gap: var(--space-2); justify-content: center; left: auto; margin: var(--space-8) 0 auto; position: relative; width: 100%; }
+:is(#res,#homework-grade-form) button { margin-left: 0; }
+:is(#res,#homework-grade-form) .btn-1 { border-color: var(--accent); color: #fff; }
+:is(#grade,#homework-grade-field) { align-items: center; bottom: auto; display: flex; gap: var(--space-2); position: relative; }
+:is(#grade,#homework-grade-field) input { background: var(--surface-control); border: 1px solid var(--border-soft); border-radius: var(--control-radius); height: var(--control-height); margin-left: 0; min-height: var(--control-height); width: 4rem; }
 
 .modal { background: rgba(3, 5, 9, .72); backdrop-filter: none; }
 .modal-content { background: var(--surface-solid); border-color: rgba(255,255,255,.12); border-radius: var(--modal-radius); clip-path: none; padding: var(--space-6); box-shadow: 0 20px 64px rgba(0,0,0,.4); }
@@ -3414,13 +3414,13 @@ kbd { border: 1px solid var(--border-soft); border-radius: 3px; padding: 2px 4px
 	#content { padding: var(--space-3); }
 	.session-header { align-items: flex-start; flex-direction: column; gap: var(--space-2); }
 	.session-tabs { flex-wrap: wrap; }
-	#res { flex-wrap: wrap; justify-content: center; }
-	#grade { justify-content: center; width: 100%; }
+	:is(#res,#homework-grade-form) { flex-wrap: wrap; justify-content: center; }
+	:is(#grade,#homework-grade-field) { justify-content: center; width: 100%; }
 	.assessment-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.modal, .modal-content, #drawer, .drawer-view, #name { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+	.modal, .modal-content, #drawer, .drawer-view, :is(#name,#homework-student-name) { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 
 /* Entry uses the same flat rows and typography as the classroom workspace. */
@@ -3562,8 +3562,8 @@ kbd { border: 1px solid var(--border-soft); border-radius: 3px; padding: 2px 4px
 .session-tabs button:hover { color: #f5f5f5; transform: none; box-shadow: none; }
 .session-end-button { min-height: 28px; padding: 0 8px; background: transparent; border-color: transparent; color: var(--text-muted); font-size: .75rem; }
 .session-end-button:hover { background: rgba(239,68,68,.08); color: var(--status-error); transform: none; }
-#content.session-active #repetition, #content.session-active #participation-view { grid-area: 2 / 1 / 3 / 2; margin: 0 32px; padding: 24px 0; background: transparent; border: 0; border-radius: 0; }
-#content.session-active #repetition { align-items: stretch; }
+#content.session-active :is(#repetition,.homework-repetition-card), #content.session-active :is(#participation-view,#homework-view) { grid-area: 2 / 1 / 3 / 2; margin: 0 32px; padding: 24px 0; background: transparent; border: 0; border-radius: 0; }
+#content.session-active :is(#repetition,.homework-repetition-card) { align-items: stretch; }
 .repetition-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex: 0 0 auto; margin-bottom: 20px; }
 .repetition-header h2 { display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; font-weight: 600; }
 .repetition-header #class-name { font-size: .875rem; color: var(--text-dim); font-weight: 400; }
@@ -3573,16 +3573,16 @@ kbd { border: 1px solid var(--border-soft); border-radius: 3px; padding: 2px 4px
 .repetition-selection-actions button { flex: 0 0 auto; min-width: 72px; max-width: none; min-height: 36px; padding: 0 14px; font-size: .8125rem; }
 .repetition-selection-actions #probabilities-btn { background: transparent; border-color: transparent; color: var(--text-muted); }
 .repetition-stage { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; flex: 1; min-height: 0; padding: 32px 0 120px; position: relative; }
-.repetition-stage #name { margin: 0; text-align: left; line-height: 1.1; text-transform: none; font-weight: 600; }
-.repetition-stage #name:not(.disabled) { color: #f5f5f5; text-shadow: none; letter-spacing: -.04em; }
-.repetition-stage #name.disabled { font-size: 1.75rem !important; white-space: normal; letter-spacing: -.03em; font-weight: 500; }
+.repetition-stage :is(#name,#homework-student-name) { margin: 0; text-align: left; line-height: 1.1; text-transform: none; font-weight: 600; }
+.repetition-stage :is(#name,#homework-student-name):not(.disabled) { color: #f5f5f5; text-shadow: none; letter-spacing: -.04em; }
+.repetition-stage :is(#name,#homework-student-name).disabled { font-size: 1.75rem !important; white-space: normal; letter-spacing: -.03em; font-weight: 500; }
 .repetition-stage .repetition-idle-hint { text-align: left; margin: 12px 0 0; max-width: 28rem; font-size: .8125rem; }
-#repetition #res { position: absolute; left: 0; bottom: 24px; width: 100%; margin: 0; padding-top: 20px; border-top: 1px solid var(--border-soft); justify-content: flex-end; gap: 12px; }
-#repetition #grade { position: static; width: auto; margin-right: auto; gap: 10px; }
-#repetition #grade label { font-size: 1.0625rem; font-weight: 600; color: var(--text-muted); }
-#repetition #grade input { width: 112px; min-height: 52px; box-sizing: border-box; text-align: center; font-size: 1.25rem; font-weight: 600; }
-#repetition #res button { min-height: 52px; padding: 0 20px; font-size: 1.0625rem; font-weight: 600; }
-#participation-student-list { grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 0 24px; }
+:is(#repetition,.homework-repetition-card) :is(#res,#homework-grade-form) { position: absolute; left: 0; bottom: 24px; width: 100%; margin: 0; padding-top: 20px; border-top: 1px solid var(--border-soft); justify-content: flex-end; gap: 12px; }
+:is(#repetition,.homework-repetition-card) :is(#grade,#homework-grade-field) { position: static; width: auto; margin-right: auto; gap: 10px; }
+:is(#repetition,.homework-repetition-card) :is(#grade,#homework-grade-field) label { font-size: 1.0625rem; font-weight: 600; color: var(--text-muted); }
+:is(#repetition,.homework-repetition-card) :is(#grade,#homework-grade-field) input { width: 112px; min-height: 52px; box-sizing: border-box; text-align: center; font-size: 1.25rem; font-weight: 600; }
+:is(#repetition,.homework-repetition-card) :is(#res,#homework-grade-form) button { min-height: 52px; padding: 0 20px; font-size: 1.0625rem; font-weight: 600; }
+:is(#participation-student-list,#homework-student-list) { grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: 0 24px; }
 .participation-student { min-height: 48px; padding: 10px 8px; background: transparent; border: 0; border-bottom: 1px solid var(--border-soft); border-radius: 0; font-size: .875rem; }
 .participation-student strong { font-weight: 500; }
 .participation-student:hover { transform: none; background: rgba(255,255,255,.04); border-color: var(--border-soft); }
@@ -3614,7 +3614,7 @@ html[data-theme="classic"] .participation-student { color: #f5f5f5; }
 .settings-content .ai-settings-section h3 { font-size: 1rem; font-weight: 600; }
 .settings-content .settings-section-heading { font-size: 1rem; font-weight: 600; border: 0; padding-top: 0; }
 .participation-modal-person { margin: 0 0 16px; color: var(--text-muted); font-size: .875rem; }
-.session-empty-view, #class-list, #session-attendance-list, #participation-student-list { scrollbar-width: thin; scrollbar-color: var(--surface-control) transparent; }
+.session-empty-view, #class-list, #session-attendance-list, :is(#participation-student-list,#homework-student-list) { scrollbar-width: thin; scrollbar-color: var(--surface-control) transparent; }
 
 /* Every dialog is centered as a box, including compact and tall dialogs. */
 .modal { align-items: center; justify-content: center; box-sizing: border-box; padding: 24px; }
@@ -3631,14 +3631,14 @@ html[data-theme="classic"] .participation-student { color: #f5f5f5; }
 	.session-header .session-tabs { flex-wrap: nowrap; gap: 16px; margin-right: auto; }
 	.session-tabs .btn-1, .session-tabs .btn-2 { padding-inline: 0; font-size: .75rem; }
 	.session-end-button { padding-inline: 0; font-size: .6875rem; }
-	#content.session-active #repetition, #content.session-active #participation-view { margin-inline: 20px; padding: 20px 0; }
+	#content.session-active :is(#repetition,.homework-repetition-card), #content.session-active :is(#participation-view,#homework-view) { margin-inline: 20px; padding: 20px 0; }
 	.repetition-header { margin-bottom: 16px; gap: 8px; }
 	.repetition-tools .history-btn { min-height: 28px; height: 28px; width: 28px; }
 	.repetition-selection-actions button { min-width: 0; padding-inline: 12px; }
-	#repetition #res { flex-wrap: wrap; padding-top: 12px; bottom: 20px; }
-	#repetition #grade { flex: 0 0 100%; justify-content: flex-start; margin: 0 0 4px; }
+	:is(#repetition,.homework-repetition-card) :is(#res,#homework-grade-form) { flex-wrap: wrap; padding-top: 12px; bottom: 20px; }
+	:is(#repetition,.homework-repetition-card) :is(#grade,#homework-grade-field) { flex: 0 0 100%; justify-content: flex-start; margin: 0 0 4px; }
 	.repetition-stage { padding-bottom: 156px; }
-	#participation-student-list { grid-template-columns: minmax(0, 1fr); }
+	:is(#participation-student-list,#homework-student-list) { grid-template-columns: minmax(0, 1fr); }
 	#title-bar .ai-title-button kbd { display: none; }
 	#content > .neum { padding: 24px; }
 	.modal { padding: 16px; }
@@ -3656,7 +3656,7 @@ select, input, .assessment-table, .stats-row, .probability-item { font-variant-n
 :root[data-motion-engine="gsap"] .drawer-view,
 :root[data-motion-engine="gsap"] .modal,
 :root[data-motion-engine="gsap"] .modal .modal-content,
-:root[data-motion-engine="gsap"] #name,
+:root[data-motion-engine="gsap"] :is(#name,#homework-student-name),
 :root[data-motion-engine="gsap"] #content #stats-view { animation: none; }
 :root[data-motion-engine="gsap"] .modal.modal-open,
 :root[data-motion-engine="gsap"] .modal.modal-closing { opacity: 1; }
@@ -3672,7 +3672,7 @@ select, input, .assessment-table, .stats-row, .probability-item { font-variant-n
 #container.splash-container { border-radius: 18px; clip-path: inset(0 round 18px); }
 .help-button:not(.help-button-back):hover { background: transparent; border-color: transparent; color: var(--text-muted); transform: none; box-shadow: 0 0 14px rgba(var(--accent-rgb), .35); }
 #content.session-active #class { display: none; }
-.repetition-stage.selection-running #name,
+.repetition-stage.selection-running :is(#name,#homework-student-name),
 .repetition-stage.selection-running .repetition-idle-hint { visibility: hidden; }
 #selection-effect { background: var(--app-bg); border-radius: 0; inset: 0 0 120px; justify-content: flex-start; transition: none; }
 #selection-effect .spinwheel-shell { width: 100%; max-width: none; transition: none; }

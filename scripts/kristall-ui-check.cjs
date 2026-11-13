@@ -48,7 +48,7 @@ async function main() {
   await until(`!document.getElementById('settings-view').classList.contains('update-hidden')`);
   await pause(600);
   await shot('app-settings-desktop');
-  await evaluate(`document.getElementById('settings-class-tab').click();document.getElementById('extra-joker-setting').scrollIntoView({block:'center'})`);await pause(250);
+  await evaluate(`document.getElementById('settings-class-tab').click()`);await until(`!document.getElementById('content').dataset.pageMotion`);await evaluate(`document.getElementById('extra-joker-setting').scrollIntoView({block:'center'})`);await pause(250);
   // Native keyboard activation must change both the checkbox and the lens.
   const start = await evaluate(`document.getElementById('extra-joker-setting').checked`);
   await evaluate(`document.getElementById('extra-joker-setting').focus()`);
