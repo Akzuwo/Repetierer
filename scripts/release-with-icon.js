@@ -3,6 +3,13 @@ const fs = require("fs");
 const path = require("path");
 const {createBuildMetadata} = require('../src/buildInfo');
 
+function assertSupportedBuildNode(version = process.versions.node) {
+  const [major, minor] = version.split('.').map(Number);
+  if (!(major === 22 && minor >= 19 || major === 24 && minor >= 6 || major > 24)) {
+    throw new Error('Fuer den Windows-Zertifikatsspeicher ist Node 22.19+ oder 24.6+ erforderlich. Bitte Node aktualisieren.');
+  }
+}
+
 function buildArguments(metadata, env = process.env, date = new Date()) {
   const info = createBuildMetadata(metadata,env,date);
   return {
@@ -23,7 +30,7 @@ const appUpdatePath = path.join(resourcesDir, "app-update.yml");
 function run(command, args) {
   const result = spawnSync(command, args, {
     cwd: rootDir,
-    env: process.env,
+    env: { ...process.env, NODE_USE_SYSTEM_CA: "1" },
     stdio: "inherit",
     shell: false,
   });
@@ -63,6 +70,7 @@ function writeAppUpdateConfig() {
 }
 
 async function main() {
+  assertSupportedBuildNode();
   const node = process.execPath;
   const electronBuilderCli = path.join(rootDir, "node_modules", "electron-builder", "out", "cli", "cli.js");
   const publishMode = process.env.PUBLISH_MODE || "always";
@@ -120,7 +128,7 @@ async function editExecutableIcon(executablePath, executableIconPath) {
 	throw lastError;
 }
 
-module.exports={buildArguments};
+module.exports={buildArguments,assertSupportedBuildNode};
 if(require.main === module) main().catch((error) => {
   console.error(error);
   process.exit(1);

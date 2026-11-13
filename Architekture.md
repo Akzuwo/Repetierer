@@ -130,10 +130,14 @@ Das Einstellungsdock hebt die geerbte Electron-Ziehregion explizit mit `app-regi
 
 ## Abhängigkeiten (13. November 2026)
 
-Electron 45, Electron Builder 26, Nodemailer 10 und ExcelJS 4.4 sind auf die aktuellen npm-Versionen aktualisiert. Tailwind 4 nutzt die separate CLI und explizite Theme-/Utilities-Imports ohne Preflight, um die bestehende Kristallgestaltung zu erhalten. Der Icon-Schritt lädt den benannten ESM-Export von rcedit bei Bedarf. Unbenutzte direkte Abhängigkeiten electron-packager, autoprefixer und postcss entfallen. Node >=22.12 ist erforderlich; der Release-Workflow verwendet Node 24.
+Electron 45, Electron Builder 26, Nodemailer 10 und ExcelJS 4.4 sind auf die aktuellen npm-Versionen aktualisiert. Tailwind 4 nutzt die separate CLI und explizite Theme-/Utilities-Imports ohne Preflight, um die bestehende Kristallgestaltung zu erhalten. Der Icon-Schritt lädt den benannten ESM-Export von rcedit bei Bedarf. Unbenutzte direkte Abhängigkeiten electron-packager, autoprefixer und postcss entfallen. Node 22.19+ oder 24.6+ ist erforderlich; der Release-Workflow verwendet Node 24.
 
 Gezielte npm-Overrides schliessen bekannte Lücken in brace-expansion 1, den Minimatch-Versionen von app-builder-lib/@electron/universal und UUID von ExcelJS. Der Packagingtest verwendet den tatsächlichen FileMatcher des Builders, die Exceltests prüfen Lesen/Schreiben und die öffentliche Suite die Mailvorlagen. Installierte Versionen sind im Lockfile festgeschrieben.
 
 `node scripts/ui-polish-smoke.js --settings-page` prüft die Einstellungsseite separat. Die Animationsprüfung wartet auf den IPC-getriebenen Seitenstart und liest eine definierte Eingangsposition der tatsächlich gestarteten GSAP-Timeline; Reduced-Motion-Prüfungen warten auf die asynchrone Medienänderung.
 
 Der gemeinsame Kristalltakt beendet `animateFor` bei reduzierter Bewegung unmittelbar. Auch nachträgliche Neuzeichnungen dürfen keinen neuen Animationsframe einplanen; die Kristallprüfung sichert dies ab.
+
+## Lokale Build-Downloads und Zertifikate
+
+`build-local.ps1` aktiviert `NODE_USE_SYSTEM_CA=1` vor allen Node-/npm-Aufrufen und stellt den vorherigen Prozesswert auch bei Fehlern wieder her. Der Release-Helfer setzt denselben Wert fuer seine Builder-Unterprozesse, auch beim direkten Aufruf. Dadurch verwenden HTTPS-Downloads zusaetzlich den Windows-Zertifikatsspeicher; TLS-Pruefung und vorhandene CA-Konfigurationen bleiben aktiv. Erforderlich ist Node 22.19+ oder 24.6+; eine fruehe Versionspruefung gibt andernfalls einen konkreten Hinweis. Buildzaehler und alte Builds bleiben bei Fehlern erhalten. Die Build-Skripttests verwenden eine temporaere Fixture und ersetzen ausschliesslich Installer-Aufrufe durch kontrollierte Stubs.

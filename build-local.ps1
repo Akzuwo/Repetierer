@@ -4,6 +4,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$previousSystemCa = $env:NODE_USE_SYSTEM_CA
 $previousPublishMode = $env:PUBLISH_MODE
 $previousLocalBuildNumber = $env:LOCAL_BUILD_NUMBER
 $previousLocalBuildDate = $env:LOCAL_BUILD_DATE
@@ -23,6 +24,10 @@ function Invoke-NativeCommand {
 
 Push-Location $rootDir
 try {
+  # Trust the Windows certificate store for Node HTTPS downloads during this build.
+  $env:NODE_USE_SYSTEM_CA = "1"
+  Invoke-NativeCommand { node -e "require('./scripts/release-with-icon').assertSupportedBuildNode()" } "Node-Pruefung"
+
   if (-not (Test-Path "node_modules")) {
     Write-Host "Installiere Abhaengigkeiten mit npm ci..."
     Invoke-NativeCommand { npm ci } "npm ci"
@@ -62,6 +67,8 @@ try {
     Format-Table -AutoSize
 }
 finally {
+  if ($null -eq $previousSystemCa) { Remove-Item Env:NODE_USE_SYSTEM_CA -ErrorAction SilentlyContinue }
+  else { $env:NODE_USE_SYSTEM_CA = $previousSystemCa }
   if ($null -eq $previousLocalBuildDate) { Remove-Item Env:LOCAL_BUILD_DATE -ErrorAction SilentlyContinue }
   else { $env:LOCAL_BUILD_DATE = $previousLocalBuildDate }
   if ($null -eq $previousPublishMode) {
