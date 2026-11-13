@@ -10,7 +10,7 @@
       "Abwesenheiten werden nach jedem Tag automatisch zurückgesetzt"
     ]
   },
-    "7.0.0": {
+  "7.0.0": {
     "title": "Grosses Update mit neuem Design und neuen Features",
     "changes": [
       "Neues Liquid Kristall Design mit verbesserter User Experience",
@@ -26,7 +26,9 @@
       "Debug-Menü mit Updatevorschau, Neustartsimulation und Testmail",
       "Menü-Animation zwischen Hamburger und X korrigiert",
       "Hausaufgaben vorführen mit Noten, Gewichtung und konfigurierbarem Extra-Joker",
-      "Globale und klassenspezifische Einstellungen getrennt, Klassenregeln bleiben lokal in der App"
+      "Globale und klassenspezifische Einstellungen getrennt, Klassenregeln bleiben lokal in der App",
+      "Klicksperre im Einstellungsdock und fehlende Renderer-Module in der EXE korrigiert",
+      "Electron und Abhängigkeiten aktualisiert, bekannte npm-Sicherheitslücken behoben"
     ]
   }
 }

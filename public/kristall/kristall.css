@@ -10,7 +10,7 @@ body .homework-stage p { color:var(--text-muted); }
 body #homework-grade-form { display:flex; align-items:center; gap:22px; margin-top:24px; }
 body #homework-grade-input { width:130px; min-height:52px; border:0; border-bottom:1px solid #ffffff88; border-radius:0; background:none; box-shadow:none; font-size:24px; }
 body #homework-grade-input:focus-visible { outline:none; box-shadow:none; border-bottom-color:#fff; }
-body #settings-navdock { display:none; position:absolute; z-index:12; bottom:18px; left:50%; transform:translateX(-50%); width:max-content; max-width:calc(100% - 32px); height:56px !important; padding:5px; }
+body #settings-navdock { -webkit-app-region:no-drag; app-region:no-drag; display:none; position:absolute; z-index:12; bottom:18px; left:50%; transform:translateX(-50%); width:max-content; max-width:calc(100% - 32px); height:56px !important; padding:5px; }
 body #container:has(#content.settings-active) #settings-navdock { display:flex; }
 body #settings-navdock button { min-width:132px; padding-inline:26px; font-size:15px; }
 body #settings-class-picker { flex:0 0 auto; margin-bottom:14px; }

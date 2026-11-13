@@ -4,7 +4,7 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 if (!app) {
 	const env = { ...process.env };
 	delete env.ELECTRON_RUN_AS_NODE;
-	const result = require('node:child_process').spawnSync(require('electron'), [__filename], { env, stdio: 'inherit', windowsHide: true });
+	const result = require('node:child_process').spawnSync(require('electron'), [__filename,...process.argv.slice(2)], { env, stdio: 'inherit', windowsHide: true });
 	if (result.error) console.error(result.error);
 	process.exit(result.status ?? 1);
 }
@@ -136,7 +136,7 @@ async function main() {
 	win.webContents.on('console-message', event => {
 		const level = event.level;
 		const text = event.message;
-		if ((level === 'error' || level === 3) && !String(text).includes('Test:')) errors.push(text);
+		if ((level === 'error' || level === 3) && !String(text).includes('Test:')) {errors.push(text);if(process.argv.includes('--settings-page'))console.error(text);}
 	});
 	await win.loadFile(path.join(__dirname, '..', 'public', 'index.html'));
 	await waitFor(`document.getElementById('session-file-empty') && !document.getElementById('ai-input').disabled`, 'Rendererstart');
@@ -144,6 +144,7 @@ async function main() {
 	await evaluate(`document.fonts.ready`);
 	assert.match(await evaluate(`getComputedStyle(document.getElementById('session-start-heading')).fontFamily`), /Segoe UI/, 'Kristall uses the native system font');
 	await waitFor(`document.documentElement.dataset.renderer === 'webgl'`, 'Kristall WebGL start');
+	if(process.argv.includes('--settings-page')){await win.webContents.debugger.attach('1.3');await require('./settings-page-ui-check.cjs')({win,evaluate,waitFor,shot,pause});assert.deepEqual(errors,[]);return;}
 	const modalCount = await verifyModalCenters();
  await win.webContents.debugger.attach('1.3');
  await win.webContents.debugger.sendCommand('DOM.enable'); await win.webContents.debugger.sendCommand('CSS.enable');
@@ -154,7 +155,7 @@ async function main() {
  assert.ok(Math.hypot(gearCenter[0]-hoverCenter[0],gearCenter[1]-hoverCenter[1])<.1,'Gear rotates without moving its centre');
  await win.webContents.debugger.sendCommand('CSS.forcePseudoState',{nodeId:gearNode.nodeId,forcedPseudoClasses:[]});win.webContents.debugger.detach();
 	assert.equal(await evaluate(`document.documentElement.dataset.motionEngine`), 'gsap');
-	assert.equal(await evaluate(`require('./vendor/ui-motion.js').gsap.version`), '3.15.0');
+	assert.equal(await evaluate(`require('./vendor/ui-motion.js').gsap.version`), require('gsap/package.json').version);
 
 	// Drawer transitions survive an interrupted exit and never leave hidden controls focusable.
 	assert.equal(await evaluate(`(()=>{document.getElementById('drawer-toggle').click();return require('./vendor/ui-motion.js').gsap.getTweensOf(document.getElementById('drawer')).length > 0;})()`), true, 'The actual drawer transition uses GSAP');

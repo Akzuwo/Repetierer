@@ -70,8 +70,10 @@ async function main() {
   await evaluate(`repetiererKristall.controls.get(document.getElementById('extra-joker-setting')).controller.press()`);
   await pause(25);
   await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
-  await pause(100);
+  await until(`matchMedia('(prefers-reduced-motion: reduce)').matches && repetiererKristall.clock.active.size === 0 && repetiererKristall.clock.frame === 0`);
   assert.deepEqual(await evaluate(`({ active: repetiererKristall.clock.active.size, frame: repetiererKristall.clock.frame })`), { active: 0, frame: 0 });
+  await evaluate(`repetiererKristall.clock.animateFor(500)`);
+  assert.equal(await evaluate(`repetiererKristall.clock.frame`),0,'Redraw cannot restart the animation clock with reduced motion');
   record('outside release / live reduced motion', true);
   await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
   await evaluate(`window.closeRepetiererSettings()`);

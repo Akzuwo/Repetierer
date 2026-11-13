@@ -30,7 +30,7 @@ Die aktive Session orientiert sich am ursprünglichen Aufbau: Datei und Klassen 
 ## GSAP
 
 - Quelle: [GSAP](https://github.com/greensock/GSAP), [Timeline-Dokumentation](https://gsap.com/docs/v3/GSAP/Timeline/).
-- Paket: `gsap@3.15.0`, Standard No Charge License; Hinweis: `public/vendor/gsap.LICENSE.txt`, originale Copyright-/Lizenzheader im Bundle.
+- Paket: `gsap@3.15.1`, Standard No Charge License; Hinweis: `public/vendor/gsap.LICENSE.txt`, originale Copyright-/Lizenzheader im Bundle.
 - `public/uiMotion.js` verwendet Vanilla-GSAP-Timelines mit `expo.out` für Dialoge, Drawer, Ansichtswechsel, Schülernamen, Nachrichten und Minimieren/Wiederherstellen. Ein- und Ausblendungen dauern 120–280 ms; Ausgänge sind kürzer als Eingänge. Klassen und Anwesenheitslisten bleiben statisch. AutoAnimate wurde ersetzt.
 - Pro Interaktionselement existiert eine Timeline. Ein neuer Auftrag beendet die vorherige Timeline, sodass alte Exit-Callbacks keinen wieder geöffneten Dialog ausblenden. Bei nachträglich aktivierter Bewegungsreduktion werden laufende Übergänge korrekt abgeschlossen. Geschlossene Drawer sind `inert` und aus dem Accessibility-Tree ausgeblendet.
 - Die bestehenden optionalen Auswahl-/Feier-Effekte, Skeleton-Shimmer und die eigenständige Splash-Animation behalten ihre passenden CSS-/Canvas-Renderer. Routineanimationen aus dem zusätzlichen Tailwind-Layer wurden entfernt, damit App-Übergänge ausschliesslich GSAP gehören.

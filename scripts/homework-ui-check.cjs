@@ -29,6 +29,8 @@ async function main(){
  assert.equal(await evaluate(`document.getElementById('settings-class-select').value`),'');
  assert.equal(await evaluate(`document.getElementById('settings-class-select').disabled`),false);
  await click('#settings-class-tab');await pause(500);
+ assert.equal(await evaluate(`document.getElementById('settings-class-tab').getAttribute('aria-selected')`),'true');
+ assert.equal(await evaluate(`getComputedStyle(document.getElementById('settings-navdock')).webkitAppRegion`),'no-drag','Dock must accept native clicks instead of dragging the window');
  assert.equal(await evaluate(`document.getElementById('settings-class-rules').disabled`),true);
  assert.equal(await evaluate(`document.getElementById('settings-class-picker').checkVisibility()`),true);
  for(const size of [[1100,800],[1440,900]]){
@@ -73,7 +75,7 @@ async function main(){
  await click('#save-settings-btn');await until(`document.getElementById('settings-view').classList.contains('update-hidden')`);await settle();
  assert.equal(storage.getClassSettings(file,'Klasse B').homeworkJokerThreshold,3);assert.equal(storage.getClassSettings(file,'Klasse B').homeworkWeight,1.3);
  assert.equal(storage.getClassSettings(file,'Klasse B').homeworkEnabled,false);assert.equal(storage.getClassSettings(file,'Klasse A').homeworkEnabled,true);
- assert.equal(await evaluate(`document.getElementById('session-homework-tab').classList.contains('update-hidden')`),false,'Editing another class does not change the current session');
+ if(!process.argv.includes('--settings-only'))assert.equal(await evaluate(`document.getElementById('session-homework-tab').classList.contains('update-hidden')`),false,'Editing another class does not change the current session');
  if(process.argv.includes('--settings-only')){console.log('SETTINGS_ONLY_PASS');return;}
  await click('#end-session-btn');await pause(450);await click('#confirm-session-end-btn');await until(`!document.getElementById('session-empty-view').classList.contains('update-hidden')`);await settle();
  await click('#class-list button:nth-child(2)');await until(`!document.getElementById('session-attendance-view').classList.contains('update-hidden')`);await settle();await click('#confirm-session-start-btn');await until(`!document.getElementById('participation-view').classList.contains('update-hidden')`);await settle();

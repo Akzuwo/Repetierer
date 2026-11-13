@@ -11,11 +11,23 @@ module.exports = async function({win,evaluate,waitFor,shot,pause}) {
   const visibleViews = () => evaluate(`[...document.querySelector('#content').children].filter(e=>!e.classList.contains('update-hidden')).map(e=>e.id)`);
   const before = await visibleViews();
   const header = await evaluate(`(()=>{const r=document.getElementById('title-bar').getBoundingClientRect();return [r.x,r.y,r.width,r.height]})()`);
+  await waitFor(`!matchMedia('(prefers-reduced-motion: reduce)').matches`);
+  // Seek the actual click-created timeline to its entrance frame. Offscreen
+  // rendering can skip directly to the elastic overshoot between IPC polls.
   await evaluate(`document.getElementById('settings-btn').click()`);
-  await waitFor(`document.getElementById('content').dataset.pageMotion==='enter'`);
-  const startY = await evaluate(`+require('./vendor/ui-motion.js').gsap.getProperty(document.getElementById('content'),'y')`);
-  assert.ok(startY < 0,'Page enters from above');
-  assert.deepEqual(await evaluate(`(()=>{const r=document.getElementById('title-bar').getBoundingClientRect();return [r.x,r.y,r.width,r.height]})()`),header,'Header remains fixed during the pop');
+  await waitFor(`!!document.getElementById('content').dataset.pageMotion`);
+  const entrance=await evaluate(`(()=>{
+    const content=document.getElementById('content'),gsap=require('./vendor/ui-motion.js').gsap;
+    const timeline=gsap.getTweensOf(content)[0]?.parent;
+    if(!timeline)throw new Error('Settings click did not create a page timeline');
+    timeline.pause().time(.15);
+    const r=document.getElementById('title-bar').getBoundingClientRect();
+    const sample={phase:content.dataset.pageMotion,y:+gsap.getProperty(content,'y'),header:[r.x,r.y,r.width,r.height]};
+    timeline.play();return sample;
+  })()`);
+  assert.equal(entrance.phase,'enter');
+  assert.ok(entrance.y<0,'Page enters from above');
+  assert.deepEqual(entrance.header,header,'Header remains fixed during the pop');
   await waitFor(`!document.getElementById('content').dataset.pageMotion`);
   assert.equal(await evaluate(`document.getElementById('settings-view').parentElement.id`),'content');
   assert.equal(await evaluate(`document.getElementById('settings-view').classList.contains('modal')`),false);

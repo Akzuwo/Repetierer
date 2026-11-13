@@ -1,7 +1,6 @@
 const { spawnSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
-const rcedit = require("rcedit");
 const {createBuildMetadata} = require('../src/buildInfo');
 
 function buildArguments(metadata, env = process.env, date = new Date()) {
@@ -107,6 +106,7 @@ async function main() {
 }
 
 async function editExecutableIcon(executablePath, executableIconPath) {
+	const {rcedit} = await import("rcedit");
 	let lastError;
 	for (let attempt = 1; attempt <= 3; attempt++) {
 		try {

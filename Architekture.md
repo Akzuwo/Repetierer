@@ -125,3 +125,15 @@ Backup, ausstehende Exceländerungen, Undo/Redo und Sessionprotokoll unterstütz
 
 
 Die Einstellungsnavigation `#settings-navdock` liegt als `.session-tabs` direkt im Container, ausserhalb des bewegten `#content`. Dadurch teilt sie Material, Marker und Geometrie mit dem Session-Dock. `settings-active` blendet sie ein; Speichern/Verwerfen stehen darüber. Der Klassenwähler ist ein fester Kopfbereich der Klassenansicht. `get-settings` wählt ausschliesslich die aktive Sessionklasse derselben Datei vor. Ohne Session bleibt die Auswahl leer; eine explizite Dropdownwahl wird unabhängig von der aktiven Session geladen. Der Session-Dock ordnet Mitarbeit, Hausaufgaben, Repetition in dieser Reihenfolge an.
+
+Das Einstellungsdock hebt die geerbte Electron-Ziehregion explizit mit `app-region: no-drag` auf. `settingsScope.js` und `homeworkPage.js` sind Teil der EXE-Dateiliste; `test/rendererPackaging.test.js` prüft alle lokalen Renderer-Einstiegsmodule gegen diese Liste.
+
+## Abhängigkeiten (13. November 2026)
+
+Electron 45, Electron Builder 26, Nodemailer 10 und ExcelJS 4.4 sind auf die aktuellen npm-Versionen aktualisiert. Tailwind 4 nutzt die separate CLI und explizite Theme-/Utilities-Imports ohne Preflight, um die bestehende Kristallgestaltung zu erhalten. Der Icon-Schritt lädt den benannten ESM-Export von rcedit bei Bedarf. Unbenutzte direkte Abhängigkeiten electron-packager, autoprefixer und postcss entfallen. Node >=22.12 ist erforderlich; der Release-Workflow verwendet Node 24.
+
+Gezielte npm-Overrides schliessen bekannte Lücken in brace-expansion 1, den Minimatch-Versionen von app-builder-lib/@electron/universal und UUID von ExcelJS. Der Packagingtest verwendet den tatsächlichen FileMatcher des Builders, die Exceltests prüfen Lesen/Schreiben und die öffentliche Suite die Mailvorlagen. Installierte Versionen sind im Lockfile festgeschrieben.
+
+`node scripts/ui-polish-smoke.js --settings-page` prüft die Einstellungsseite separat. Die Animationsprüfung wartet auf den IPC-getriebenen Seitenstart und liest eine definierte Eingangsposition der tatsächlich gestarteten GSAP-Timeline; Reduced-Motion-Prüfungen warten auf die asynchrone Medienänderung.
+
+Der gemeinsame Kristalltakt beendet `animateFor` bei reduzierter Bewegung unmittelbar. Auch nachträgliche Neuzeichnungen dürfen keinen neuen Animationsframe einplanen; die Kristallprüfung sichert dies ab.

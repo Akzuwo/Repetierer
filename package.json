@@ -11,7 +11,7 @@
   },
   "main": "app.js",
   "scripts": {
-    "build:css": "tailwindcss -c tailwind.config.js -i ./public/tailwind.input.css -o ./public/tailwind.css --minify",
+    "build:css": "tailwindcss -i ./public/tailwind.input.css -o ./public/tailwind.css --minify",
     "build:ui-vendor": "node scripts/build-ui-vendor.js",
     "test": "node scripts/run-tests.cjs",
     "test:ui": "node scripts/ui-polish-smoke.js",
@@ -43,6 +43,8 @@
       "public/splash.html",
       "public/splash.js",
       "public/renderProcess.js",
+      "public/settingsScope.js",
+      "public/homeworkPage.js",
       "public/notifications.js",
       "public/jokerDateMigration.js",
       "public/assessmentRenderer.js",
@@ -109,22 +111,35 @@
   },
   "author": "srpnt3, Jonas-Luetolf, Akzuwo",
   "dependencies": {
-    "electron-updater": "^6.8.3",
-    "exceljs": "^4.2.1",
-    "nodemailer": "^9.1.1"
+    "electron-updater": "^6.8.11",
+    "exceljs": "^4.4.0",
+    "nodemailer": "^10.5.0"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261013.1",
-    "autoprefixer": "^10.4.20",
-    "electron": "^41.3.0",
-    "electron-builder": "^26.5.0",
-    "electron-packager": "^15.2.0",
-    "esbuild": "0.28.2",
-    "gsap": "3.15.0",
-    "postcss": "^8.4.49",
-    "rcedit": "^2.3.0",
-    "tailwindcss": "^3.4.17",
-    "thinking-orbs": "0.3.2",
-    "wrangler": "^4.150.0"
+    "@cloudflare/workers-types": "^5.20261113.1",
+    "@tailwindcss/cli": "^4.3.5",
+    "electron": "^45.3.1",
+    "electron-builder": "^26.18.1",
+    "esbuild": "^0.28.2",
+    "gsap": "^3.15.1",
+    "rcedit": "^5.0.2",
+    "tailwindcss": "^4.3.5",
+    "thinking-orbs": "^0.3.2",
+    "wrangler": "^4.161.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "overrides": {
+    "brace-expansion@^1.1.7": "^1.1.22",
+    "app-builder-lib": {
+      "minimatch": "^11.0.8"
+    },
+    "@electron/universal": {
+      "minimatch": "^11.0.8"
+    },
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   }
 }

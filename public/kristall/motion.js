@@ -49,8 +49,8 @@ class LiquidMotion {
     this.schedule();
   }
   animateFor(duration = 0) {
-    if (document.hidden) { this.finish(); return; }
-    this.until = Math.max(this.until, performance.now() + (this.preference.matches ? 0 : duration));
+    if (this.preference.matches || document.hidden) { this.finish(); return; }
+    this.until = Math.max(this.until, performance.now() + duration);
     this.schedule();
   }
   schedule() {

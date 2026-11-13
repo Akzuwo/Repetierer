@@ -53,6 +53,7 @@ module.exports=async function({win,evaluate,waitFor,shot,pause,bundleFixture}) {
  assert.ok(await evaluate(`[...document.querySelector('#settings-global-fields').children].some(e=>Math.abs(parseFloat(e.style.translate.split(' ')[1]))>30 && Number(e.style.opacity)<.5)`),'Scroll entries fly out at the viewport edges');
  await evaluate(`document.querySelector('#settings-view .settings-scroll-area').scrollTop=180`);await pause(120);
  await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+ await waitFor(`matchMedia('(prefers-reduced-motion: reduce)').matches && [...document.querySelector('#settings-global-fields').children].every(e=>!e.style.translate)`);
  assert.equal(await evaluate(`[...document.querySelector('#settings-global-fields').children].some(e=>!!e.style.translate)`),false,'Reduced motion clears scroll movement');
  await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
  await evaluate(`document.getElementById('integration-package-import-btn').click()`);
