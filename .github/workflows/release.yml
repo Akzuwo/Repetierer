@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: repetierer-release
+  cancel-in-progress: false
+
 jobs:
   release-windows:
     name: Build and publish Windows release
@@ -31,14 +35,13 @@ jobs:
         id: release-notes
         run: node scripts/generate-release-notes.js
 
-      - name: Build and publish release
+      - name: Build Windows release without publishing
         run: npm run release:ci
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PUBLISH_MODE: never
 
-      - name: Update release body
-        run: gh release edit "$env:RELEASE_TAG" --notes-file "$env:RELEASE_NOTES_PATH"
+      - name: Verify tag and publish release with assets
+        run: node scripts/publish-release.js
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ steps.release-notes.outputs.tag }}
-          RELEASE_NOTES_PATH: ${{ steps.release-notes.outputs.release_notes_path }}
