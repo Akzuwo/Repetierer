@@ -1,4 +1,4 @@
-const { ipcMain, app, BrowserWindow, dialog } = require('electron');
+const { ipcMain, app, BrowserWindow, dialog, clipboard } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -122,6 +122,11 @@ ipcMain.on('minimize', (event, args) => {
 // quit
 ipcMain.on('quit', (event, args) => {
 	app.quit();
+});
+
+ipcMain.handle('copy-log-text',async(_event,text)=>{
+ if(typeof text!=='string' || text.length>1000000)throw new Error('Ungueltiger Logtext.');
+ await clipboard.writeText(text);return {copied:true};
 });
 
 // app version

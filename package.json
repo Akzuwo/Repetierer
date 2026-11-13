@@ -28,7 +28,9 @@
     "build:local": "powershell -ExecutionPolicy Bypass -File ./build-local.ps1",
     "release": "electron-builder -p=always",
     "release:ci": "node scripts/release-with-icon.js",
-    "test:repository": "node scripts/check-repository.cjs"
+    "test:repository": "node scripts/check-repository.cjs",
+    "test:assessment": "node --test test/assessmentApiClient.test.js test/assessmentLifecycle.test.js test/assessmentStore.test.js test/delivery.test.js && node scripts/assessment-workflow-ui-check.cjs",
+    "test:session-close": "node --test test/sessionCloseGuard.test.js && node scripts/session-close-ui-check.cjs"
   },
   "build": {
     "appId": "net.srpnt3.repetierer",

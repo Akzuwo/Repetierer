@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, net, safeStorage } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, net, safeStorage, clipboard } = require('electron');
 const { AssessmentApiClient } = require('./assessmentApiClient.js');
 const { protectTeacherToken, revealTeacherToken } = require('./teacherCredentials.js');
 const { AssessmentStore, hashPath } = require('./assessmentStore.js');
@@ -50,7 +50,7 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 		onError: (target,error) => {if(target)broadcast('assessment:auto-sync-failed',{...target,message:error.message});}
 	});
 	previousAutoSync=autoSync;
-	app.once('before-quit',()=>autoSync.stop());
+	app.once('will-quit',()=>autoSync.stop());
 	const locked = (context,roundId,action) => autoSync.run({...context,roundId},action);
 	async function syncRound(context,roundId) {
 		const {round}=store.getRound(context.filePath,context.className,context.students,roundId);
@@ -81,6 +81,12 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 		const context = getContext(getProgram, args);
 		return presentRound(context, store, args.roundId, paths);
 	});
+ register('assessment:copy-invitation-link', async (_event,args)=>{
+  const context=getContext(getProgram,args),view=await presentRound(context,store,args.roundId,paths);
+  if(!view.invitation?.url)throw contextError('Für diese Runde ist kein Einladungslink verfügbar.');
+  await clipboard.writeText(view.invitation.url);
+  return {copied:true};
+ });
 	register('assessment:sync-responses', async (event, args) => {
 		const context = getContext(getProgram, args);
 		return locked(context,args.roundId,()=>syncRound(context,args.roundId));

@@ -293,6 +293,7 @@ async function main() {
 
 	// Skeletons persist while the actual read is pending and disappear on completion.
 	await click('assessment-nav-btn');
+ await waitFor(`!document.getElementById('assessment-view').classList.contains('update-hidden') && !document.getElementById('content').dataset.pageMotion`);
 	await evaluate(`(() => { const select = document.getElementById('assessment-class-select'); select.value = 'L23a'; select.dispatchEvent(new Event('change')); })()`);
 	await waitFor(`!!document.querySelector('#assessment-body .ui-skeleton-state')`);
 	assert.equal(await evaluate(`document.getElementById('assessment-class-select').disabled`), true);

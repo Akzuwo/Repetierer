@@ -1,4 +1,4 @@
-const {ipcRenderer, clipboard} = require('electron');
+const {ipcRenderer} = require('electron');
 const uiMotion = require('./uiMotion.js');
 const notify = require('./notifications').initNotifications();
 const {inferType} = require('../src/notificationPolicy');
@@ -249,6 +249,27 @@ _quit.addEventListener('click', () => {
 	ipcRenderer.send('quit');
 });
 
+const sessionCloseModal=document.getElementById('session-close-modal');
+const sessionCloseCancel=document.getElementById('session-close-cancel-btn'),sessionCloseConfirm=document.getElementById('session-close-confirm-btn');
+let sessionCloseRequest,sessionCloseFocus;
+ipcRenderer.on('session-close-confirmation',(_event,payload)=>{
+ sessionCloseRequest=payload.requestId;sessionCloseFocus=document.activeElement;window.repetiererSelects?.closeAll();
+ document.getElementById('session-close-text').textContent=`Die Session der Klasse ${payload.className} läuft noch. Möchtest du die App schliessen, ohne die Session zu beenden?`;
+ openModal(sessionCloseModal);sessionCloseCancel.focus();
+});
+function cancelSessionClose(){
+ if(sessionCloseRequest)ipcRenderer.send('session-close-cancel',sessionCloseRequest);
+ sessionCloseRequest=null;closeModal(sessionCloseModal,()=>sessionCloseFocus?.focus());
+}
+sessionCloseCancel.addEventListener('click',cancelSessionClose);
+sessionCloseConfirm.addEventListener('click',()=>{if(sessionCloseRequest)ipcRenderer.send('session-close-confirm',sessionCloseRequest);});
+sessionCloseModal.addEventListener('click',event=>{if(event.target===sessionCloseModal)cancelSessionClose();});
+document.addEventListener('keydown',event=>{
+ if(!sessionCloseModal.classList.contains('modal-open'))return;
+ if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();cancelSessionClose();}
+ if(event.key==='Tab'){event.preventDefault();(document.activeElement===sessionCloseCancel?sessionCloseConfirm:sessionCloseCancel).focus();}
+},true);
+
 // file
 _file.addEventListener('click', () => {
 	ipcRenderer.send('file');
@@ -334,8 +355,9 @@ _closeLogModal.addEventListener('click', () => {
 	closeModal(_logModal);
 });
 
-_copyLogBtn.addEventListener('click', () => {
-	clipboard.writeText(_logList.innerText || '');
+_copyLogBtn.addEventListener('click', async () => {
+ try {await ipcRenderer.invoke('copy-log-text',_logList.innerText || '');}
+ catch {notify.error('Die Logs konnten nicht kopiert werden.',{title:'Logs'});return;}
 	showUpdatePanel({
 		title: 'Logs kopiert',
 		detail: 'Die Log-Datei liegt jetzt in der Zwischenablage.',

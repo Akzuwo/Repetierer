@@ -1,6 +1,6 @@
 const notify = require('./notifications');
 const roundNoticeSignatures = new Set();
-const { ipcRenderer, clipboard } = require('electron');
+const { ipcRenderer } = require('electron');
 const assessmentMotion = require('./uiMotion.js');
 const {deadlineBounds,validateDeadline,zurichDate,DAY} = require('../src/assessment/deadlinePolicy');
 
@@ -51,7 +51,16 @@ let roundView = null;
 let teacherIndex = 0;
 let pendingSendMode = 'pending';
 let brevoState = { configured: false };
-let busy = false;
+let busy = false,viewRequest=0,renderedTeacherKey=null;
+const teacherDrafts=new Map();
+function captureTeacherDraft(){
+ if(!renderedTeacherKey || !elements.body.querySelector('.teacher-assessment'))return;
+ const ratings={},comments={};
+ elements.body.querySelectorAll('[data-teacher-criterion]').forEach(input=>{ratings[input.dataset.teacherCriterion]={value:Number(input.value),rated:input.dataset.rated==='true'};});
+ elements.body.querySelectorAll('[data-teacher-comment]').forEach(input=>{comments[input.dataset.teacherComment]=input.value;});
+ teacherDrafts.set(renderedTeacherKey,{ratings,comments,comment:document.getElementById('teacher-comment').value});
+}
+function teacherKey(student){return JSON.stringify([roundView.filePath||'',selectedClass,roundView.round.id,student.id]);}
 const autoSyncErrors = new Set();
 ipcRenderer.on('assessment:auto-synced', async (_event,payload) => {
 	if(payload.className!==selectedClass || elements.view.classList.contains('update-hidden'))return;
@@ -81,8 +90,10 @@ ipcRenderer.on('classes', (event, classes) => {
 elements.assessmentNav.addEventListener('click', openAssessment);
 elements.repetitionNav.addEventListener('click', openRepetition);
 elements.classSelect.addEventListener('change', async () => {
+ captureTeacherDraft();
 	selectedClass = elements.classSelect.value;
 	roundView = null;
+ if(elements.view.classList.contains('update-hidden'))return;
 	if (selectedClass) await loadOverview();
 	else renderEmpty('Bitte wähle eine Klasse.');
 });
@@ -148,7 +159,8 @@ elements.deleteModal.addEventListener('click', event => { if (event.target === e
 elements.deleteConfirm.addEventListener('click', deleteRound);
 
 async function openAssessment() {
-	if (busy) return;
+ if(busy && !elements.view.classList.contains('update-hidden')){closeDrawer();return;}
+ if(busy){viewRequest++;setBusy(false);}
 	if (assessmentMotion.beginPageChange(() => { openAssessment(); })) return;
 	window.dismissRepetiererSettingsForNavigation?.();
 	window.dismissRepetiererExcelEditorForNavigation?.();
@@ -177,6 +189,7 @@ async function openAssessment() {
 }
 
 function openRepetition() {
+ captureTeacherDraft();viewRequest++;setBusy(false);
 	if (assessmentMotion.beginPageChange(() => { openRepetition(); })) return;
 	window.dismissRepetiererSettingsForNavigation?.();
 	window.dismissRepetiererExcelEditorForNavigation?.();
@@ -214,15 +227,16 @@ function renderClassOptions() {
 }
 
 async function loadOverview() {
-	if (busy) return;
+ captureTeacherDraft();roundView=null;renderedTeacherKey=null;const request=++viewRequest,className=selectedClass;
 	setBusy(true, 'Beurteilungsrunden werden geladen …', true, 'overview');
 	try {
-		overview = await invoke('assessment:get-overview', { className: selectedClass });
-		renderOverview();
+		const result=await invoke('assessment:get-overview', {className});
+  if(request!==viewRequest || className!==selectedClass || elements.view.classList.contains('update-hidden'))return;
+  overview=result;renderOverview();
 	} catch (error) {
-		renderError(error.message);
+		if(request===viewRequest)renderError(error.message);
 	} finally {
-		setBusy(false);
+		if(request===viewRequest)setBusy(false);
 	}
 }
 
@@ -257,35 +271,42 @@ function renderOverview() {
 
 async function createRound() {
 	if (busy) return;
+ const request=++viewRequest,className=selectedClass;
 	const title = document.getElementById('assessment-round-title').value;
 	const deadline = document.getElementById('assessment-round-deadline').value;
 	try {
 		validateDeadline(deadline);
 		setBusy(true, 'Runde wird erstellt …');
-		overview = await invoke('assessment:create-round', { className: selectedClass, title, deadline });
+		const result=await invoke('assessment:create-round', {className,title,deadline});
+  if(request!==viewRequest || className!==selectedClass || elements.view.classList.contains('update-hidden'))return;
+  overview=result;
 		renderOverview();
 	} catch (error) {
-		showNotice(error.message, 'error');
+		if(request===viewRequest)showNotice(error.message, 'error');
 	} finally {
-		setBusy(false);
+		if(request===viewRequest)setBusy(false);
 	}
 }
 
 async function openRound(roundId) {
 	if (busy) return;
+ const request=++viewRequest,className=selectedClass;
 	try {
 		setBusy(true, 'Beurteilungsrunde wird geladen …', true);
-		roundView = await invoke('assessment:get-round', { className: selectedClass, roundId });
+		const result=await invoke('assessment:get-round', {className,roundId});
+  if(request!==viewRequest || className!==selectedClass || elements.view.classList.contains('update-hidden'))return;
+  roundView=result;
 		await refreshBrevoState();
-		renderRound();
+		if(request===viewRequest && !elements.view.classList.contains('update-hidden'))renderRound();
 	} catch (error) {
-		renderError(error.message);
+		if(request===viewRequest)renderError(error.message);
 	} finally {
-		setBusy(false);
+		if(request===viewRequest)setBusy(false);
 	}
 }
 
 function renderRound(background = false) {
+ captureTeacherDraft();
 	if (!background && assessmentMotion.beginPageChange(() => { renderRound(); })) return;
 	const previousScroll=elements.body.scrollTop;
 	elements.body.scrollTop = 0;
@@ -300,7 +321,7 @@ function renderRound(background = false) {
 	const syncLabel = summary.lastSyncAt ? `Zuletzt ${formatDateTime(summary.lastSyncAt)}` : 'Noch nicht synchronisiert';
 	const studentRows = students.map(student => {
 		const assessment = round.assessments[student.id] || {};
-		return `<div class="assessment-student-row"><strong>${escapeHtml(student.name)}</strong><span>Selbst ${statusIcon(assessment.studentAnswers)}</span><span>Lehrer ${statusIcon(assessment.teacherAnswers)}</span><span>Versand ${mailIcon(assessment.mailStatus)}</span></div>`;
+		return `<button type="button" class="assessment-student-row" data-teacher-index="${students.indexOf(student)}"><strong>${escapeHtml(student.name)}</strong><span>Selbst ${statusIcon(assessment.studentAnswers)}</span><span>Lehrer ${statusIcon(assessment.teacherAnswers)}</span><span>Versand ${mailIcon(assessment.mailStatus)}</span></button>`;
 	}).join('');
 	const unmatched = (round.unmatchedResponses || []).map(response => `
 		<div class="assessment-match-row">
@@ -323,7 +344,7 @@ function renderRound(background = false) {
 		</div>
 		<div class="assessment-toolbar">
 			<button class="btn-1${assessmentConfigured ? '' : ' disabled'}" id="assessment-sync-btn" title="${assessmentConfigured ? '' : 'Mitmachnoten-Konfiguration fehlt'}">Antworten aktualisieren</button>
-			<button class="btn-2${invitation ? '' : ' disabled'}" id="assessment-invitation-btn">Einladung kopieren</button>
+			<button class="btn-2${invitation?.url ? '' : ' disabled'}" id="assessment-invitation-btn" ${invitation?.url ? '' : 'disabled'}>Einladungslink kopieren</button>
 			<button class="btn-1" id="assessment-teacher-btn">Beurteilungen öffnen</button>
 			<button class="btn-2${deliveryValidation.valid && brevoState.configured ? '' : ' disabled'}" id="assessment-send-btn" title="${escapeAttribute(invalidHint)}">Klassensatz versenden</button>
 			${summary.failedCount ? '<button class="btn-2" id="assessment-retry-btn">Fehlgeschlagene erneut senden</button>' : ''}
@@ -333,19 +354,19 @@ function renderRound(background = false) {
 		${assessmentConfigured && ['closed','pending'].includes(round.cloudStatus) ? `<div class="assessment-reopen"><label>Neue Abgabefrist<input id="assessment-reopen-deadline" type="date" min="${deadlineBounds().min}" max="${deadlineBounds().max}" value="${zurichDate(Date.now()+7*DAY)}"></label><button class="btn-2" id="assessment-reopen-round-btn">${round.cloudStatus==='pending' ? 'Abgabefrist korrigieren und veröffentlichen' : 'Runde wieder öffnen'}</button><p>Der bestehende Umfragelink und bereits gespeicherte Antworten bleiben erhalten.</p></div>` : ''}
 		${assessmentConfigured ? '<p class="assessment-auto-sync-note">Antworten werden automatisch alle 30 Sekunden synchronisiert.</p>' : ''}
 		<details class="assessment-danger-zone"><summary>Weitere Aktionen</summary><button class="btn-danger" id="assessment-delete-round-btn">Runde lokal und online löschen</button></details>
-		${!assessmentConfigured ? '<div class="assessment-warning">Die Umfrage ist noch nicht eingerichtet. Importiere die Mitmachnoten-Konfiguration in den Einstellungen.</div>' : ''}
+		${!assessmentConfigured ? `<div class="assessment-warning">${!round.cloudStatus ? 'Diese Runde ist lokal archiviert. Gespeicherte Beurteilungen bleiben bearbeitbar. Für neue Online-Abgaben erstelle eine neue Runde.' : 'Die Online-Umfrage ist noch nicht verbunden. Importiere die Mitmachnoten-Konfiguration in den Einstellungen.'}</div>` : ''}
 		${summary.duplicateCount ? `<section class="assessment-duplicates"><h3>Mehrfachantworten</h3><p class="assessment-warning">Standardmäßig wird die neueste Antwort verwendet. Hier kann eine frühere Abgabe gewählt werden.</p>${duplicates}</section>` : ''}
 		${unmatched ? `<section class="assessment-unmatched"><h3>Manuelle Zuordnung erforderlich</h3>${unmatched}</section>` : ''}
 		<section class="assessment-roster"><h3>Klassenübersicht</h3>${studentRows}</section>
-		<div id="assessment-invitation-area">${invitation ? renderInvitation(invitation, true) : ''}</div>`;
+		`;
 	const sync = document.getElementById('assessment-sync-btn');
 	if (sync && assessmentConfigured) sync.addEventListener('click', () => runRoundAction('assessment:sync-responses'));
 	document.getElementById('assessment-teacher-btn').addEventListener('click', () => openTeacher(0));
+ elements.body.querySelectorAll('[data-teacher-index]').forEach(button=>button.addEventListener('click',()=>openTeacher(Number(button.dataset.teacherIndex))));
 	const invite = document.getElementById('assessment-invitation-btn');
-	if (invite && invitation) invite.addEventListener('click', () => {
-		clipboard.writeText(invitation.complete);
-		document.getElementById('assessment-invitation-area').classList.add('invitation-expanded');
-		showNotice('Einladung kopiert.', 'success');
+	if (invite && invitation?.url) invite.addEventListener('click', async () => {
+  try {await invoke('assessment:copy-invitation-link',{className:selectedClass,roundId:round.id});showNotice('Einladungslink kopiert.', 'success');}
+  catch {showNotice('Der Einladungslink konnte nicht kopiert werden. Bitte erneut versuchen.','error');}
 	});
 	const send = document.getElementById('assessment-send-btn');
 	if (!send.classList.contains('disabled')) send.addEventListener('click', () => openSendConfirm('pending'));
@@ -359,36 +380,25 @@ function renderRound(background = false) {
 	});
 	elements.body.querySelectorAll('[data-assign-response]').forEach(button => button.addEventListener('click', () => assignResponse(button.dataset.assignResponse)));
 	elements.body.querySelectorAll('[data-select-response]').forEach(select => select.addEventListener('change', () => selectResponse(select.value)));
-	bindCopyButtons();
 	if(background)elements.body.scrollTop=previousScroll;
-}
-
-function renderInvitation(invitation, collapsed) {
-	return `<section class="assessment-invitation${collapsed ? ' invitation-collapsed' : ''}"><h3>Einladung</h3><label>Betreff<textarea readonly rows="2">${escapeHtml(invitation.subject)}</textarea></label><label>Text<textarea readonly rows="8">${escapeHtml(invitation.text)}</textarea></label><div class="assessment-copy-actions"><button class="btn-2" data-copy="subject">Betreff kopieren</button><button class="btn-2" data-copy="text">Text kopieren</button><button class="btn-1" data-copy="complete">Gesamte Mail kopieren</button></div></section>`;
-}
-
-function bindCopyButtons() {
-	if (!roundView.invitation) return;
-	elements.body.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', () => {
-		clipboard.writeText(roundView.invitation[button.dataset.copy]);
-		button.innerText = 'Kopiert';
-		setTimeout(() => { button.innerText = button.dataset.copy === 'subject' ? 'Betreff kopieren' : button.dataset.copy === 'text' ? 'Text kopieren' : 'Gesamte Mail kopieren'; }, 1200);
-	}));
 }
 
 async function runRoundAction(channel, extra = {}) {
 	if(busy)return;
+ const request=++viewRequest,className=selectedClass,roundId=roundView.round.id;
 	try {
 		setBusy(true, channel==='assessment:reopen-round' ? 'Runde wird geöffnet …' : 'Antworten werden aktualisiert …');
-		roundView = await invoke(channel, { className: selectedClass, roundId: roundView.round.id, ...extra });
+		const updated=await invoke(channel, {className,roundId,...extra});
+  if(request!==viewRequest || className!==selectedClass || elements.view.classList.contains('update-hidden'))return;
+  roundView=updated;
 		renderRound();
 		const result = roundView.summary.lastSyncResult;
 		if(channel==='assessment:reopen-round')showNotice('Die Runde ist wieder geöffnet. Der bisherige Umfragelink bleibt gültig.','success');
 		else if (channel==='assessment:sync-responses' && result) showNotice(result.added ? `${result.added} neue Antwort${result.added === 1 ? '' : 'en'} gespeichert.` : 'Keine neuen Antworten.', result.invalid ? 'warning' : 'success');
 	} catch (error) {
-		showNotice(error.message, 'error');
+		if(request===viewRequest)showNotice(error.message, 'error');
 	} finally {
-		setBusy(false);
+		if(request===viewRequest)setBusy(false);
 	}
 }
 
@@ -414,18 +424,21 @@ async function assignResponse(responseId) {
 }
 
 function openTeacher(index) {
+ captureTeacherDraft();
+ if(!roundView?.students.length){renderEmpty('In dieser Klasse sind keine Schüler vorhanden.');return;}
 	if (assessmentMotion.beginPageChange(() => { openTeacher(index); })) return;
 	elements.body.scrollTop = 0;
 	teacherIndex = Math.max(0, Math.min(index, roundView.students.length - 1));
 	const student = roundView.students[teacherIndex];
 	const assessment = roundView.round.assessments[student.id] || {};
+ const key=teacherKey(student),draft=teacherDrafts.get(key);
 	elements.heading.innerText = `${teacherIndex + 1} / ${roundView.students.length} · ${student.name}`;
 	const criteriaRows = roundView.round.criteria.map(criterion => {
 		const self = assessment.studentAnswers && assessment.studentAnswers[criterion.id];
-		const teacher = assessment.teacherAnswers && assessment.teacherAnswers[criterion.id];
+		const teacher = draft ? (draft.ratings[criterion.id]?.rated ? draft.ratings[criterion.id].value : undefined) : assessment.teacherAnswers?.[criterion.id];
 		const rated = Number.isInteger(teacher) && teacher >= 1 && teacher <= 5;
 		const inputId = `teacher-rating-${criterion.id}`;
-		const comment = assessment.teacherCriterionComments?.[criterion.id] || '';
+		const comment = draft?.comments[criterion.id] ?? assessment.teacherCriterionComments?.[criterion.id] ?? '';
 		return `<div class="teacher-criterion-block">
 			<div class="teacher-criterion">
 				<strong>${escapeHtml(criterion.label)}</strong>
@@ -445,9 +458,10 @@ function openTeacher(index) {
 			<p class="teacher-rating-hint">Bewertung von 1 bis 5: Regler anklicken oder ziehen. Kommentare kannst du bei Bedarf aufklappen.</p>
 			<div class="teacher-grid-heading"><span>Kriterium</span><span>Schüler</span><span>Lehrer</span><span>Differenz</span></div>
 			${criteriaRows}
-			<div class="teacher-comments"><div><h3>Zusätzliche Qualität</h3><p>${escapeHtml(assessment.studentAdditionalQuality || 'Keine Angabe.')}</p></div><div><h3>Sonstige Bemerkungen</h3><p>${escapeHtml(assessment.studentComment || 'Keine Angabe.')}</p></div><label><h3>Kommentar Lehrer</h3><textarea id="teacher-comment" rows="5" maxlength="4000">${escapeHtml(assessment.teacherComment || '')}</textarea></label></div>
-			<div class="teacher-actions"><button class="btn-2${teacherIndex === 0 ? ' disabled' : ''}" id="teacher-previous-btn">Vorheriger</button><button class="btn-1" id="teacher-save-btn">Speichern</button><button class="btn-1" id="teacher-next-btn">Speichern & nächster</button></div>
+			<div class="teacher-comments"><div><h3>Zusätzliche Qualität</h3><p>${escapeHtml(assessment.studentAdditionalQuality || 'Keine Angabe.')}</p></div><div><h3>Sonstige Bemerkungen</h3><p>${escapeHtml(assessment.studentComment || 'Keine Angabe.')}</p></div><label><h3>Kommentar Lehrer</h3><textarea id="teacher-comment" rows="5" maxlength="4000">${escapeHtml(draft?.comment ?? assessment.teacherComment ?? '')}</textarea></label></div>
+			<div class="teacher-actions"><button class="btn-2${teacherIndex === 0 ? ' disabled' : ''}" id="teacher-previous-btn" ${teacherIndex===0 ? 'disabled' : ''}>Vorheriger</button><button class="btn-1" id="teacher-save-btn">Speichern</button><button class="btn-1" id="teacher-next-btn">Speichern & nächster</button></div>
 		</section>`;
+ renderedTeacherKey=key;
 	elements.body.querySelectorAll('[data-teacher-criterion]').forEach(input => {
 		const rate = () => {input.dataset.rated = 'true'; updateDifferences();};
 		input.addEventListener('input', rate);
@@ -487,19 +501,26 @@ function updateDifferences() {
 }
 
 async function saveTeacher(moveNext) {
+ if(busy)return;
+ const request=++viewRequest,className=selectedClass,roundId=roundView.round.id;
 	const student = roundView.students[teacherIndex];
 	const answers = {};
 	const criterionComments = {};
 	elements.body.querySelectorAll('[data-teacher-criterion]').forEach(input => { answers[input.dataset.teacherCriterion] = input.dataset.rated === 'true' ? Number(input.value) : 0; });
 	elements.body.querySelectorAll('[data-teacher-comment]').forEach(field => { criterionComments[field.dataset.teacherComment] = field.value; });
 	try {
+  setBusy(true,'Lehrerbeurteilung wird gespeichert …');
 		const updated = await invoke('assessment:save-teacher', { className: selectedClass, roundId: roundView.round.id, studentId: student.id, answers, criterionComments, comment: document.getElementById('teacher-comment').value });
+  if(request!==viewRequest || className!==selectedClass || roundView?.round.id!==roundId || elements.view.classList.contains('update-hidden'))return;
+  teacherDrafts.delete(teacherKey(student));renderedTeacherKey=null;
 		roundView = updated;
+  showNotice('Lehrerbeurteilung gespeichert.','success');
 		if (moveNext && teacherIndex < roundView.students.length - 1) openTeacher(teacherIndex + 1);
-		else openTeacher(teacherIndex);
+		else if(moveNext)renderRound();
+  else openTeacher(teacherIndex);
 	} catch (error) {
-		showNotice(error.message, 'error');
-	}
+		if(request===viewRequest)showNotice(error.message, 'error');
+	} finally {if(request===viewRequest)setBusy(false);}
 }
 
 function openSendConfirm(mode) {

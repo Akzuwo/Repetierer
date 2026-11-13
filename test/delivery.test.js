@@ -78,3 +78,11 @@ test('Resultatmails use only the fixed sender, even with an old Gmail configurat
 	assert.match(result.message.toString(), /<no-reply@akzuwo\.ch>/);
 	assert.doesNotMatch(result.message.toString(), /timowigger8@gmail\.com|Alter Lehrername/);
 });
+
+
+test('invitation exposes the exact standalone round URL',()=>{
+ const url='https://example.ch/app/services/repetierer/?round=fixture';
+ const invitation=require('../src/assessment/mailTemplates').buildInvitation({title:'Fixture',deadline:null},url);
+ assert.equal(invitation.url,url);assert.equal(new URL(invitation.url).searchParams.get('round'),'fixture');
+ assert.equal(invitation.url.includes('\n'),false);
+});

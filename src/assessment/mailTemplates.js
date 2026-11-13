@@ -16,7 +16,7 @@ function buildInvitation(round, responderUrl, teacherName = 'Herr Schaufelberger
 		'Freundliche Grüsse',
 		teacherName
 	].join('\n');
-	return { subject, text, complete: `Betreff: ${subject}\n\n${text}` };
+	return { url: responderUrl, subject, text, complete: `Betreff: ${subject}\n\n${text}` };
 }
 
 function buildResultMessage({ student, assessment, round }) {

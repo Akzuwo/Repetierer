@@ -118,7 +118,7 @@ class AssessmentApiClient {
 			throw apiError('Die Mitmachnoten-API hat keine gültige JSON-Antwort geliefert.', 'ASSESSMENT_API_INVALID_JSON');
 		}
 		if (response.status === 401 || response.status === 403) throw apiError('Der Lehrerzugang ist abgelaufen oder wurde widerrufen.', 'ASSESSMENT_API_UNAUTHORIZED');
-		if (response.status === 404 && body?.error === 'not_found' && resource.endsWith('/reopen')) throw apiError('Das Wiederöffnen benötigt die aktualisierte Umfrage-API. Bitte zuerst die neue API-Version veröffentlichen.', 'ASSESSMENT_API_UPDATE_REQUIRED');
+		if (response.status === 404 && body?.error === 'not_found' && resource.endsWith('/reopen')) throw apiError('Die Online-Umfrage unterstützt das Wiederöffnen noch nicht. Die Runde bleibt geschlossen; gespeicherte Antworten bleiben erhalten.', 'ASSESSMENT_API_UPDATE_REQUIRED');
 		if (response.status === 404) throw apiError('Die Online-Runde wurde nicht gefunden oder bereits gelöscht.', 'ASSESSMENT_ROUND_NOT_FOUND');
 		if (response.status >= 500) throw apiError('Die Mitmachnoten-API ist vorübergehend nicht verfügbar.', 'ASSESSMENT_API_UNAVAILABLE');
 		if (!response.ok) throw apiError(publicApiMessage(body), 'ASSESSMENT_API_HTTP_ERROR');

@@ -7,6 +7,7 @@ if (!app.isPackaged && process.env.REPETIERER_DEV_USER_DATA) {
 	app.setPath('userData', devUserData);
 }
 require('./src/mainProcess.js');
+const closeGuard=require('./src/sessionCloseGuard').createSessionCloseGuard({app,ipcMain,getActiveSession:()=>require('./src/teachingSessions').createTeachingSessionStore(require('./src/storage').getPaths().teachingSessionsPath).getActiveSession()});
 
 let mainWindow;
 let splashWindow;
@@ -93,6 +94,7 @@ function createMainWindow() {
 		webPreferences: getWindowPreferences(),
 	});
 
+	closeGuard.attach(mainWindow);
 	require('./src/notifications').registerWindow(mainWindow);
 	console.log('MainWindow erstellt');
 	mainWindow.loadFile(path.join(__dirname, 'public', 'index.html'));

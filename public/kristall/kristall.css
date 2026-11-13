@@ -677,3 +677,8 @@ body #content.session-active #homework-view.homework-grading { margin:0; padding
 body .homework-repetition-card { flex:1; min-height:0; box-sizing:border-box; }
 body #homework-list-header #homework-history-actions button { width:42px; height:42px; min-height:42px; }
 body #homework-migration-preview { line-height:1.6; margin:16px 0; }
+
+body #assessment-body button.assessment-student-row { width:100%; font:inherit; text-align:left; border-radius:0; border:0; border-bottom:1px solid #ffffff20; cursor:pointer; }
+body #assessment-body button.assessment-student-row:hover { background:none; text-shadow:0 0 8px #ffffff55; }
+
+body #session-close-modal { z-index:10000; }

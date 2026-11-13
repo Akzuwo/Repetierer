@@ -6,13 +6,13 @@ Excel bleibt die Quelle für Klassen und Schüler. Selbstbeurteilungen, Lehrerbe
 
 1. In den Einstellungen den individuellen Lehrerzugang importieren und die API-Verbindung prüfen.
 2. Klasse wählen und eine Runde erstellen. Electron speichert lokal eine zufällige UUID und erstellt damit die Online-Runde. Die Klassenliste wird nicht hochgeladen.
-3. **Einladung kopieren** liefert `https://timolu.ch/app/services/repetierer/?round=<UUID>`. Bei Netzwerksperren verwendet Electron automatisch `https://akzuwo.ch/app/services/repetierer/?round=<UUID>`.
+3. **Einladungslink kopieren** kopiert ausschliesslich die URL, ohne Betreff oder Nachrichtentext: `https://timolu.ch/app/services/repetierer/?round=<UUID>`. Bei Netzwerksperren verwendet Electron automatisch `https://akzuwo.ch/app/services/repetierer/?round=<UUID>`.
 4. Schüler antworten ohne Anmeldung. Das bestehende Raster mit sieben Kriterien, fünf Skalenwerten, zusätzlicher Qualität und Bemerkungen bleibt erhalten.
 5. **Antworten aktualisieren** übernimmt Antworten über stabile IDs. Wiederholte Synchronisierung verändert bestehende Antworten und Lehrerbewertungen nicht.
 6. **Runde schliessen** verhindert weitere Abgaben auf beiden Domains. Die Frist gilt bis 23:59:59 Uhr in `Europe/Zurich`; ohne Frist ist die Runde 30 Tage offen.
 7. Bewertung, Eigenkorrektur und Brevo-Versand erfolgen lokal wie bisher. Eine Schülerabgabe verschickt keine automatische Mail.
 
-Unter jedem Kriterium erscheint nach Auswahl der Lehrerbewertung automatisch ein optionales Kommentarfeld. Beim erneuten Öffnen bleiben Bewertung und Kommentar erhalten. Diese Kommentare werden zusätzlich zum allgemeinen Lehrerkommentar in der persönlichen Auswertung angezeigt. Sie werden nicht an die öffentliche Webumfrage oder D1 hochgeladen.
+Kommentare unter den Kriterien bleiben standardmässig zugeklappt und lassen sich bei Bedarf einzeln öffnen. Beim erneuten Öffnen bleiben Bewertung und Kommentar erhalten. Diese Kommentare werden zusätzlich zum allgemeinen Lehrerkommentar in der persönlichen Auswertung angezeigt. Sie werden nicht an die öffentliche Webumfrage oder D1 hochgeladen.
 
 Bei fehlgeschlagener Online-Erstellung bleibt die lokale Runde `pending`. Öffnen oder Aktualisieren wiederholt denselben idempotenten Auftrag. Einladungen werden erst nach erfolgreicher Veröffentlichung angeboten. Alte lokale Runden bleiben Archive und werden nicht ungefragt hochgeladen; für neue Abgaben eine neue Runde erstellen.
 
@@ -58,3 +58,7 @@ Online-Runden laufen spätestens nach 90 Tagen ab, nach Schliessung innerhalb vo
 Vor Ablauf synchronisieren und lokale Kopien nach schulischen Aufbewahrungsregeln löschen. E-Mails bei Empfängern und persönliche Backups werden nicht automatisch entfernt. D1 wurde mit EU-Jurisdiktion erstellt; Worker-Anfragen werden im Cloudflare-Netz verarbeitet. Der verantwortliche Betreiber prüft die schulisch geltenden Vorgaben für Auftragsverarbeitung und Aufbewahrung.
 
 Deployment, Infrastruktur und Zugangswiderruf verwaltet der Betreiber separat. Der Servercode und die Zugangsdaten sind nicht Teil dieses öffentlichen App-Repositories.
+
+Lehrerbewertungen lassen sich direkt über die Schülerzeilen öffnen. Ungespeicherte Bewertungen und Kommentare bleiben beim Zurückwechseln als Entwurf erhalten.
+
+Die Online-Umfrage wird getrennt von der Desktop-App aktualisiert. Seit dem Serverupdate vom 13. November 2026 lassen sich geschlossene Runden mit neuer Frist wieder öffnen; Link und vorhandene Antworten bleiben erhalten.
