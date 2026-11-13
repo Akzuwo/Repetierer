@@ -5,12 +5,6 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
-    inputs:
-      release_notes:
-        description: "Optionale Release Notes für den GitHub-Release (Markdown möglich)"
-        required: false
-        default: ""
-        type: string
 
 permissions:
   contents: write
@@ -33,11 +27,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate release notes
+      - name: Generate release notes from Buildnotes.json
         id: release-notes
         run: node scripts/generate-release-notes.js
-        env:
-          RELEASE_NOTES_OVERRIDE: ${{ inputs.release_notes }}
 
       - name: Build and publish release
         run: npm run release:ci
@@ -45,6 +37,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update release body
-        run: gh release edit "${{ steps.release-notes.outputs.tag }}" --notes-file "${{ steps.release-notes.outputs.release_notes_path }}"
+        run: gh release edit "$env:RELEASE_TAG" --notes-file "$env:RELEASE_NOTES_PATH"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release-notes.outputs.tag }}
+          RELEASE_NOTES_PATH: ${{ steps.release-notes.outputs.release_notes_path }}
