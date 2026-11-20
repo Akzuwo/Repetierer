@@ -95,11 +95,11 @@ async function assessmentAudit() {
  const open=async()=>{await evaluate(`document.querySelector('[data-round-id]').click()`);await waitFor(`!!document.getElementById('assessment-teacher-btn')`);};
  await open();await shot('beurteilungen-runde-offen');
  await evaluate(`document.querySelector('.assessment-danger-zone').open=true`);await shot('beurteilungen-weitere-aktionen');
- await click('assessment-delete-round-btn');await shot('beurteilungen-loeschen-bestaetigung');await click('assessment-delete-cancel-btn');await pause(200);
- await click('assessment-send-btn');await shot('beurteilungen-versand-bestaetigung');await click('assessment-confirm-cancel-btn');await pause(200);
- await click('assessment-retry-btn');await shot('beurteilungen-versand-wiederholen');await click('assessment-confirm-cancel-btn');await pause(200);
+ await click('assessment-delete-round-btn');await shot('beurteilungen-loeschen-bestaetigung');await click('question-button1');await pause(200);
+ await click('assessment-send-btn');await shot('beurteilungen-versand-bestaetigung');await click('question-button1');await pause(200);
+ await click('assessment-retry-btn');await shot('beurteilungen-versand-wiederholen');await click('question-button1');await pause(200);
  await evaluate(`document.getElementById('assessment-invitation-area').classList.add('invitation-expanded')`);await shot('beurteilungen-einladung-ausgeklappt');
- for(const m of ['closed','conflicts','sent']) {mode=m;await click('assessment-back-btn');await waitFor(`!!document.querySelector('[data-round-id]')`);await open();await shot('beurteilungen-runde-'+m);if(m==='sent'){await click('assessment-delete-round-btn');await shot('beurteilungen-loeschen-versandwarnung');await click('assessment-delete-cancel-btn');await pause(200);}}
+ for(const m of ['closed','conflicts','sent']) {mode=m;await click('assessment-back-btn');await waitFor(`!!document.querySelector('[data-round-id]')`);await open();await shot('beurteilungen-runde-'+m);if(m==='sent'){await click('assessment-delete-round-btn');await shot('beurteilungen-loeschen-versandwarnung');await click('question-button1');await pause(200);}}
  await click('assessment-teacher-btn');await shot('beurteilungen-lehrer-kommentare');
  await click('teacher-next-btn');await pause(200);await shot('beurteilungen-lehrer-naechster');
 }

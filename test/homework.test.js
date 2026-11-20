@@ -88,6 +88,22 @@ test('legacy class rules become defaults; global saves and another class preserv
  const bytes=fs.readFileSync(f.file);storage.saveScopedSettings({notificationDurationSeconds:7},null,null);
  assert.equal(program.getCurrentSettings().probabilityDecreaseFactor,8);assert.equal(program.getCurrentSettings().notificationDurationSeconds,7);assert.deepEqual(fs.readFileSync(f.file),bytes);
 });
+test('live single-field saves preserve class overrides, penalties and original settings after write failure',async()=>{
+ const f=await fixture();
+ const settings=()=>JSON.parse(fs.readFileSync(storage.getPaths().settingsPath,'utf8'));
+ storage.saveScopedSettings({probabilityDecreaseFactor:8,homeworkWeight:1.7},f.file,'3a');
+ const penaltyKey=`${f.file}::3a::0`;storage.saveWiggersRulePenalty(penaltyKey,Date.now()+60000);
+ const classes=structuredClone(settings().classSettings);
+ storage.saveScopedSettings({notificationDurationSeconds:5},f.file,'3b');
+ assert.deepEqual(settings().classSettings,classes,'Global edits do not create or replace class overrides');
+ storage.saveScopedSettings({homeworkJokerThreshold:4},f.file,'3a');
+ assert.equal(storage.getClassSettings(f.file,'3a').homeworkWeight,1.7);assert.equal(storage.getClassSettings(f.file,'3a').probabilityDecreaseFactor,8);
+ assert.ok(settings().wiggersRulePenalties[penaltyKey]);
+ const settingsPath=storage.getPaths().settingsPath,before=fs.readFileSync(settingsPath),rename=fs.renameSync;
+ fs.renameSync=(from,to)=>{if(to===settingsPath)throw new Error('fixture denied');return rename(from,to);};
+ try{assert.throws(()=>storage.saveScopedSettings({notificationDurationSeconds:8},null,null),/denied/);}finally{fs.renameSync=rename;}
+ assert.deepEqual(fs.readFileSync(settingsPath),before);assert.equal(fs.existsSync(`${settingsPath}.${process.pid}.tmp`),false);
+});
 
 
 test('workbook migration completes remaining classes and preserves existing homework entries',async()=>{
@@ -102,3 +118,7 @@ test('workbook migration completes remaining classes and preserves existing home
  assert.equal(updated.getWorksheet('3b').getCell('AO6').value,'behalten');
  const stable=fs.readFileSync(f.file);assert.equal((await migrate()).alreadyMigrated,true);assert.deepEqual(fs.readFileSync(f.file),stable);
 });
+
+ test('voluntary flags survive workbook storage, undo and redo; legacy entries remain unknown',async()=>{
+ const f=await fixture();await migrate();const entry=await new Promise(r=>program.saveHomework(0,5,r,true));assert.equal(program.getHomeworkPersons()[0].homework[0].voluntary,true);await new Promise(r=>program.undoLastExcelEntry(entry,r));await new Promise(r=>program.redoExcelEntry(entry,r));assert.equal(program.getHomeworkPersons()[0].homework[0].voluntary,true);await save(4);assert.equal(program.getHomeworkPersons()[0].homework[1].voluntary,null);
+ });

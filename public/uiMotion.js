@@ -86,6 +86,43 @@ function cancel(element) {
 	if (animation) { animation.kill(); animations.delete(element); }
 }
 
+// Keep native details/summary semantics while animating the content height in
+// both directions. A second activation reverses from the current live height.
+const boundDisclosures = new WeakSet();
+function bindDisclosure(details) {
+	if (boundDisclosures.has(details)) return;
+	const summary = details.querySelector(':scope > summary');
+	const panel = details.querySelector(':scope > .disclosure-content');
+	if (!summary || !panel) return;
+	boundDisclosures.add(details);
+	details.dataset.disclosureOpen = String(details.open);
+	summary.setAttribute('aria-expanded', String(details.open));
+	summary.addEventListener('click', event => {
+		event.preventDefault();
+		const opening = details.dataset.disclosureOpen !== 'true';
+		const height = details.open ? panel.getBoundingClientRect().height : 0;
+		const opacity = details.open ? Number(getComputedStyle(panel).opacity) : 0;
+		cancel(details);
+		details.dataset.disclosureOpen = String(opening);
+		details.dataset.disclosureAnimating = 'true';
+		summary.setAttribute('aria-expanded', String(opening));
+		if (!opening && panel.contains(document.activeElement)) summary.focus();
+		panel.inert = !opening;
+		details.open = true;
+		const targetHeight = opening ? panel.scrollHeight : 0;
+		gsap.set(panel, { height, opacity, overflow: 'hidden' });
+		animate(details, timeline => {
+			timeline.to(panel, { height: targetHeight, opacity: opening ? 1 : 0, duration: opening ? .32 : .24, ease: opening ? 'power3.out' : 'power2.inOut' });
+		}, () => {
+			details.open = opening;
+			delete details.dataset.disclosureAnimating;
+			gsap.set(panel, { clearProps: 'height,opacity,overflow' });
+			window.repetiererKristall?.refresh();
+			refreshScrollEffects();
+		});
+	});
+}
+
 function animate(element, build, finish) {
 	cancel(element);
 	window.repetiererKristall?.clock.animateFor(520);
@@ -278,4 +315,4 @@ function initUiMotion() {
 	}, { once: true });
 }
 
-module.exports = { initUiMotion, refreshScrollEffects, openDialog, closeDialog, setDrawerOpen, changeDrawerView, revealView, exitView, revealStudent, minimizeWindow, restoreWindow, cancel, pageChange, pageHandler, beginPageChange, setGradingVisible, confirmScore };
+module.exports = { initUiMotion, refreshScrollEffects, openDialog, closeDialog, setDrawerOpen, changeDrawerView, revealView, exitView, revealStudent, minimizeWindow, restoreWindow, cancel, pageChange, pageHandler, beginPageChange, setGradingVisible, confirmScore, bindDisclosure };

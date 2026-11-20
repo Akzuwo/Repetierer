@@ -29,14 +29,16 @@ async function deliverRound({ classRecord, round, mode = 'pending', buildMessage
 	const results = [];
 	for (const student of targets) {
 		const assessment = round.assessments[student.id];
-		await updateStatus(student.id, 'sending', { incrementAttempt: true });
+		const sending=await updateStatus(student.id, 'sending', { incrementAttempt: true });
 		try {
-			await send(buildMessage(student, assessment));
+			const message=buildMessage(student, assessment);
+			if(sending?.mailDeliveryId||assessment.mailDeliveryId)message.idempotencyKey=sending?.mailDeliveryId||assessment.mailDeliveryId;
+			await send(message);
 			await updateStatus(student.id, 'sent', {});
 			results.push({ studentId: student.id, status: 'sent' });
 		} catch (error) {
 			const reason = sanitizeMailError(error);
-			await updateStatus(student.id, 'failed', { error: reason });
+			await updateStatus(student.id, 'failed', { error: reason, clearDeliveryId:error.code==='MAIL_PROVIDER_REJECTED' });
 			results.push({ studentId: student.id, status: 'failed', error: reason });
 		}
 	}
@@ -49,6 +51,7 @@ async function deliverRound({ classRecord, round, mode = 'pending', buildMessage
 }
 
 function sanitizeMailError(error) {
+	if(String(error?.code||'').startsWith('MAIL_'))return error.message;
 	const code = String(error && error.code || '').toUpperCase();
 	if (code.includes('AUTH') || code === 'EAUTH') return 'SMTP-Anmeldung fehlgeschlagen.';
 	if (code.includes('TIMEOUT') || code === 'ETIMEDOUT') return 'SMTP-Zeitüberschreitung.';

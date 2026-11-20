@@ -1,21 +1,21 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),{EventEmitter}=require('node:events');
 const {createSessionCloseGuard}=require('../src/sessionCloseGuard');
 function fixture(){
- const app=new EventEmitter(),ipcMain=new EventEmitter();let active={id:'session-a',className:'Klasse A'},quits=0;
+ const app=new EventEmitter(),ipcMain=new EventEmitter();let active={id:'session-a',className:'Klasse A'},quits=0,saving=false;
  app.quit=()=>quits++;
  const win=new EventEmitter(),messages=[];
  Object.assign(win,{isDestroyed:()=>false,show(){},focus(){},webContents:{send:(...args)=>messages.push(args)}});
- const guard=createSessionCloseGuard({app,ipcMain,getActiveSession:()=>active});guard.attach(win);
+ const guard=createSessionCloseGuard({app,ipcMain,getActiveSession:()=>active,isSaving:()=>saving});guard.attach(win);
  const event=()=>({prevented:false,preventDefault(){this.prevented=true;}});
- return {app,ipcMain,win,messages,event,setActive:value=>active=value,quits:()=>quits};
+ return {app,ipcMain,win,messages,event,setActive:value=>active=value,setSaving:value=>saving=value,quits:()=>quits};
 }
 test('native close and app quit require one session confirmation',()=>{
  const f=fixture(),native=f.event();f.win.emit('close',native);assert.equal(native.prevented,true);
- const quit=f.event();f.app.emit('before-quit',quit);assert.equal(quit.prevented,true);assert.equal(f.messages.length,1);
+ const quit=f.event();f.app.emit('before-quit',quit);assert.equal(quit.prevented,true);assert.equal(f.messages.length,2);
  const request=f.messages[0][1];assert.equal(request.className,'Klasse A');
  f.ipcMain.emit('session-close-confirm',{sender:{}},request.requestId);assert.equal(f.quits(),0);
  f.ipcMain.emit('session-close-confirm',{sender:f.win.webContents},'wrong');assert.equal(f.quits(),0);
- f.ipcMain.emit('session-close-confirm',{sender:f.win.webContents},request.requestId);assert.equal(f.quits(),1);
+ f.setActive(null);f.ipcMain.emit('session-close-confirm',{sender:f.win.webContents},request.requestId);assert.equal(f.quits(),1);
  const approved=f.event();f.app.emit('before-quit',approved);assert.equal(approved.prevented,false);
 });
 test('cancel leaves the session active and requires a fresh confirmation',()=>{
@@ -30,3 +30,5 @@ test('another session invalidates an old confirmation; no session closes directl
  f.ipcMain.emit('session-close-confirm',{sender:f.win.webContents},old);assert.equal(f.quits(),0);assert.equal(f.messages[1][1].className,'Klasse B');
  f.setActive(null);const event=f.event();f.win.emit('close',event);assert.equal(event.prevented,false);
 });
+
+test('pending writes block quit even without an active session',()=>{const f=fixture();f.setActive(null);f.setSaving(true);const event=f.event();f.win.emit('close',event);assert.equal(event.prevented,true);f.ipcMain.emit('session-close-confirm',{sender:f.win.webContents},f.messages[0][1].requestId);assert.equal(f.quits(),0);f.setSaving(false);const next=f.event();f.win.emit('close',next);assert.equal(next.prevented,false);});

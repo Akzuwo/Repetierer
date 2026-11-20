@@ -316,8 +316,14 @@ class GlassRenderer {
       gl.uniform1f(u.squareBottom, element.id === 'title-bar' ? 1 : 0);
       gl.uniform4f(u.rect, rect.x, rect.y, rect.width, rect.height);
       const popover = element.closest('.floating-panel');
-      gl.uniform1f(u.readability, popover ? 1 : 0);
+      const questionAction = element.classList.contains('question-action');
+      const questionGlass = !!element.closest('#question-modal');
+      gl.uniform1f(u.readability, questionGlass ? 0 : popover ? 1 : 0);
       gl.uniform1f(u.control, element.classList.contains('liquid-marker') || element.classList.contains('range-thumb') ? 1 : 0);
+      // Per-lens tint; reset for every other surface so existing materials stay unchanged.
+      const questionDanger = questionAction && element.classList.contains('question-danger');
+      gl.uniform3f(u.tone, ...(questionDanger ? [.60,.12,.17] : [0,0,0]));
+      gl.uniform1f(u.toneStrength, questionDanger ? .10 : 0);
       let opacity = Number(style.opacity);
       for (let parent = element.parentElement; parent; parent = parent.parentElement) opacity *= Number(getComputedStyle(parent).opacity);
       gl.uniform1f(u.opacity, opacity);

@@ -24,6 +24,17 @@ class AssessmentApiClient {
 		await this.request('GET', 'me');
 		return { reachable: true, apiUrl: this.getApiUrl(), fallback: this.getApiUrl() !== this.config.apiUrl };
 	}
+	async mailCapabilities() {
+		try {
+			const body=await this.request('GET','mail/capabilities');
+			if(body.mail?.supported!==true || typeof body.mail.configured!=='boolean' || !Number.isInteger(body.mail.dailyLimit))throw apiError('Der Server hat keinen eindeutigen Mailstatus geliefert.','MAIL_CAPABILITIES_INVALID');
+			return body.mail;
+		}catch(error){if(error.code==='MAIL_CAPABILITIES_UNSUPPORTED')return {legacy:true,configured:false};throw error;}
+	}
+	async sendMail(message,idempotencyKey) {
+		const attachments=(message.attachments||[]).map(a=>({filename:a.filename,content:Buffer.isBuffer(a.content)?a.content.toString('base64'):a.content}));
+		return this.request('POST','mail/send',{idempotencyKey,message:{to:message.to,subject:message.subject,text:message.text,html:message.html,...(attachments.length?{attachments}:{})}});
+	}
 
 	getApiUrl() {
 		const preference = reachableEndpoints.get(this.config.apiUrl);
@@ -59,7 +70,7 @@ class AssessmentApiClient {
 			if (!Number.isSafeInteger(result.nextCursor) || result.nextCursor <= cursor || page === 9) throw apiError('Ungültige Seitennavigation.', 'ASSESSMENT_API_SCHEMA_INVALID');
 			cursor = result.nextCursor;
 		}
-		if (!Array.isArray(body.responses)) throw apiError('Die Antwort der Mitmachnoten-API enthält keine Antwortliste.', 'ASSESSMENT_API_SCHEMA_INVALID');
+		if (!Array.isArray(body.responses)) throw apiError('Die Antwort der Beurteilungs-API enthält keine Antwortliste.', 'ASSESSMENT_API_SCHEMA_INVALID');
 		const responses = [];
 		const invalidResponses = [];
 		let ignoredRoundCount = 0;
@@ -106,8 +117,8 @@ class AssessmentApiClient {
 				redirect: 'error'
 			});
 		} catch (error) {
-			if (error && error.name === 'AbortError') throw apiError('Zeitüberschreitung beim Abrufen der Mitmachnoten.', 'ASSESSMENT_API_TIMEOUT');
-			throw apiError('Die Mitmachnoten-API ist derzeit nicht erreichbar.', 'ASSESSMENT_API_NETWORK_ERROR');
+			if (error && error.name === 'AbortError') throw apiError('Zeitüberschreitung beim Abrufen der mündlichen Beurteilungen.', 'ASSESSMENT_API_TIMEOUT');
+			throw apiError('Die Beurteilungs-API ist derzeit nicht erreichbar.', 'ASSESSMENT_API_NETWORK_ERROR');
 		} finally {
 			clearTimeout(timer);
 		}
@@ -115,12 +126,18 @@ class AssessmentApiClient {
 		try {
 			body = await response.json();
 		} catch (error) {
-			throw apiError('Die Mitmachnoten-API hat keine gültige JSON-Antwort geliefert.', 'ASSESSMENT_API_INVALID_JSON');
+			throw apiError('Die Beurteilungs-API hat keine gültige JSON-Antwort geliefert.', 'ASSESSMENT_API_INVALID_JSON');
 		}
 		if (response.status === 401 || response.status === 403) throw apiError('Der Lehrerzugang ist abgelaufen oder wurde widerrufen.', 'ASSESSMENT_API_UNAUTHORIZED');
+		if(response.status===404 && body?.error==='not_found' && resource==='mail/capabilities')throw apiError('Alter Server ohne Cloudmail.','MAIL_CAPABILITIES_UNSUPPORTED');
+		if(resource==='mail/send' && !response.ok){
+			const messages={mail_daily_limit:'Das gemeinsame Cloud-Tageslimit von 200 Mails ist erreicht.',mail_delivery_uncertain:'Der Versandstatus ist unklar. Vor einem erneuten Versand den Brevo-Versandverlauf prüfen.',mail_provider_rejected:'Brevo hat den Versand abgelehnt.',mail_failed:'Dieser Versandversuch ist fehlgeschlagen.',mail_not_configured:'Cloudmail ist nicht eingerichtet.',mail_key_conflict:'Der Versandauftrag wurde verändert.'};
+			const code=body?.error==='mail_daily_limit'?'MAIL_DAILY_LIMIT':body?.error==='mail_provider_rejected'?'MAIL_PROVIDER_REJECTED':'MAIL_CLOUD_ERROR';
+			throw apiError(messages[body?.error]||'Cloudversand fehlgeschlagen.',code);
+		}
 		if (response.status === 404 && body?.error === 'not_found' && resource.endsWith('/reopen')) throw apiError('Die Online-Umfrage unterstützt das Wiederöffnen noch nicht. Die Runde bleibt geschlossen; gespeicherte Antworten bleiben erhalten.', 'ASSESSMENT_API_UPDATE_REQUIRED');
 		if (response.status === 404) throw apiError('Die Online-Runde wurde nicht gefunden oder bereits gelöscht.', 'ASSESSMENT_ROUND_NOT_FOUND');
-		if (response.status >= 500) throw apiError('Die Mitmachnoten-API ist vorübergehend nicht verfügbar.', 'ASSESSMENT_API_UNAVAILABLE');
+		if (response.status >= 500) throw apiError('Die Beurteilungs-API ist vorübergehend nicht verfügbar.', 'ASSESSMENT_API_UNAVAILABLE');
 		if (!response.ok) throw apiError(publicApiMessage(body), 'ASSESSMENT_API_HTTP_ERROR');
 		if (!body || body.success !== true) throw apiError(publicApiMessage(body), 'ASSESSMENT_API_REJECTED');
 		return body;
@@ -173,7 +190,7 @@ function publicApiMessage(body) {
 	if (code === 'invalid_input') return 'Die Angaben zur Umfragerunde sind ungültig. Bitte Titel, Abgabefrist (höchstens 90 Tage) und Klassengrösse prüfen.';
 	if (code === 'round_limit') return 'Für diesen Zugang bestehen bereits 200 Umfragerunden. Bitte nicht mehr benötigte Runden entfernen.';
 	if (code === 'round_conflict') return 'Die Online-Runde besitzt andere Angaben. Bitte die bestehende Runde öffnen und synchronisieren.';
-	return 'Die Mitmachnoten-API hat die Anfrage abgelehnt.';
+	return 'Die Beurteilungs-API hat die Anfrage abgelehnt.';
 }
 
 function schemaError(message) {

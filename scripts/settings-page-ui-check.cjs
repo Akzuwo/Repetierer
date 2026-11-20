@@ -3,7 +3,7 @@ const {ipcMain} = require('electron');
 module.exports = async function({win,evaluate,waitFor,shot,pause}) {
   let saved = [];
   await evaluate(`notify.clear()`);
-  const onSave = (event,payload) => { saved.push(payload); event.reply('settings-saved',payload); };
+  const onSave = (event,payload) => { saved.push(payload); event.reply('settings-saved',payload,{live:payload.live,requestId:payload.requestId}); };
   ipcMain.on('save-settings',onSave);
   await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
   win.setSize(1100,800); await pause(200);
@@ -46,16 +46,20 @@ module.exports = async function({win,evaluate,waitFor,shot,pause}) {
   await waitFor(`getComputedStyle(document.getElementById('settings-help-modal')).display==='none'`);
   assert.equal(await evaluate(`document.getElementById('settings-view').classList.contains('update-hidden')`),false);
   assert.ok(await evaluate(`document.querySelector(${JSON.stringify(scroller)}).scrollTop`)>100,'Help retains scroll position');
-  await evaluate(`document.getElementById('probability-factor-setting').value='1.8';document.getElementById('never-selected-boost-factor-setting').value='1.5';document.getElementById('save-settings-btn').click()`);
+  assert.equal(await evaluate(`document.querySelector('#save-settings-btn,#close-settings-modal')`),null);
+  await evaluate(`const input=document.getElementById('notification-duration-setting');input.scrollIntoView({block:'center'});input.focus();`);
+  win.webContents.sendInputEvent({type:'keyDown',keyCode:'Home'});win.webContents.sendInputEvent({type:'keyUp',keyCode:'Home'});
+  await pause(150);assert.equal(saved.length,1);assert.equal(saved[0].notificationDurationSeconds,2);assert.equal(saved[0].live,true);
+  assert.equal(await evaluate(`document.getElementById('settings-view').checkVisibility()`),true,'A live save leaves settings open');
+  await evaluate(`document.getElementById('settings-back-btn').click()`);
   await waitFor(`document.getElementById('settings-view').classList.contains('update-hidden') && !document.getElementById('content').dataset.pageMotion`);
-  assert.equal(saved.length,1);assert.equal(saved[0].probabilityDecreaseFactor,1.8);
-  assert.deepEqual(await visibleViews(),before,'Save restores the previous page');
+  assert.deepEqual(await visibleViews(),before,'Back restores the previous page after live save');
   for(const [w,h] of [[1100,800],[1440,900]]) {
     win.setSize(w,h);await pause(160);
     await evaluate(`document.getElementById('settings-btn').click()`);
     await waitFor(`!document.getElementById('settings-view').classList.contains('update-hidden') && !document.getElementById('content').dataset.pageMotion`);
-    const bounds = await evaluate(`(()=>{const r=document.getElementById('settings-view').getBoundingClientRect(),b=document.getElementById('save-settings-btn').getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1&&b.bottom<=innerHeight;})()`);
-    assert.ok(bounds,'Page and save action stay within viewport '+w);
+    const bounds = await evaluate(`(()=>{const r=document.getElementById('settings-view').getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1;})()`);
+    assert.ok(bounds,'Page stays within viewport '+w);
     await shot('settings-page-'+w);
     await evaluate(`document.getElementById('settings-back-btn').click()`);
     await waitFor(`document.getElementById('settings-view').classList.contains('update-hidden') && !document.getElementById('content').dataset.pageMotion`);
@@ -70,5 +74,5 @@ module.exports = async function({win,evaluate,waitFor,shot,pause}) {
   await evaluate(`document.getElementById('repetition-nav-btn').click()`);
   await waitFor(`!document.getElementById('content').dataset.pageMotion`);
   ipcMain.removeListener('save-settings',onSave);
-  console.log('SETTINGS_PAGE_UI_PASS: page, fixed header/top-down pop, help/scroll, save/back, desktop windows, direct navigation');
+  console.log('SETTINGS_PAGE_UI_PASS: page, fixed header/top-down pop, help/scroll, live save/back, desktop windows, direct navigation');
 };

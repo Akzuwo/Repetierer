@@ -105,6 +105,7 @@ function initKristall() {
     if (document.documentElement.dataset.crystalOverlay !== overlay) document.documentElement.dataset.crystalOverlay = overlay;
     document.documentElement.dataset.crystalDrawer = String(document.getElementById('drawer').classList.contains('drawer-open'));
     document.querySelectorAll('.modal').forEach(modal => {
+      if(modal.id==='question-modal')return; // questions.js owns cancellation, never infer it from button text.
       if (dismissBindings.has(modal)) return;
       dismissBindings.add(modal);
       modal.addEventListener('click', event => {
@@ -121,7 +122,7 @@ function initKristall() {
     document.querySelectorAll(controlSelector).forEach(element => {
       if (element.classList.contains('liquid-select-native')) return;
       if (element.closest('#excel-editor-list') || element.matches('#excel-editor-name, #excel-editor-joker, #excel-editor-add-btn')) return;
-      if (element.matches('.assessment-student-row, #homework-grade-input, #grade-input, #ai-input, #ai-send-btn, #ai-info-btn, #participation-summary-btn, #settings-back-btn, #excel-editor-close-btn, .modal-close-action') || element.closest('#title-bar, #drawer, .session-tabs, .drawer-tabs, .settings-scope-tabs')) return;
+      if (element.matches('.page-back-link, .dossier-export-choice, .assessment-student-row, #homework-grade-input, #grade-input, #ai-input, #ai-send-btn, #ai-info-btn, #participation-summary-btn, #settings-back-btn, #excel-editor-close-btn, .modal-close-action') || element.closest('#title-bar, #drawer, .session-tabs, .drawer-tabs, .settings-scope-tabs')) return;
       mark(element, element.matches('.ico, .help-button, .history-btn') ? 'circle' : 'pill');
       if (!controls.has(element) && element.matches('button')) {
         const controller = new LiquidSurface(element, clock);

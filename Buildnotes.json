@@ -34,5 +34,15 @@
       "Mitmachnoten: direkter Schülerzugriff, erhaltene Bewertungsentwürfe und Einladungslink statt Mailtext kopieren",
       "Bestätigung beim Schliessen der App mit laufender Session, ohne die Session zu beenden"
     ]
+  },
+    "7.1.0": {
+    "title": "Kleinere Verbesserungen und Bugfixes",
+    "changes": [
+      "Neue Schülerakte",
+      "Note in der mündlich Beurteilung",
+      "Mail Versand API angepasst",
+      "diverse kleine UX Verbesserungen"
+    ]
   }
+
 }

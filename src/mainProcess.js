@@ -2,6 +2,7 @@ const { ipcMain, app, BrowserWindow, dialog, clipboard } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+require('./documentation').registerDocumentation({app,ipcMain,dialog,BrowserWindow});
 const { getBackupPreview, getAppSettings, getPendingExcelEntries, getExcelFilePath, saveExcelFilePath, saveAppSettings, clearWiggersRulePenalties, addBackupEntry, addPendingExcelEntry, removePendingExcelEntries, removeBackupEntries, logEvent, getLogs, getPaths, getLastShownUpdateVersion, saveLastShownUpdateVersion } = require('./storage.js');
 const { readReleaseNotesForVersion, stripReleaseNotesHeader } = require('./releaseNotes.js');
 const { ANALYTICS_ENDPOINT, ANALYTICS_APP_ID, getAnalyticsApiKey } = require('./analyticsConfig.js');
@@ -18,6 +19,18 @@ let lastRedoEntry;
 let programModule;
 let ExcelJSModule;
 let teachingSessionStore;
+let repetitionSaving=false;
+const sessionFinish=require('./sessionFinish').createSessionFinish({
+ getSession:()=>getTeachingSessionStore().getActiveSession(),getSelection:()=>getProgram().getSelectedPerson(),isSaving:()=>repetitionSaving||homeworkBusy,
+ endSession:id=>getTeachingSessionStore().endSession(id),
+ onEnded:session=>{getProgram().cancelRepetitionTiming();getProgram().setAbsences([],()=>{});logEvent('Unterrichts-Session beendet',{sessionId:session.id,className:session.className});}
+});
+ipcMain.handle('session:finish-status',()=>sessionFinish.snapshot());
+ipcMain.handle('session:finish',(event,args)=>{
+ const result=sessionFinish.finish(args);
+ if(result.success)event.sender.send('teaching-session-ended');
+ return result;
+});
 const ollamaService = createAiIntegration({service:createOllamaService(),getEnabled:()=>getAppSettings().aiIntegrationEnabled,setEnabled:enabled=>require('./storage').setAiIntegrationEnabled(enabled)});
 const aiAssistants = new WeakMap();
 const MAX_REPORT_COMMENT_LENGTH = 4000;
@@ -56,17 +69,25 @@ function getAiAssistant(sender) {
 			}
 			},
 			commitGrade: (classId, studentId, grade) => new Promise((resolve, reject) => {
+				if(repetitionSaving||homeworkBusy)return reject(new Error('Eine Bewertung wird bereits gespeichert.'));
+				repetitionSaving=true;
+				try{
 				const selected = getProgram().selectSpecificPerson(studentId);
-				if (!selected) return reject(new Error('Person kann nicht für eine Repetition ausgewählt werden.'));
+				if (!selected){repetitionSaving=false;return reject(new Error('Person kann nicht für eine Repetition ausgewählt werden.'));}
+				const selectionToken=getProgram().getSelectedPerson()?.selectionToken,sessionId=getTeachingSessionStore().getActiveSession()?.id;
 				getProgram().saveGrade(grade, (error, entry) => {
+					try{
 					if (error || !entry) return reject(new Error('Repetitionsnote konnte nicht gespeichert werden.'));
 					const saved = handleExcelBackupEntry({ sender }, entry);
 					if (!saved) return reject(new Error('Repetitionsnote konnte nicht gespeichert werden.'));
 					recordActiveSessionRepetition(entry);
+					getProgram().cancelRepetitionTiming();
 					sender.send('finished', undefined);
-					sender.send('repetition-saved', {type:'grade',excelWriteSucceeded:entry.excelWriteSucceeded});
+					sender.send('repetition-saved', {type:'grade',sessionId,selectionToken,excelWriteSucceeded:entry.excelWriteSucceeded});
 					resolve({ saved: true, pendingExcel: !entry.excelWriteSucceeded, classId, studentId, grade });
+					}catch(error){reject(error);}finally{repetitionSaving=false;}
 				});
+				}catch(error){repetitionSaving=false;reject(error);}
 			})
 		})
 	});
@@ -166,6 +187,10 @@ ipcMain.on('get-debug-mode', (event, args) => {
 });
 
 // settings
+ipcMain.handle('local-api:copy-access',()=>{
+ const tokenFile=path.join(getPaths().storageDir,'local-api-token');
+ clipboard.writeText(`http://127.0.0.1:17839/v1\n${tokenFile}`);return {copied:true};
+});
 ipcMain.on('get-settings', (event,args) => {
  const program=getProgram(),filePath=program.getCurrentFilePath(),classes=program.getClasses()||[];
  const active=getTeachingSessionStore().getActiveSession();
@@ -177,17 +202,19 @@ ipcMain.on('get-settings', (event,args) => {
 ipcMain.on('get-ui-settings', event=>event.sender.send('ui-settings',getProgram().getCurrentSettings()));
 ipcMain.on('save-settings', (event,settings) => {
  const program=getProgram();
+ const details={live:settings?.live===true,requestId:settings?.requestId};
  try {
  if(settings?.scope==='combined') {
   const filePath=program.getCurrentFilePath(),className=settings.className||'';
   if((className && (!(program.getClasses()||[]).includes(className)||filePath!==settings.filePath)) || (!className && settings.filePath && settings.filePath!==filePath)) {
-   event.sender.send('settings-save-failed','Die geladene Datei oder Klasse hat sich geändert. Bitte die Einstellungen erneut öffnen.');return;
+   event.sender.send('settings-save-failed','Die geladene Datei oder Klasse hat sich geändert. Bitte die Einstellungen erneut öffnen.',details);return;
   }
   require('./storage').saveScopedSettings(settings,filePath,className);
  } else saveAppSettings(settings||{});
- program.clearWiggersRulePenalties();
- logEvent('Einstellungen gespeichert');event.sender.send('settings-saved',program.getCurrentSettings());
- } catch {event.sender.send('settings-save-failed','Die Einstellungen konnten nicht gespeichert werden. Bitte die Schreibrechte des App-Profils prüfen.');}
+ if(Object.hasOwn(settings||{},'localApiEnabled'))require('./localApi/lifecycle').reconcile({app,profile:getPaths().storageDir,enabled:require('./storage').getAppSettings().localApiEnabled,launch:app.isPackaged});
+ if(Object.hasOwn(settings||{},'wiggersRuleEnabled'))program.clearWiggersRulePenalties();
+ if(!details.live)logEvent('Einstellungen gespeichert');event.sender.send('settings-saved',program.getCurrentSettings(),details);
+ } catch {event.sender.send('settings-save-failed','Die Einstellungen konnten nicht gespeichert werden. Bitte die Schreibrechte des App-Profils prüfen.',details);}
 });
 
 // file
@@ -291,20 +318,8 @@ ipcMain.on('start-teaching-session', (event, args) => {
 });
 
 ipcMain.on('end-teaching-session', (event, sessionId) => {
-	const active = getTeachingSessionStore().getActiveSession();
-	if (!active || active.id !== sessionId) {
-		event.sender.send('teaching-session-end-failed', { reason: 'no-active-session' });
-		return;
-	}
-	const result = getTeachingSessionStore().endSession(sessionId);
-	if (result.success) {
-		getProgram().cancelRepetitionTiming();
-		getProgram().setAbsences([], () => {});
-		logEvent('Unterrichts-Session beendet', { sessionId, className: active.className });
-		event.sender.send('teaching-session-ended', result.session);
-	} else {
-		event.sender.send('teaching-session-end-failed', result);
-	}
+ const result=sessionFinish.finish({sessionId});
+ event.sender.send(result.success?'teaching-session-ended':'teaching-session-end-failed',result);
 });
 
 ipcMain.on('add-participation-entry', (event, args) => {
@@ -426,7 +441,7 @@ ipcMain.handle('homework:status',()=>{
  try{return getProgram().getHomeworkStatus();}catch(error){return {error:error.message};}
 });
 ipcMain.handle('homework:prepare',async(_event,fingerprint)=>{
- if(homeworkBusy)return {success:false,error:'Bitte warte, bis die laufende Aktion abgeschlossen ist.'};
+ if(homeworkBusy||repetitionSaving)return {success:false,error:'Bitte warte, bis die laufende Aktion abgeschlossen ist.'};
  if(!getProgram().getCurrentSettings().homeworkEnabled)return {success:false,error:'Hausaufgaben sind deaktiviert.'};
  homeworkBusy=true;
  try{return await new Promise(resolve=>getProgram().migrateHomework(fingerprint,resolve));}finally{homeworkBusy=false;}
@@ -438,7 +453,7 @@ ipcMain.handle('homework:save',async(event,args)=>{
  const session=getTeachingSessionStore().getActiveSession();
  const identify=require('./storage').getFileIdentifier;
  if(session?.filePath && identify(session.filePath)!==identify(getProgram().getCurrentFilePath()))return {success:false,error:'Die Session gehört zu einer anderen Exceldatei. Bitte die Session beenden und für diese Datei neu starten.'};
- if(homeworkBusy || !session || session.id!==args?.sessionId || session.className!==getProgram().getCurrentClass() || !session.presentStudents.some(p=>p.id===args.personId) || !getProgram().getCurrentSettings().homeworkEnabled)return {success:false,error:'Bitte eine anwesende Person in der aktiven Session auswählen.'};
+ if(homeworkBusy || repetitionSaving || !session || session.id!==args?.sessionId || session.className!==getProgram().getCurrentClass() || !session.presentStudents.some(p=>p.id===args.personId) || !getProgram().getCurrentSettings().homeworkEnabled)return {success:false,error:'Bitte eine anwesende Person in der aktiven Session auswählen.'};
  homeworkBusy=true;
  try {
   return await new Promise(resolve=>getProgram().saveHomework(args.personId,args.grade,entry=>{
@@ -446,7 +461,7 @@ ipcMain.handle('homework:save',async(event,args)=>{
    const accepted=handleExcelBackupEntry(event,entry);
    if(accepted)getTeachingSessionStore().addHomework(session.id,entry);
    resolve({success:accepted,entry,error:entry.excelWriteError});
-  }));
+  },args.voluntary===true));
  } catch(error){return {success:false,error:error.message};}finally{homeworkBusy=false;}
 });
 
@@ -454,22 +469,33 @@ ipcMain.handle('homework:save',async(event,args)=>{
 ipcMain.on('repetition-timing-start', (_event, token) => { getProgram().startRepetitionTiming(token); });
 ipcMain.on('repetition-timing-cancel', () => { getProgram().cancelRepetitionTiming(); });
 ipcMain.on('ok', (event, args) => {
-	getProgram().saveGrade(args, (result, backupEntry) => {
-		const wasSaved = handleExcelBackupEntry(event, backupEntry);
-		if (wasSaved) recordActiveSessionRepetition(backupEntry);
-		event.sender.send('finished', result);
-		if (wasSaved) event.sender.send('repetition-saved', {type:'grade',excelWriteSucceeded:backupEntry.excelWriteSucceeded});
-	});
+ if(repetitionSaving||homeworkBusy)return;
+ const selection=getProgram().getSelectedPerson(),sessionId=getTeachingSessionStore().getActiveSession()?.id;
+ if(!selection?.selectionToken||!Number.isFinite(args)||args<1||args>6){event.sender.send('finished','invalid-grade');return;}
+ repetitionSaving=true;
+ const failed=()=>{repetitionSaving=false;event.sender.send('finished','save-failed');};
+ try{getProgram().saveGrade(args, (result, backupEntry) => {
+  try{
+   if(result||!handleExcelBackupEntry(event,backupEntry)){failed();return;}
+   recordActiveSessionRepetition(backupEntry);getProgram().cancelRepetitionTiming();repetitionSaving=false;
+   event.sender.send('finished');
+   event.sender.send('repetition-saved',{type:'grade',sessionId,selectionToken:selection.selectionToken,excelWriteSucceeded:backupEntry.excelWriteSucceeded});
+  }catch{failed();}
+ });}catch{failed();}
 });
 
 // joker
 ipcMain.on('joker', (event, args) => {
-	getProgram().setJoker((result, backupEntry) => {
-		const wasSaved = handleExcelBackupEntry(event, backupEntry);
-		if (wasSaved) recordActiveSessionRepetition(backupEntry);
-		event.sender.send('finished', result);
-		if (wasSaved) event.sender.send('repetition-saved', {type:'joker',excelWriteSucceeded:backupEntry.excelWriteSucceeded});
-	});
+ if(repetitionSaving||homeworkBusy||!getProgram().getSelectedPerson()?.selectionToken)return;
+ repetitionSaving=true;
+ try{getProgram().setJoker((result,backupEntry)=>{
+  try{
+   const saved=!result&&handleExcelBackupEntry(event,backupEntry);
+   if(saved){recordActiveSessionRepetition(backupEntry);getProgram().cancelRepetitionTiming();}
+   event.sender.send('finished',saved?undefined:'save-failed');
+   if(saved)event.sender.send('repetition-saved',{type:'joker',excelWriteSucceeded:backupEntry.excelWriteSucceeded});
+  }catch{event.sender.send('finished','save-failed');}finally{repetitionSaving=false;}
+ });}catch{repetitionSaving=false;event.sender.send('finished','save-failed');}
 });
 
 function recordActiveSessionRepetition(entry) {
@@ -1392,3 +1418,6 @@ function sendClassesOrJokerMigration(event, worksheets, filePath) {
  if(dateStatus.needsMigration) { event.sender.send('joker-date-migration-required',dateStatus,filePath);return; }
  event.sender.send('classes', worksheets, filePath);
 }
+
+require('./studentDossierIpc').registerStudentDossiers({ipcMain,BrowserWindow,dialog,getProgram,getPaths,getSessions:getTeachingSessionStore,getPending:getPendingExcelEntries});
+module.exports={getSessionFinishState:()=>sessionFinish.snapshot()};

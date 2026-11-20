@@ -35,7 +35,7 @@ function parseEnv(content) {
 }
 
 function validateAssessmentConfig(values) {
-	assertCompleteGroup(values, ASSESSMENT_KEYS, 'Mitmachnote');
+	assertCompleteGroup(values, ASSESSMENT_KEYS, 'Mündliche Mitarbeit');
 	const apiUrl = validateHttpsUrl(values.ASSESSMENT_API_URL, 'ASSESSMENT_API_URL');
 	const url = new URL(apiUrl);
 	if (url.username || url.password || url.search || url.hash || !url.pathname.endsWith('/api')) throw configError('ASSESSMENT_API_URL muss auf /api enden und darf keine Zugangsdaten enthalten.');
@@ -113,7 +113,7 @@ async function importIntegrationEnv(sourcePath, destinationPath, options = {}) {
 	const imported = portable ? parsePortableConfig(original) : parseEnv(original);
 	const hasAssessment = hasAny(imported, ASSESSMENT_KEYS);
 	const hasBrevo = hasAny(imported, BREVO_KEYS);
-	if (!hasAssessment && !hasBrevo) throw configError('Die .env-Datei enthält keine unterstützte Mitmachnoten- oder Brevo-Konfiguration.');
+	if (!hasAssessment && !hasBrevo) throw configError('Die .env-Datei enthält keine unterstützte Konfiguration für Mündliche Mitarbeit oder Brevo.');
 	if (hasAssessment) validateAssessmentConfig(imported);
 	if (hasBrevo) validateBrevoConfig(imported);
 
@@ -157,18 +157,20 @@ function parsePortableConfig(content) {
 	if (!bundle || bundle.format !== 'repetierer-settings' || bundle.version !== 1 || !bundle.values || Array.isArray(bundle.values) || typeof bundle.values !== 'object') throw configError('Unbekanntes .repetierer-Format oder nicht unterstützte Version.');
 	if (Object.keys(bundle.values).some(key => !KNOWN_KEYS.includes(key) || typeof bundle.values[key] !== 'string')) throw configError('Das Paket enthält unbekannte oder ungültige Einstellungen.');
 	const values = pickKnown(bundle.values);
-	validateAssessmentConfig(values); validateBrevoConfig(values);
+	validateAssessmentConfig(values);
+	if(hasAny(values,BREVO_KEYS))validateBrevoConfig(values);
 	if (values.ASSESSMENT_TEACHER_TOKEN.startsWith('encrypted:')) throw configError('Dieses Paket enthält einen gerätegebundenen Zugang. Bitte über «Paket exportieren» neu erstellen.');
 	return values;
 }
 
 function exportIntegrationFile(destinationPath, values, options = {}) {
 	const exported = pickKnown(values);
+	if(options.cloudOnly)for(const key of BREVO_KEYS)delete exported[key];
 	if (exported.ASSESSMENT_TEACHER_TOKEN?.startsWith('encrypted:')) {
 		if (!options.revealTeacherToken) throw configError('Der lokale Lehrerzugang konnte nicht für das Paket geöffnet werden.');
 		exported.ASSESSMENT_TEACHER_TOKEN = options.revealTeacherToken(exported.ASSESSMENT_TEACHER_TOKEN);
 	}
-	// A package always contains both connections and only portable credentials.
+	// Cloud-only packages contain only portable teacher credentials; legacy packages remain importable.
 	const content = JSON.stringify({format:'repetierer-settings', version:1, values:exported}, null, 2) + '\n';
 	parsePortableConfig(content);
 	atomicWrite(destinationPath, content);

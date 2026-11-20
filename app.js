@@ -1,13 +1,19 @@
 const {BrowserWindow, app, ipcMain} = require('electron');
 const fs = require('fs');
 const path = require('path');
+if (process.argv.includes('--background-api')) {
+  require('./src/localApi/lifecycle').runBackground(app);
+  return;
+}
 if (!app.isPackaged && process.env.REPETIERER_DEV_USER_DATA) {
 	const devUserData = path.resolve(process.env.REPETIERER_DEV_USER_DATA);
 	fs.mkdirSync(devUserData, { recursive: true });
 	app.setPath('userData', devUserData);
 }
+if (!app.requestSingleInstanceLock()) { app.quit(); return; }
+const crashHandler=require('./src/crashHandler').installCrashHandler({app,ipcMain,dialog:require('electron').dialog,crashReporter:require('electron').crashReporter});
 require('./src/mainProcess.js');
-const closeGuard=require('./src/sessionCloseGuard').createSessionCloseGuard({app,ipcMain,getActiveSession:()=>require('./src/teachingSessions').createTeachingSessionStore(require('./src/storage').getPaths().teachingSessionsPath).getActiveSession()});
+const closeGuard=require('./src/sessionCloseGuard').createSessionCloseGuard({app,ipcMain,getActiveSession:()=>require('./src/teachingSessions').createTeachingSessionStore(require('./src/storage').getPaths().teachingSessionsPath).getActiveSession(),isSaving:()=>require('./src/mainProcess').getSessionFinishState().saving});
 
 let mainWindow;
 let splashWindow;
@@ -19,6 +25,7 @@ const debugUpdate = require('./src/debugUpdate').createDebugUpdate({
 	send: sendUpdateStatus,
 	restart: () => {
 		fs.writeFileSync(path.join(app.getPath('userData'), 'debug-update-state.json'), JSON.stringify({previousPid:process.pid}));
+        crashHandler.journal.clean();
 		app.relaunch();
 		app.exit(0);
 	}
@@ -95,6 +102,7 @@ function createMainWindow() {
 	});
 
 	closeGuard.attach(mainWindow);
+    crashHandler.attach(mainWindow);
 	require('./src/notifications').registerWindow(mainWindow);
 	console.log('MainWindow erstellt');
 	mainWindow.loadFile(path.join(__dirname, 'public', 'index.html'));
@@ -333,7 +341,13 @@ function getErrorMessage(error) {
 }
 
 // main method
-app.whenReady().then(createApp);
+app.whenReady().then(() => {
+  if (app.isPackaged) {
+    try { require('./src/localApi/lifecycle').reconcile({app,profile:app.getPath('userData'),enabled:require('./src/storage').getAppSettings().localApiEnabled}); }
+    catch { require('./src/notifications').error('Der lokale API-Dienst konnte nicht gestartet werden.'); }
+  }
+  createApp();
+});
 
 app.on('window-all-closed', () => {
 	if (process.platform !== 'darwin') app.quit();

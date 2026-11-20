@@ -31,7 +31,7 @@ function createPanel() {
       <button type="button" class="btn-2" data-debug-scenario="update-preview">Fake Update</button>
       <button type="button" class="btn-2" data-debug-scenario="update-restart">Update mit Neustart</button>
     </div></section>
-    <form id="debug-mail-form"><h3>Testmail</h3><p>Eine echte E-Mail mit Beispieldaten im normalen Mitmachnoten-Layout. Verwendet die eingerichtete SMTP-Verbindung.</p>
+    <form id="debug-mail-form"><h3>Testmail</h3><p>Eine echte E-Mail mit Beispieldaten im normalen Layout für Mündliche Mitarbeit. Verwendet die eingerichtete SMTP-Verbindung.</p>
       <label for="debug-mail-recipient">Empfängeradresse</label>
       <input id="debug-mail-recipient" type="email" required autocomplete="email" placeholder="name@beispiel.ch">
       <button type="submit" class="btn-2" id="debug-mail-send">Testmail senden</button>

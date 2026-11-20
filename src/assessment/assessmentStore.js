@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { matchResponse, normalizeEmail, normalizeName, selectLatestResponses } = require('./matching.js');
+const {initializeContact,recordSubmission,setManualEmail}=require('./studentContact');
 
 const SCHEMA_VERSION = 3;
 const FREQUENCY_SCALE = ['(Fast) nie', 'Ab und zu', 'Manchmal', 'Häufig', 'Sehr häufig'];
@@ -28,7 +29,7 @@ class AssessmentStore {
 			if (!fs.existsSync(this.filePath)) return emptyData();
 			return migrate(JSON.parse(fs.readFileSync(this.filePath, 'utf8')));
 		} catch (error) {
-			const wrapped = new Error('Mitmachnoten-Daten konnten nicht gelesen werden.');
+			const wrapped = new Error('Beurteilungsdaten konnten nicht gelesen werden.');
 			wrapped.code = 'ASSESSMENT_DATA_INVALID';
 			wrapped.cause = error;
 			throw wrapped;
@@ -186,7 +187,7 @@ class AssessmentStore {
 		return clone(round);
 	}
 
-	saveTeacherAssessment(workbookPath, className, sourceStudents, roundId, studentId, answers, comment, criterionComments) {
+	saveTeacherAssessment(workbookPath, className, sourceStudents, roundId, studentId, answers, comment, criterionComments, grade) {
 		const { round } = this.getRound(workbookPath, className, sourceStudents, roundId);
 		const assessment = round.assessments[studentId];
 		if (!assessment) throw notFoundError('Schüler nicht gefunden.');
@@ -206,6 +207,12 @@ class AssessmentStore {
 			if (typeof value !== 'string' || value.length > 2000) throw validationError(`Der Kommentar für „${criterion.label}“ darf höchstens 2000 Zeichen enthalten.`);
 			if (value.trim()) normalizedComments[criterion.id] = value.trim();
 		}
+        const calculated = require('./grade').suggestedGrade(round.criteria, normalizedAnswers);
+        const finalGrade = grade === undefined ? calculated : grade;
+        if (!require('./grade').validGrade(finalGrade)) throw validationError('Die Note muss zwischen 1 und 6 liegen.');
+        assessment.teacherGrade = finalGrade;
+        assessment.suggestedGrade = calculated;
+        assessment.teacherGradeManual = finalGrade !== calculated;
 		assessment.teacherAnswers = normalizedAnswers;
 		assessment.teacherCriterionComments = normalizedComments;
 		assessment.teacherComment = String(comment || '').trim();
@@ -219,11 +226,25 @@ class AssessmentStore {
 		const assessment = round.assessments[studentId];
 		if (!assessment) throw notFoundError('Schüler nicht gefunden.');
 		assessment.mailStatus = status;
+		if(status==='sending' && !assessment.mailDeliveryId)assessment.mailDeliveryId=crypto.randomUUID();
+		if(details?.clearDeliveryId)delete assessment.mailDeliveryId;
 		assessment.mailAttempts = Number(assessment.mailAttempts || 0) + (details && details.incrementAttempt ? 1 : 0);
 		assessment.sentAt = status === 'sent' ? new Date().toISOString() : assessment.sentAt || null;
 		assessment.lastMailError = details && details.error ? String(details.error).slice(0, 500) : null;
 		this.save();
 		return clone(assessment);
+	}
+
+	setStudentEmail(workbookPath,className,sourceStudents,sourceId,name,email,expectedEmail) {
+		const before=clone(this.data);
+		try {
+			const cls=this.ensureClass(workbookPath,className,sourceStudents);
+			const student=cls.students.find(s=>s.sourceId===sourceId&&s.name===name);
+			if(!student)throw notFoundError('Die Schülerzuordnung hat sich geändert. Bitte die Schülerakten erneut öffnen.');
+			initializeContact(student,cls);
+			if((student.email||'')!==expectedEmail)throw validationError('Die Adresse wurde inzwischen geändert. Bitte die Schülerakte erneut öffnen.');
+			setManualEmail(student,email);this.save();return student.email;
+		} catch(error) {this.data=before;throw error;}
 	}
 }
 
@@ -239,7 +260,7 @@ function applyStudentResponse(classRecord, round, studentId, response, method) {
 	assessment.matchMethod = method;
 	round.assessments[studentId] = assessment;
 	const student = classRecord.students.find(item => item.id === studentId);
-	if (student && assessment.studentEmail) student.email = assessment.studentEmail;
+	if (student && assessment.studentEmail) recordSubmission(student,round.id,response);
 }
 
 function rebuildStudentResponses(classRecord, round) {
@@ -261,22 +282,31 @@ function rebuildStudentResponses(classRecord, round) {
 
 function syncStudents(classRecord, sourceStudents) {
 	const incoming = Array.isArray(sourceStudents) ? sourceStudents : [];
+	const used=new Set();
+	const exact=new Map();
+	for(const source of incoming){
+		const match=classRecord.students.find(item=>!used.has(item.id)&&item.sourceId===Number(source.id)&&normalizeName(item.name)===normalizeName(source.name));
+		if(match){exact.set(source,match);used.add(match.id);}
+	}
 	for (const source of incoming) {
 		const sourceId = Number(source.id);
 		const normalized = normalizeName(source.name);
-		let student = classRecord.students.find(item => item.sourceId === sourceId && normalizeName(item.name) === normalized);
-		if (!student) student = classRecord.students.find(item => normalizeName(item.name) === normalized);
+		let student = exact.get(source);
+		if (!student && incoming.filter(item=>normalizeName(item.name)===normalized).length===1) {
+			const candidates=classRecord.students.filter(item=>!used.has(item.id)&&normalizeName(item.name)===normalized);
+			if(candidates.length===1)student=candidates[0];
+		}
 		if (!student) {
-			student = { id: crypto.randomUUID(), sourceId, name: String(source.name), email: '' };
+			student = { id: crypto.randomUUID(), sourceId, name: String(source.name), email: '', emailHistory: [] };
 			classRecord.students.push(student);
 		} else {
 			student.sourceId = sourceId;
 			student.name = String(source.name);
 		}
+		used.add(student.id);
 	}
-	const activeNames = new Set(incoming.map(source => normalizeName(source.name)));
-	classRecord.students.forEach(student => { student.active = activeNames.has(normalizeName(student.name)); });
-	classRecord.students = classRecord.students.filter(student => student.active || classRecord.rounds.some(round => round.assessments[student.id]));
+	classRecord.students.forEach(student => { student.active = used.has(student.id); });
+	classRecord.students = classRecord.students.filter(student => student.active || student.emailHistory?.length || classRecord.rounds.some(round => round.assessments[student.id]));
 }
 
 function ensureRoundStudents(round, students) {
@@ -312,7 +342,7 @@ function emptyData() {
 function migrate(input) {
 	if (!input || typeof input !== 'object') return emptyData();
 	if (!input.schemaVersion) input.schemaVersion = 1;
-	if (input.schemaVersion > SCHEMA_VERSION) throw new Error('Neuere Mitmachnoten-Datenversion wird nicht unterstützt.');
+	if (input.schemaVersion > SCHEMA_VERSION) throw new Error('Neuere Beurteilungsdatenversion wird nicht unterstützt.');
 	if (!input.workbooks || typeof input.workbooks !== 'object') input.workbooks = {};
 	for (const workbook of Object.values(input.workbooks)) {
 		if (!workbook.classes) workbook.classes = {};
@@ -342,6 +372,7 @@ function migrate(input) {
 			}
 		}
 	}
+	for(const workbook of Object.values(input.workbooks))for(const cls of Object.values(workbook.classes))for(const student of cls.students)initializeContact(student,cls);
 	input.schemaVersion = SCHEMA_VERSION;
 	return input;
 }
@@ -446,7 +477,14 @@ function clone(value) {
 	return JSON.parse(JSON.stringify(value));
 }
 
+const sharedStores=new Map();
+function getSharedAssessmentStore(filePath){
+ const key=path.resolve(filePath);
+ if(!sharedStores.has(key))sharedStores.set(key,new AssessmentStore(filePath));
+ return sharedStores.get(key);
+}
 module.exports = {
+	getSharedAssessmentStore,
 	AssessmentStore,
 	DEFAULT_CRITERIA,
 	SCHEMA_VERSION,

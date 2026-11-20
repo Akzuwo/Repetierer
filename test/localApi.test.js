@@ -1,0 +1,33 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {startServer}=require('../src/localApi/server');
+const {reconcile}=require('../src/localApi/lifecycle');
+test('Lokale API: echte Excel-/Profildaten, nur GET, Token/Origin-Schutz, keine Dateiänderungen, Deaktivierung',async t=>{
+ const profile=fs.mkdtempSync(path.join(os.tmpdir(),'repetierer-api-')),Excel=require('exceljs');
+ const file=path.join(profile,'fixture.xlsx'),book=new Excel.Workbook(),sheet=book.addWorksheet('3a');sheet.getCell('A1').value='repetierer';sheet.getCell('A6').value='Testperson';sheet.getCell('B6').value=5;await book.xlsx.writeFile(file);
+ const settings={excelFilePath:file,localApiEnabled:true,secret:'never-export',nested:{teacherToken:'private'}};
+ fs.writeFileSync(path.join(profile,'settings.json'),JSON.stringify(settings));
+ fs.writeFileSync(path.join(profile,'unterrichtssessions.json'),JSON.stringify({sessions:[]}));
+ const before=fs.readFileSync(file),settingsBefore=fs.readFileSync(path.join(profile,'settings.json'));
+ const api=await startServer({profile,port:0});t.after(()=>api.close());
+ const token=fs.readFileSync(path.join(profile,'local-api-token'),'utf8'),headers={Authorization:'Bearer '+token};
+ assert.equal((await fetch(api.url+'/settings')).status,401);
+ assert.equal((await fetch(api.url+'/settings',{headers:{...headers,Origin:'https://evil.example'}})).status,403);
+ assert.equal((await fetch(api.url+'/settings',{method:'POST',headers})).status,405);
+ const result=await (await fetch(api.url+'/snapshot',{headers})).json();
+ assert.equal(result.data.settings.nested.teacherToken,undefined);assert.equal(result.data.settings.secret,undefined);
+ assert.equal(result.data.workbook.classes[0].students[0].name,'Testperson');
+ assert.equal((await fetch(api.url+'/students?class=3a',{headers})).status,200);
+ assert.equal((await fetch(api.url+'/../../repetierer.env',{headers})).status,404);
+ assert.deepEqual(fs.readFileSync(file),before);assert.deepEqual(fs.readFileSync(path.join(profile,'settings.json')),settingsBefore);
+ fs.writeFileSync(path.join(profile,'settings.json'),'{');assert.equal((await fetch(api.url+'/settings',{headers})).status,503);
+ fs.writeFileSync(path.join(profile,'settings.json'),JSON.stringify({...settings,localApiEnabled:false}));
+ await new Promise(resolve=>api.server.once('close',resolve));
+ await assert.rejects(fetch(api.url+'/health',{headers}));
+});
+test('Windows-Autostart wird im temporären Startupordner eingerichtet und deaktiviert, Builds bleiben erhalten',()=>{
+ const profile=fs.mkdtempSync(path.join(os.tmpdir(),'repetierer-startup-')),startupDirectory=path.join(profile,'Startup');
+ const app={isPackaged:true,getAppPath:()=>profile,getPath:()=>profile};
+ reconcile({app,profile,enabled:true,startupDirectory,launch:false});
+ const script=fs.readFileSync(path.join(startupDirectory,'Repetierer API.vbs'),'utf8');assert.match(script,/--background-api/);assert.match(script,/, 0, False/);
+ reconcile({app,profile,enabled:false,startupDirectory,launch:false});assert.equal(fs.existsSync(path.join(startupDirectory,'Repetierer API.vbs')),false);
+});

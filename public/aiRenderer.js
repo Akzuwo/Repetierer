@@ -18,7 +18,7 @@ let aiOpenedStudent = null;
 let aiReturnFocus = null;
 let aiFlightActive = false, currentFlight = null;
 let aiSettingUp = false;
-const infoModal=document.getElementById('ai-info-modal'), removeModal=document.getElementById('ai-remove-modal');
+const infoModal=document.getElementById('ai-info-modal');
 const infoButton=document.getElementById('ai-info-btn'), removeButton=document.getElementById('ai-remove-btn');
 let settingsDialogReturn;
 function showAiInfo(setup = false) {
@@ -31,15 +31,17 @@ function closeSettingsDialog(modal,after) {aiMotion.closeDialog(modal,()=>{(sett
 infoButton.addEventListener('click',()=>showAiInfo());
 document.getElementById('ai-info-close-btn').addEventListener('click',()=>closeSettingsDialog(infoModal));
 document.getElementById('ai-info-confirm-btn').addEventListener('click',()=>closeSettingsDialog(infoModal,aiStartSetup));
-removeButton.addEventListener('click',()=>{settingsDialogReturn=removeButton;aiMotion.openDialog(removeModal);document.getElementById('ai-remove-cancel-btn').focus();});
-document.getElementById('ai-remove-cancel-btn').addEventListener('click',()=>closeSettingsDialog(removeModal));
-document.getElementById('ai-remove-confirm-btn').addEventListener('click',async()=>{
-	const button=document.getElementById('ai-remove-confirm-btn');if(button.disabled)return;button.disabled=true;
-	try {const result=await aiIpc.invoke('ai:remove');closeSettingsDialog(removeModal);notify.success(result.message,{title:'Lokale KI'});await aiRefreshStatus();}
-	catch(error){notify.error(aiErrorText(error),{title:'Lokale KI'});}
-	finally {button.disabled=false;}
+let removingAi=false;
+removeButton.addEventListener('click',async()=>{
+ if(removingAi)return;removingAi=true;
+ try {
+  const answer=await require('./questions').askQuestion({title:'KI-Integration entfernen?',content:'Repetierer verwendet die lokale KI danach nicht mehr. Ollama, Modelle und deine Daten bleiben erhalten.',buttons:['KI behalten','Integration entfernen'],highlight:1,focus:1,destructive:2});
+  if(answer.action!=='button2')return;
+  const result=await aiIpc.invoke('ai:remove');notify.success(result.message,{title:'Lokale KI'});await aiRefreshStatus();
+ }catch(error){notify.error(aiErrorText(error),{title:'Lokale KI'});}
+ finally{removingAi=false;}
 });
-for(const modal of [infoModal,removeModal]) {
+for(const modal of [infoModal]) {
 	modal.addEventListener('click',event=>{if(event.target===modal)closeSettingsDialog(modal);});
 	modal.addEventListener('keydown',event=>{
 		if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeSettingsDialog(modal);}

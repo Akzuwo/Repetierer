@@ -1,5 +1,8 @@
 /* Kristall 1.3: the material constants live in glass.js, geometry in motion.js.
    This sheet maps the existing product onto that material without changing data. */
+/* Touch uses the same liquid press feedback as the mouse. Chromium's extra
+   rectangular tap overlay would cover the rounded optical surface. */
+html { -webkit-tap-highlight-color: transparent; }
 body #settings-navdock { -webkit-app-region:no-drag; app-region:no-drag; display:none; position:absolute; z-index:12; bottom:18px; left:50%; transform:translateX(-50%); width:max-content; max-width:calc(100% - 32px); height:56px !important; padding:5px; }
 body #container:has(#content.settings-active) #settings-navdock { display:flex; }
 body #settings-navdock button { min-width:132px; padding-inline:26px; font-size:15px; }
@@ -198,6 +201,7 @@ body #drawer .drawer-header { display: flex; gap: 12px; align-items: center; mar
 body #drawer #drawer-title { flex: 1; font-size: 24px; font-weight: 550; margin: 0; text-align: left; }
 body #drawer button { border-radius: 6px; background: none; border: 0; box-shadow: none; outline: 0; padding-inline: 0; }
 body #drawer .drawer-actions button { min-height: 44px; font-size: 14px; }
+body #documentation-manual-status { margin: 8px 0 0; color: #c9ddd5; font-size: 13px; line-height: 1.5; }
 body #drawer button:hover, body #drawer button[aria-current="page"] { background: none; border: 0; box-shadow: none; transform: none; color: #e0fff1; }
 body #drawer button:hover { text-shadow: 0 0 10px #d5fff055; }
 body #drawer button:hover svg { filter: drop-shadow(0 0 5px #d5fff070); }
@@ -390,7 +394,8 @@ body #settings-view .settings-back { order: -1; display: inline-flex; align-item
 body #settings-view .settings-back:hover { color: #fff; filter: drop-shadow(0 0 6px #ffffff88); }
 body #settings-view .settings-scroll-area { min-height: 0; padding: 0 12px 8px 0; margin: 0; clip-path: none; scrollbar-width: none; scrollbar-gutter: auto; }
 body #settings-view .settings-scroll-area::-webkit-scrollbar { display: none; }
-body .settings-page-actions { display: flex; justify-content: flex-end; gap: 12px; padding-top: 16px; flex: 0 0 auto; }
+body .settings-config-actions { margin-top: 28px; }
+body .settings-config-actions button { width: 100%; }
 @media (max-width: 600px) { body #content.settings-active { padding: 16px 20px; } body #settings-heading { font-size: 26px; } body #settings-view .settings-header { gap: 8px; } }
 
 body .debug-launcher { position: fixed; right: 20px; bottom: 14px; z-index: 3000; -webkit-app-region: no-drag; app-region: no-drag; font-size: 12px; padding: 7px 14px; }
@@ -682,3 +687,21 @@ body #assessment-body button.assessment-student-row { width:100%; font:inherit; 
 body #assessment-body button.assessment-student-row:hover { background:none; text-shadow:0 0 8px #ffffff55; }
 
 body #session-close-modal { z-index:10000; }
+
+/* Approved balanced question dialog: hierarchy from the sandbox, existing crystal material. */
+body #question-modal { z-index:11000; }
+body #question-modal .question-content { width:560px; max-width:calc(100vw - 48px); padding:40px; border-radius:32px; font-family:'Geist',sans-serif; background:rgba(220,243,235,.035); box-shadow:0 14px 38px -14px rgba(0,22,16,.2),inset 0 1px 0 rgba(255,255,255,.15); }
+body #question-modal .question-content * { font-family:'Geist',sans-serif; }
+body #question-modal h2 { font-size:32px; font-weight:650; line-height:1.25; letter-spacing:-.025em; margin:0 0 20px; overflow-wrap:anywhere; text-wrap:balance; }
+body #question-modal p { margin:0; font-size:20px; line-height:1.5; color:rgba(255,255,255,.8); white-space:pre-wrap; overflow-wrap:anywhere; max-height:38vh; overflow:auto; }
+/* Trim outer font leading so panel spacing starts at the visible cap height. */
+body #question-modal :is(h2,p) { text-box-trim:trim-both; text-box-edge:cap text; }
+body #question-modal .modal-buttons { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; padding:0; margin:32px 0 0; border:0; background:none; }
+body #question-modal .question-action { position:relative; order:0; width:100%; min-height:64px; height:auto; margin:0; padding:18px 12px; border-radius:12px; font-size:20px; font-weight:550; line-height:1.2; white-space:normal; overflow-wrap:anywhere; border:1px solid rgba(234,255,247,.2); background:rgba(255,255,255,.025); color:#fff; box-shadow:inset 0 1px 0 rgba(255,255,255,.12),inset 0 -1px 0 rgba(2,24,17,.08),0 6px 14px -10px rgba(0,18,13,.25); text-shadow:0 1px 2px rgba(0,20,14,.22); backdrop-filter:blur(2px); }
+body #question-modal .question-action::before { content:''; position:absolute; inset:1px; border-radius:inherit; pointer-events:none; background:linear-gradient(165deg,rgba(255,255,255,.04),transparent 45%,rgba(255,255,255,.008)); }
+body #question-modal .question-action:hover { border-color:rgba(234,255,247,.5); box-shadow:inset 0 1px 0 rgba(255,255,255,.3),inset 0 -1px 0 rgba(2,24,17,.12),0 9px 20px -10px rgba(0,18,13,.46); }
+body #question-modal .question-highlight { background:rgba(255,255,255,.025); border-color:rgba(234,255,247,.3); color:#fff; font-weight:600; }
+body #question-modal .question-highlight:hover { border-color:rgba(255,255,255,.58); }
+body #question-modal .question-danger { color:#fff; border-color:rgba(249,153,153,.26); background:rgba(139,34,44,.08); }
+body #question-modal .question-danger:hover { border-color:rgba(255,185,185,.62); }
+html[data-renderer=webgl] body #question-modal :is(.question-content,.question-action) { background:transparent; backdrop-filter:none; }

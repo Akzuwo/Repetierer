@@ -1,8 +1,8 @@
 {
   "name": "repetierer",
-  "version": "7.0.0",
-  "buildNumber": 28,
-  "buildDate": "09112026",
+  "version": "7.1.0",
+  "buildNumber": 33,
+  "buildDate": "16112026",
   "description": "(:",
   "license": "GPL-3.0",
   "repository": {
@@ -15,8 +15,10 @@
     "build:ui-vendor": "node scripts/build-ui-vendor.js",
     "test": "node scripts/run-tests.cjs",
     "test:ui": "node scripts/ui-polish-smoke.js",
+    "test:documentation": "node --test test/documentation.test.js && node scripts/documentation-ui-check.cjs",
     "test:notifications": "node --test test/notifications.test.js && node scripts/liquid-refinement-focused.cjs --notifications",
     "test:homework": "node --test test/homework.test.js && node scripts/homework-ui-check.cjs",
+    "test:settings": "node scripts/liquid-refinement-focused.cjs --settings-scroll-touch && node scripts/liquid-refinement-focused.cjs --settings-sliders",
     "test:debug": "node scripts/debug-ui-check.cjs",
     "test:debug:exe": "node scripts/debug-exe-check.cjs",
     "test:integrations": "node --test test/assessmentLifecycle.test.js test/aiIntegration.test.js && node scripts/integration-lifecycle-ui-check.cjs",
@@ -30,7 +32,8 @@
     "release:ci": "node scripts/release-with-icon.js",
     "test:repository": "node scripts/check-repository.cjs",
     "test:assessment": "node --test test/assessmentApiClient.test.js test/assessmentLifecycle.test.js test/assessmentStore.test.js test/delivery.test.js && node scripts/assessment-workflow-ui-check.cjs",
-    "test:session-close": "node --test test/sessionCloseGuard.test.js && node scripts/session-close-ui-check.cjs"
+    "test:dossiers": "node --test --test-concurrency=1 test/studentDossiers.test.js test/studentDossierMail.test.js test/crashHandler.test.js && node scripts/student-dossiers-ui-check.cjs",
+    "test:session-close": "node --test --test-concurrency=1 test/sessionCloseGuard.test.js test/sessionFinish.test.js test/sessionFinishFlow.test.js && node scripts/session-close-ui-check.cjs"
   },
   "build": {
     "appId": "net.srpnt3.repetierer",
@@ -41,6 +44,9 @@
     "files": [
       "app.js",
       "src/**/*",
+      "docs/local-api.md",
+      "docs/assessment-api.md",
+      "docs/mail-service.md",
       "public/index.html",
       "public/splash.html",
       "public/splash.js",
@@ -48,8 +54,12 @@
       "public/settingsScope.js",
       "public/homeworkPage.js",
       "public/notifications.js",
+      "public/questions.js",
+      "public/sessionFinishFlow.js",
       "public/jokerDateMigration.js",
       "public/assessmentRenderer.js",
+      "public/studentDossiers.js",
+      "public/crashReporter.js",
       "public/aiRenderer.js",
       "public/visualFeedback.js",
       "public/uiMotion.js",
@@ -95,6 +105,7 @@
       ]
     },
     "nsis": {
+      "include": "build/api-service.nsh",
       "installerIcon": "./public/icons/icon.ico",
       "uninstallerIcon": "./public/icons/icon.ico",
       "installerSidebar": "./public/images/sidebar.bmp",

@@ -41,7 +41,7 @@ test('full simulation produces progress then one real restart even on repeated a
 test('debug mail uses real result template and fixed sender, one explicit recipient',()=>{
   const message=buildDebugMessage(' demo@example.ch ');
   assert.equal(message.to,'demo@example.ch');assert.equal(message.from.address,'no-reply@akzuwo.ch');
-  assert.equal(message.subject,'Mitmachnote – Beispielrunde – Alex Beispiel');
+  assert.equal(message.subject,'Mündliche Mitarbeit – Beispielrunde – Alex Beispiel');
   assert.match(message.html,/<table/);assert.match(message.html,/Beteiligung mit Äusserungen/);assert.match(message.text,/Selbstbeurteilung/);
   for(const address of ['', 'a@example.ch,b@example.ch','a@example.ch\r\nBcc: x@example.ch'])assert.throws(()=>buildDebugMessage(address),/gültige/);
 });

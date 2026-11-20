@@ -62,7 +62,12 @@ function getSettings() {
 }
 
 function saveSettings(settings) {
-	writeJson(getPaths().settingsPath, Object.assign({}, getSettings(), settings));
+	ensureStorageDir();
+	const target=getPaths().settingsPath,temporary=`${target}.${process.pid}.tmp`;
+	try{
+		fs.writeFileSync(temporary,JSON.stringify(Object.assign({},getSettings(),settings),null,2),{encoding:'utf8',mode:0o600});
+		fs.renameSync(temporary,target);
+	}finally{if(fs.existsSync(temporary))fs.unlinkSync(temporary);}
 }
 
 function getLastShownUpdateVersion() {
@@ -151,6 +156,8 @@ function getAppSettings(settings = getSettings()) {
 		homeworkWeight:Number.isFinite(Number(settings.homeworkWeight)) && Number(settings.homeworkWeight)>=.1 && Number(settings.homeworkWeight)<=5 ? Math.round(Number(settings.homeworkWeight)*10)/10 : 1.2,
 		theme: normalizeTheme(settings.theme),
 		aiIntegrationEnabled: settings.aiIntegrationEnabled !== false,
+		localApiEnabled: settings.localApiEnabled !== false,
+		localMailDailyLimit: Number.isInteger(Number(settings.localMailDailyLimit)) && Number(settings.localMailDailyLimit)>=1 && Number(settings.localMailDailyLimit)<=1000 ? Number(settings.localMailDailyLimit) : 200,
 		notificationDurationSeconds: normalizeNotificationDuration(settings.notificationDurationSeconds),
 		extraJokerAfterThreeGrades: !!settings.extraJokerAfterThreeGrades,
 		probabilityDecreaseFactor: normalizeFactor(settings.probabilityDecreaseFactor, defaultAppSettings.probabilityDecreaseFactor),
@@ -163,7 +170,7 @@ function getAppSettings(settings = getSettings()) {
 }
 
 const CLASS_SETTING_KEYS=['extraJokerAfterThreeGrades','probabilityDecreaseFactor','boostNeverSelected','neverSelectedBoostFactor','wiggersRuleEnabled','wiggersRuleDurationMinutes','homeworkEnabled','homeworkJokerThreshold','homeworkWeight'];
-const GLOBAL_SETTING_KEYS=['theme','visualEffectsEnabled','notificationDurationSeconds'];
+const GLOBAL_SETTING_KEYS=['theme','visualEffectsEnabled','notificationDurationSeconds','localApiEnabled','localMailDailyLimit'];
 function classSettingsKey(filePath,className) {return JSON.stringify([getFileIdentifier(filePath),className]);}
 function getClassSettings(filePath,className) {
  const settings=getSettings(),key=classSettingsKey(filePath,className);
@@ -172,11 +179,11 @@ function getClassSettings(filePath,className) {
 }
 function saveScopedSettings(settings,filePath,className) {
  const persisted=getSettings(), normalized=getAppSettings({...persisted,...settings});
- const changes=Object.fromEntries(GLOBAL_SETTING_KEYS.map(key=>[key,normalized[key]]));
- if(filePath && className) {
+ const changes=Object.fromEntries(GLOBAL_SETTING_KEYS.filter(key=>Object.hasOwn(settings,key)).map(key=>[key,normalized[key]]));
+ if(filePath && className && CLASS_SETTING_KEYS.some(key=>Object.hasOwn(settings,key))) {
   const rules=getAppSettings({...getClassSettings(filePath,className),...settings});
   changes.classSettings={...persisted.classSettings,[classSettingsKey(filePath,className)]:Object.fromEntries(CLASS_SETTING_KEYS.map(key=>[key,rules[key]]))};
-  if(!rules.wiggersRuleEnabled)changes.wiggersRulePenalties=Object.fromEntries(Object.entries(persisted.wiggersRulePenalties||{}).filter(([key])=>!key.startsWith(`${filePath}::${className}::`)));
+  if(settings.wiggersRuleEnabled===false)changes.wiggersRulePenalties=Object.fromEntries(Object.entries(persisted.wiggersRulePenalties||{}).filter(([key])=>!key.startsWith(`${filePath}::${className}::`)));
  }
  saveSettings(changes);
 }
@@ -184,6 +191,8 @@ function saveScopedSettings(settings,filePath,className) {
 function saveAppSettings(settings) {
 	const wiggersRuleEnabled = settings.wiggersRuleEnabled !== false;
 	saveSettings({
+		localApiEnabled: settings.localApiEnabled ?? getAppSettings().localApiEnabled,
+		localMailDailyLimit: getAppSettings({...getSettings(),...settings}).localMailDailyLimit,
 		homeworkEnabled:settings.homeworkEnabled !== false,
 		homeworkJokerThreshold:Number.isInteger(Number(settings.homeworkJokerThreshold)) && Number(settings.homeworkJokerThreshold)>=1 && Number(settings.homeworkJokerThreshold)<=20 ? Number(settings.homeworkJokerThreshold) : 2,
 		homeworkWeight:Number.isFinite(Number(settings.homeworkWeight)) && Number(settings.homeworkWeight)>=.1 && Number(settings.homeworkWeight)<=5 ? Math.round(Number(settings.homeworkWeight)*10)/10 : 1.2,

@@ -39,8 +39,8 @@ async function main(){
  await click('#ai-info-btn');await until(`document.getElementById('ai-info-modal').classList.contains('modal-open')`);
  assert.equal(await evaluate(`document.getElementById('ai-info-confirm-btn').checkVisibility()`),false);assert.match(await evaluate(`document.getElementById('ai-info-modal').textContent`),/ausdrücklichen Bestätigung/);await shot('ai-integration-explanation');
  await click('#ai-info-close-btn');await until(`getComputedStyle(document.getElementById('ai-info-modal')).display==='none'`);
- await click('#ai-remove-btn');await until(`document.getElementById('ai-remove-modal').classList.contains('modal-open')`);await pause(500);await click('#ai-remove-confirm-btn');
- await until(`document.getElementById('ai-setup-status').textContent==='KI-Integration entfernt' && getComputedStyle(document.getElementById('ai-remove-modal')).display==='none'`);
+ await click('#ai-remove-btn');await until(`document.getElementById('question-modal').classList.contains('modal-open')`);await pause(500);await click('#question-button2');
+ await until(`document.getElementById('ai-setup-status').textContent==='KI-Integration entfernt' && getComputedStyle(document.getElementById('question-modal')).display==='none'`);
  assert.equal(require('../src/storage').getAppSettings().aiIntegrationEnabled,false);
  console.log('UI: AI removed');
  require('../src/storage').saveAppSettings(require('../src/storage').getAppSettings());assert.equal(require('../src/storage').getAppSettings().aiIntegrationEnabled,false);

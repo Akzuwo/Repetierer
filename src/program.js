@@ -206,7 +206,7 @@ function saveGrade(grade, callback) {
 	}, awardExtraJoker);
 }
 
-function saveHomework(personId,grade,callback) {
+function saveHomework(personId,grade,callback,voluntary) {
  const settings=getCurrentSettings(),reader=require('./excelReader');
  const student=getClassPersons(cls).find(p=>p.id===personId);
  if(!settings.homeworkEnabled || !student || !require('./homework').validGrade(grade))return callback(null);
@@ -214,7 +214,7 @@ function saveHomework(personId,grade,callback) {
  const history=reader.read_homework(cls).find(p=>p.id===personId)?.homework||[];
  const count=history.length+pending.filter(e=>e.personId===personId && !history.some(h=>h.id===e.homeworkId)).length;
  const id=require('node:crypto').randomUUID();
- const entry={id,homeworkId:id,type:'homework',className:cls,filePath,personId,personName:student.name,grade,weight:settings.homeworkWeight,awardExtraJoker:(count+1)%settings.homeworkJokerThreshold===0,date:getFormattedDate()};
+ const entry={...(typeof voluntary==='boolean'?{voluntary}:{}),id,homeworkId:id,type:'homework',className:cls,filePath,personId,personName:student.name,grade,weight:settings.homeworkWeight,awardExtraJoker:(count+1)%settings.homeworkJokerThreshold===0,date:getFormattedDate()};
  const done=result=>{if(result.success)persons=read(cls);callback({...entry,excelWriteSucceeded:!!result.success,excelWriteReason:result.reason,excelWriteError:result.error});};
  if(pending.length)return done({success:false,reason:'excel-locked',error:'Frühere Hausaufgabeneinträge warten noch auf Excel.'});
  reader.apply_entries(cls,[entry],(_people,result)=>done(result));

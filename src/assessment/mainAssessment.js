@@ -1,10 +1,13 @@
 const { app, BrowserWindow, dialog, ipcMain, net, safeStorage, clipboard } = require('electron');
 const { AssessmentApiClient } = require('./assessmentApiClient.js');
 const { protectTeacherToken, revealTeacherToken } = require('./teacherCredentials.js');
-const { AssessmentStore, hashPath } = require('./assessmentStore.js');
+const { getSharedAssessmentStore, hashPath } = require('./assessmentStore.js');
+const {publicStudent,publicRound}=require('./studentContact');
 const {validateDeadline} = require('./deadlinePolicy');
 const {createAutoSync} = require('./autoSync');
 let previousAutoSync;
+let previousHealthMonitor;
+const {createHealthMonitor}=require('./healthMonitor');
 const { deliverRound, sanitizeMailError, validateRoundForDelivery } = require('./assessmentDelivery.js');
 const {
 	buildRoundFormUrl,
@@ -20,6 +23,12 @@ const {
 } = require('./integrationConfig.js');
 const { buildInvitation, buildResultMessage } = require('./mailTemplates.js');
 const { createSmtpMailer } = require('./smtpMailer.js');
+const {resolveMailService}=require('./mailService');
+async function requireMailer(paths){
+  const configured=readAssessmentConfig(paths.integrationEnvPath,paths.brevoEnvPath);
+  const client=configured?createAssessmentApiClient(await requireAssessmentConfig(paths)):null;
+  return resolveMailService({client,getSmtpConfig:()=>readBrevoConfig(paths.integrationEnvPath,paths.brevoEnvPath),createSmtpMailer:config=>require('./smtpMailer').createSmtpMailer(config),profile:paths.storageDir||require('node:path').dirname(paths.integrationEnvPath),localDailyLimit:require('../storage').getAppSettings().localMailDailyLimit});
+}
 
 function registerAssessmentHandlers({ getProgram, getPaths }) {
 	const paths = getPaths();
@@ -27,13 +36,20 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 	let storeInstance;
 	const store = new Proxy({}, {
 		get(target, property) {
-			if (!storeInstance) storeInstance = new AssessmentStore(paths.assessmentPath);
+			if (!storeInstance) storeInstance = getSharedAssessmentStore(paths.assessmentPath);
 			const value = storeInstance[property];
 			return typeof value === 'function' ? value.bind(storeInstance) : value;
 		}
 	});
 	previousAutoSync?.stop();
 	const broadcast = (channel,payload) => {for(const win of BrowserWindow.getAllWindows()) if(!win.isDestroyed()) win.webContents.send(channel,payload);};
+	previousHealthMonitor?.stop();
+	const health=createHealthMonitor({check:()=>probeIntegrationHealth(paths),onUpdate:()=>{
+		for(const win of BrowserWindow.getAllWindows())if(!win.isDestroyed()){try{win.webContents.send('assessment:health-changed');}catch{}}
+	}});
+	previousHealthMonitor=health;
+	app.whenReady().then(()=>health.start());
+	app.once('will-quit',()=>health.stop());
 	const autoSync = createAutoSync({
 		getTargets: () => {
 			if (!getAssessmentStatus(paths).configured) return [];
@@ -103,7 +119,7 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 	});
 	register('assessment:save-teacher', async (event, args) => {
 		const context = getContext(getProgram, args);
-		store.saveTeacherAssessment(context.filePath, context.className, context.students, args.roundId, args.studentId, args.answers, args.comment, args.criterionComments);
+		store.saveTeacherAssessment(context.filePath, context.className, context.students, args.roundId, args.studentId, args.answers, args.comment, args.criterionComments, args.grade);
 		return presentRound(context, store, args.roundId, paths);
 	});
 	register('assessment:delete-round', async (event, args) => {
@@ -143,7 +159,9 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 		});
 	});
 
-	register('assessment:config-status', async () => getAssessmentStatus(paths));
+	register('assessment:config-status', async () => {
+		const status=await health.get();return {...getAssessmentStatus(paths),connection:status?.connection,checkedAt:status?.checkedAt};
+	});
 	register('assessment:config-import', async () => {
 		const selected = dialog.showOpenDialogSync(BrowserWindow.getFocusedWindow(), {
 			properties: ['openFile'],
@@ -151,6 +169,7 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 		});
 		if (!selected) return { cancelled: true };
 		const result = await importIntegrationEnv(selected[0], paths.integrationEnvPath, {
+			preserveSource:true,
 			legacyBrevoPath: paths.brevoEnvPath,
 			protectTeacherToken: token => protectTeacherToken(token, safeStorage),
 			verify: async ({ assessment }) => {
@@ -160,17 +179,20 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 				}
 			}
 		});
+		await health.invalidate();
 		return result;
 	});
 	register('assessment:config-export', async () => {
 		const destination = dialog.showSaveDialogSync(BrowserWindow.getFocusedWindow(), {
-			title: 'SMTP und Cloudflare gemeinsam exportieren',
+			title: 'Repetierer-Konfiguration exportieren',
 			defaultPath: 'Repetierer-Konfiguration.repetierer',
 			filters: [{name:'Repetierer-Paket',extensions:['repetierer']}]
 		});
 		if (!destination) return {cancelled:true};
 		const filePath = destination.toLowerCase().endsWith('.repetierer') ? destination : destination + '.repetierer';
+		const mailer=await requireMailer(paths);
 		return exportIntegrationFile(filePath, readIntegrationValues(paths.integrationEnvPath, paths.brevoEnvPath), {
+			cloudOnly:mailer.mode==='cloud',
 			revealTeacherToken: token => revealTeacherToken(token, safeStorage)
 		});
 	});
@@ -180,23 +202,27 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 	});
 	register('assessment:config-remove', async () => {
 		removeConfigGroup(paths.integrationEnvPath, paths.brevoEnvPath, 'assessment');
+		await health.invalidate();
 		return { configured: false };
 	});
 
-	register('assessment:brevo-status', async () => getBrevoStatus(paths));
+	register('assessment:brevo-status', async () => {
+		const status=(await health.get())?.brevo||{configured:false};
+		return status.mode==='smtp'?{...status,dailyLimit:require('../storage').getAppSettings().localMailDailyLimit}:status;
+	});
 	register('debug:send-test-mail', async (event,args) => {
 		if (!require('../debugFlags').isDebugMode(process.argv)) throw contextError('Testmails sind nur im Debug-Modus verfügbar.');
 		const message=require('./debugMail').buildDebugMessage(args.recipient);
-		const config=requireBrevo(paths);
+		const mailer=await requireMailer(paths);
 		try {
-			await createSmtpMailer(config).send(message);
+			await mailer.send(message);
 			return {sent:true};
 		} catch(error) { throw contextError(sanitizeMailError(error)); }
 	});
 	register('assessment:brevo-test', async () => {
-		const config = requireBrevo(paths);
+		const mailer = await requireMailer(paths);
 		try {
-			await createSmtpMailer(config).verify();
+			await mailer.verify();
 			return { ok: true };
 		} catch (error) {
 			return { ok: false, error: sanitizeMailError(error) };
@@ -204,14 +230,15 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 	});
 	register('assessment:brevo-remove', async () => {
 		removeConfigGroup(paths.integrationEnvPath, paths.brevoEnvPath, 'brevo');
+		await health.invalidate();
 		return { configured: false };
 	});
 
 	register('assessment:send-round', async (event, args) => {
-		const config = requireBrevo(paths);
+		const mailer = await requireMailer(paths);
 		const context = getContext(getProgram, args);
+		return locked(context,args.roundId,async()=>{
 		const current = store.getRound(context.filePath, context.className, context.students, args.roundId);
-		const mailer = createSmtpMailer(config);
 		const result = await deliverRound({
 			classRecord: current.classRecord,
 			round: current.round,
@@ -221,6 +248,7 @@ function registerAssessmentHandlers({ getProgram, getPaths }) {
 			updateStatus: (studentId, status, details) => store.setMailStatus(context.filePath, context.className, context.students, current.round.id, studentId, status, details)
 		});
 		return { result, round: await presentRound(context, store, current.round.id, paths) };
+		});
 	});
 }
 
@@ -254,7 +282,7 @@ function presentClass(classRecord) {
 	return {
 		id: classRecord.id,
 		name: classRecord.name,
-		students: classRecord.students.filter(student => student.active !== false),
+		students: classRecord.students.filter(student => student.active !== false).map(publicStudent),
 		rounds: classRecord.rounds.map(round => summarizeRound(round, classRecord.students))
 	};
 }
@@ -278,12 +306,13 @@ async function presentRound(context, store, roundId, paths) {
 	return {
 		filePath: context.filePath,
 		classRecord: presentClass(classRecord),
-		round,
-		students: classRecord.students.filter(student => student.active !== false),
+		round: publicRound(round,classRecord.students),
+		students: classRecord.students.filter(student => student.active !== false).map(publicStudent),
 		summary: summarizeRound(round, classRecord.students),
 		invitation,
 		invitationError,
 		assessmentConfigured,
+        participation: require('../studentDossiers').participationForClass(context.filePath, context.className, context.students, require('../teachingSessions').createTeachingSessionStore(paths.teachingSessionsPath).readData().sessions),
 		deliveryValidation: validateRoundForDelivery(classRecord, round)
 	};
 }
@@ -315,6 +344,17 @@ function getAssessmentStatus(paths) {
 	try { return publicAssessmentConfig(readAssessmentConfig(paths.integrationEnvPath, paths.brevoEnvPath)); }
 	catch (error) { return { configured: false, invalid: true, error: error.message }; }
 }
+async function probeIntegrationHealth(paths){
+	const assessment=getAssessmentStatus(paths);let connection=null;
+	if(assessment.configured){
+		try{connection=await createAssessmentApiClient(await requireAssessmentConfig(paths)).checkStatus();}
+		catch(error){return {connection:{reachable:false,error:error.message},brevo:{configured:false,invalid:true,error:error.message}};}
+	}
+	try{
+		const {send,verify,...status}=await requireMailer(paths);
+		return {connection,brevo:{...status,localConfigured:getBrevoStatus(paths).configured}};
+	}catch(error){return {connection,brevo:{configured:false,invalid:error.code!=='BREVO_NOT_CONFIGURED',error:error.message}};}
+}
 
 function getBrevoStatus(paths) {
 	try { return publicBrevoConfig(readBrevoConfig(paths.integrationEnvPath, paths.brevoEnvPath)); }
@@ -323,7 +363,7 @@ function getBrevoStatus(paths) {
 
 async function requireAssessmentConfig(paths) {
 	const config = readAssessmentConfig(paths.integrationEnvPath, paths.brevoEnvPath);
-	if (!config) throw contextError('Die Mitmachnoten-Konfiguration ist noch nicht eingerichtet.');
+	if (!config) throw contextError('Die Konfiguration für Mündliche Mitarbeit ist noch nicht eingerichtet.');
 	config.teacherToken = revealTeacherToken(config.teacherToken, safeStorage);
 	return config;
 }
@@ -358,4 +398,4 @@ function contextError(message) {
 	return error;
 }
 
-module.exports = { presentClass, registerAssessmentHandlers, summarizeRound };
+module.exports = { presentClass, registerAssessmentHandlers, summarizeRound, requireMailer };

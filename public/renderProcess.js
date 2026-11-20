@@ -1,7 +1,17 @@
 const {ipcRenderer} = require('electron');
+document.getElementById('local-api-copy-btn').addEventListener('click',async()=>{try{await ipcRenderer.invoke('local-api:copy-access');require('./notifications').success('API-Adresse und Pfad zum Zugriffsschlüssel kopiert.');}catch{require('./notifications').error('Die API-Zugriffsdaten konnten nicht kopiert werden.');}});
+document.getElementById('smtp-mail-limit-setting').addEventListener('input',event=>{document.getElementById('smtp-mail-limit-value').textContent=event.target.value;});
 const uiMotion = require('./uiMotion.js');
 const notify = require('./notifications').initNotifications();
 const {inferType} = require('../src/notificationPolicy');
+const {askQuestion}=require('./questions');
+require('./questions').initQuestions();
+const sessionFinishFlow=require('./sessionFinishFlow').createSessionFinishFlow({
+ ask:askQuestion,getState:()=>ipcRenderer.invoke('session:finish-status'),finishSession:args=>ipcRenderer.invoke('session:finish',args),
+ editGrade:()=>{clearSelectionEffect();showSessionArea('repetition');_grade.focus();},
+ confirmQuit:requestId=>ipcRenderer.send('session-close-confirm',requestId),cancelQuit:requestId=>ipcRenderer.send('session-close-cancel',requestId),
+ reportError:message=>notify.error(message,{title:'Beenden abgebrochen'})
+});
 let currentRepetitionToken = null;
 function startRepetitionTiming() { if(currentRepetitionToken && (state === 3 || state === 4)) ipcRenderer.send('repetition-timing-start', currentRepetitionToken); }
 let state = 0; // 0: select file, 1: select class, 2: click start, 3: set grade
@@ -20,6 +30,7 @@ const _drawerHelpBtn = document.getElementById('drawer-help-btn');
 const _drawerMainView = document.getElementById('drawer-main-view');
 const _drawerDataView = document.getElementById('drawer-data-view');
 const _drawerProtocolView = document.getElementById('drawer-protocol-view');
+const _drawerDocumentationView = document.getElementById('drawer-documentation-view');
 const _drawerDataViewBtn = document.getElementById('drawer-data-view-btn');
 const _drawerProtocolViewBtn = document.getElementById('drawer-protocol-view-btn');
 const _file = document.getElementById('drawer-file-btn');
@@ -99,9 +110,6 @@ const _sessionPresentPreview = document.getElementById('session-present-preview'
 const _sessionAbsentPreview = document.getElementById('session-absent-preview');
 const _confirmSessionStartBtn = document.getElementById('confirm-session-start-btn');
 const _cancelSessionStartBtn = document.getElementById('cancel-session-start-btn');
-const _sessionEndModal = document.getElementById('session-end-modal');
-const _confirmSessionEndBtn = document.getElementById('confirm-session-end-btn');
-const _cancelSessionEndBtn = document.getElementById('cancel-session-end-btn');
 const _participationModal = document.getElementById('participation-modal');
 const _participationStudentName = document.getElementById('participation-student-name');
 const _participationScoreList = document.getElementById('participation-score-list');
@@ -191,8 +199,6 @@ for (const input of settingsRanges) {
 	input.addEventListener('change', () => updateSettingsRangeValue(input));
 	updateSettingsRangeValue(input);
 }
-const _saveSettingsBtn = document.getElementById('save-settings-btn');
-const _closeSettingsModal = document.getElementById('close-settings-modal');
 const _updatePanel = document.getElementById('update-panel');
 const _updateTitle = document.getElementById('update-title');
 const _updateDetail = document.getElementById('update-detail');
@@ -249,26 +255,7 @@ _quit.addEventListener('click', () => {
 	ipcRenderer.send('quit');
 });
 
-const sessionCloseModal=document.getElementById('session-close-modal');
-const sessionCloseCancel=document.getElementById('session-close-cancel-btn'),sessionCloseConfirm=document.getElementById('session-close-confirm-btn');
-let sessionCloseRequest,sessionCloseFocus;
-ipcRenderer.on('session-close-confirmation',(_event,payload)=>{
- sessionCloseRequest=payload.requestId;sessionCloseFocus=document.activeElement;window.repetiererSelects?.closeAll();
- document.getElementById('session-close-text').textContent=`Die Session der Klasse ${payload.className} läuft noch. Möchtest du die App schliessen, ohne die Session zu beenden?`;
- openModal(sessionCloseModal);sessionCloseCancel.focus();
-});
-function cancelSessionClose(){
- if(sessionCloseRequest)ipcRenderer.send('session-close-cancel',sessionCloseRequest);
- sessionCloseRequest=null;closeModal(sessionCloseModal,()=>sessionCloseFocus?.focus());
-}
-sessionCloseCancel.addEventListener('click',cancelSessionClose);
-sessionCloseConfirm.addEventListener('click',()=>{if(sessionCloseRequest)ipcRenderer.send('session-close-confirm',sessionCloseRequest);});
-sessionCloseModal.addEventListener('click',event=>{if(event.target===sessionCloseModal)cancelSessionClose();});
-document.addEventListener('keydown',event=>{
- if(!sessionCloseModal.classList.contains('modal-open'))return;
- if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();cancelSessionClose();}
- if(event.key==='Tab'){event.preventDefault();(document.activeElement===sessionCloseCancel?sessionCloseConfirm:sessionCloseCancel).focus();}
-},true);
+ipcRenderer.on('session-close-confirmation',(_event,payload)=>{sessionFinishFlow.run({quitRequest:payload.requestId});});
 
 // file
 _file.addEventListener('click', () => {
@@ -296,6 +283,17 @@ _drawerDataViewBtn.addEventListener('click', () => {
 
 _drawerProtocolViewBtn.addEventListener('click', () => {
 	setDrawerView('protocol');
+});
+document.getElementById('drawer-documentation-view-btn').addEventListener('click',()=>setDrawerView('documentation'));
+document.getElementById('documentation-api-btn').addEventListener('click',async event=>{
+	const button=event.currentTarget;if(button.disabled)return;
+	button.disabled=true;button.textContent='Wird gespeichert …';
+	try{
+		const result=await ipcRenderer.invoke('documentation:export',{id:'api'});
+		if(!result?.ok)throw new Error(result?.error||'Die API-Dokumentation konnte nicht gespeichert werden.');
+		if(!result.cancelled)notify.success('Die API-Dokumentation wurde als Markdown gespeichert.',{title:'Dokumentationen'});
+	}catch(error){notify.error(error.message,{title:'Dokumentationen'});}
+	finally{button.disabled=false;button.textContent='API Dokumentation';}
 });
 
 _drawerHelpBtn.addEventListener('click', () => {
@@ -529,33 +527,6 @@ _teacherHelpModal.addEventListener('click', (e) => {
 	}
 });
 
-_saveSettingsBtn.addEventListener('click', () => {
-	const probabilityDecreaseFactor = parseFloat(_probabilityFactorSetting.value.replace(',', '.'));
-	const neverSelectedBoostFactor = parseFloat(_neverSelectedBoostFactorSetting.value.replace(',', '.'));
-	const wiggersRuleDurationMinutes = parseInt(_wiggersRuleDurationSetting.value, 10);
-	if (!probabilityDecreaseFactor || probabilityDecreaseFactor < 1.1 || probabilityDecreaseFactor > 10 ||
-		!neverSelectedBoostFactor || neverSelectedBoostFactor < 1.1 || neverSelectedBoostFactor > 10 ||
-		!wiggersRuleDurationMinutes || wiggersRuleDurationMinutes < 1 || wiggersRuleDurationMinutes > 480) {
-		error(_saveSettingsBtn, 'Bitte prüfe die Werte der Einstellungen.');
-		return;
-	}
-
-	ipcRenderer.send('save-settings', {
-		theme: 'midnight',
-		scope:'combined',...window.getSettingsScopeContext?.(),
-		homeworkEnabled:homeworkToggle.checked,homeworkJokerThreshold:Number(homeworkJokerSetting.value),homeworkWeight:Number(homeworkWeightSetting.value),
-		extraJokerAfterThreeGrades: _extraJokerSetting.checked,
-		probabilityDecreaseFactor: probabilityDecreaseFactor,
-		boostNeverSelected: _boostNeverSelectedSetting.checked,
-		neverSelectedBoostFactor: neverSelectedBoostFactor,
-		visualEffectsEnabled: _visualEffectsSetting.checked,
-		wiggersRuleEnabled: _wiggersRuleSetting.checked,
-		notificationDurationSeconds: Number(_notificationDurationSetting.value),
-		wiggersRuleDurationMinutes: wiggersRuleDurationMinutes
-	});
-	closeModal(_settingsView);
-});
-
 _extraJokerMigrationBtn.addEventListener('click', () => {
 	if (!extraJokerMigrationStatus || !extraJokerMigrationStatus.hasFile) {
 		showExtraJokerMigrationMessage('Extra-Joker-Migration', 'Bitte zuerst eine Datei laden.');
@@ -571,9 +542,6 @@ _extraJokerMigrationBtn.addEventListener('click', () => {
 	ipcRenderer.send('run-extra-joker-migration',window.getSettingsScopeContext?.());
 });
 
-_closeSettingsModal.addEventListener('click', () => {
-	closeModal(_settingsView);
-});
 document.getElementById('settings-back-btn').addEventListener('click', () => closeSettingsPage());
 
 _closeUpdateNewsBtn.addEventListener('click', () => {
@@ -644,6 +612,7 @@ _start.addEventListener('click', () => {
 
 // cancel
 _cancel.addEventListener('click', () => {
+	sessionFinishFlow.cancelWaiting();
 	ipcRenderer.send('repetition-timing-cancel'); currentRepetitionToken = null;
 	state = 2;
 	updateState();
@@ -696,18 +665,8 @@ _sessionHomeworkTab.addEventListener('click',uiMotion.pageHandler(()=>showSessio
 _sessionParticipationTab.addEventListener('click', uiMotion.pageHandler(() => showSessionArea('participation')));
 _sessionRepetitionTab.addEventListener('click', uiMotion.pageHandler(() => showSessionArea('repetition')));
 _endSessionBtn.addEventListener('click', () => {
-	if (activeTeachingSession) openModal(_sessionEndModal);
+	if (activeTeachingSession) sessionFinishFlow.run();
 });
-_cancelSessionEndBtn.addEventListener('click', () => closeModal(_sessionEndModal));
-_sessionEndModal.addEventListener('click', event => {
-	if (event.target === _sessionEndModal) closeModal(_sessionEndModal);
-});
-_confirmSessionEndBtn.addEventListener('click', () => {
-	if (!activeTeachingSession) return;
-	disableElement(_confirmSessionEndBtn);
-	ipcRenderer.send('end-teaching-session', activeTeachingSession.id);
-});
-
 _participationSummaryBtn.addEventListener('click', () => {
 	if (!activeTeachingSession) return;
 	ipcRenderer.send('get-participation-summary', activeTeachingSession.className);
@@ -873,6 +832,10 @@ ipcRenderer.on('debug-mode', (event, isDebugMode) => {
 });
 
 ipcRenderer.on('settings-data', (event, settings, paths, migrationStatus) => {
+	document.getElementById('local-api-setting').checked=settings.localApiEnabled!==false;
+	document.getElementById('smtp-mail-limit-setting').value=settings.localMailDailyLimit||200;
+	document.getElementById('smtp-mail-limit-value').textContent=settings.localMailDailyLimit||200;
+	document.getElementById('local-api-status').textContent=settings.localApiEnabled===false?'Deaktiviert · kein automatischer Start mit Windows':'http://127.0.0.1:17839/v1 · Zugriffsschlüssel: local-api-token im App-Datenordner';
  homeworkToggle.checked=settings.homeworkEnabled!==false;homeworkJokerSetting.value=settings.homeworkJokerThreshold||2;homeworkWeightSetting.value=settings.homeworkWeight||1.2;updateHomeworkFields();
 	_extraJokerSetting.checked = !!settings.extraJokerAfterThreeGrades;
 	_probabilityFactorSetting.value = settings.probabilityDecreaseFactor;
@@ -926,11 +889,12 @@ function applyHomeworkSettings(settings) {
  if(!homeworkEnabled && activeSessionArea==='homework') {activeSessionArea='participation';renderTeachingSessionView();}
  window.applyHomeworkSettings?.(settings);
 }
-ipcRenderer.on('settings-save-failed',(_event,message)=>{notify.error(message,{title:'Einstellungen nicht gespeichert'});ipcRenderer.send('get-settings');});
-ipcRenderer.on('settings-saved', (event, settings) => {
+ipcRenderer.on('settings-save-failed',(_event,message,details)=>{notify.error(message,{title:'Einstellungen nicht gespeichert'});if(!details?.live)ipcRenderer.send('get-settings');});
+ipcRenderer.on('settings-saved', (event, settings,details) => {
  applyHomeworkSettings(settings);
+	if(typeof settings.localApiEnabled==='boolean')document.getElementById('local-api-status').textContent=settings.localApiEnabled?'http://127.0.0.1:17839/v1 · Zugriffsschlüssel: local-api-token im App-Datenordner':'Deaktiviert · kein automatischer Start mit Windows';
 	notify.configure(settings);
-	notify.success('Deine Einstellungen wurden gespeichert.', {title:'Einstellungen'});
+	if(!details?.live)notify.success('Deine Einstellungen wurden gespeichert.', {title:'Einstellungen'});
 	applyTheme(settings && settings.theme);
 	updateVisualEffects(settings && settings.visualEffectsEnabled);
 });
@@ -1172,7 +1136,7 @@ ipcRenderer.on('finished', (event, args) => {
 		state = 2;
 		updateState();
 	} else
-		error(_ok, 'Die Repetition konnte nicht gespeichert werden. Bitte erneut versuchen.');
+		{sessionFinishFlow.failed();error(_ok, 'Die Repetition konnte nicht gespeichert werden. Bitte erneut versuchen.');}
 
 })
 
@@ -1249,6 +1213,7 @@ ipcRenderer.on('excel-reload-failed', (event, result) => {
 
 // name
 ipcRenderer.on('name', (event, args, selectionNames, selectedPerson) => {
+	sessionFinishFlow.cancelWaiting();
 	currentRepetitionToken = selectedPerson?.selectionToken || null;
 	aiSelectedStudentId = selectedPerson && selectedPerson.id;
 
@@ -1519,8 +1484,6 @@ ipcRenderer.on('active-teaching-session-data', (event, session) => {
 
 ipcRenderer.on('teaching-session-ended', () => {
 	currentRepetitionToken = null;
-	closeModal(_sessionEndModal);
-	enableElement(_confirmSessionEndBtn);
 	activeTeachingSession = null;
 	activeSessionArea = 'participation';
 	closeParticipationSummary();
@@ -1531,8 +1494,6 @@ ipcRenderer.on('teaching-session-ended', () => {
 });
 
 ipcRenderer.on('teaching-session-end-failed', () => {
-	enableElement(_confirmSessionEndBtn);
-	closeModal(_sessionEndModal);
 	showUpdatePanel({ title: 'Session nicht beendet', detail: 'Die Session konnte nicht beendet werden. Bitte versuchen Sie es erneut.', primaryVisible: false, secondaryText: 'OK', secondaryVisible: true });
 });
 
@@ -1580,6 +1541,7 @@ function setActiveTeachingSession(session) {
 }
 
 function renderTeachingSessionView() {
+    if (window.isStudentDossierOpen?.()) return;
 	if (!document.getElementById('excel-editor-view').classList.contains('update-hidden')) return;
 	if (!_settingsView.classList.contains('update-hidden')) return;
 	const assessmentView = document.getElementById('assessment-view');
@@ -1955,10 +1917,12 @@ function renderAbsencePersons(persons) {
 }
 
 function openStatsView() {
+
 	if (_statsViewBtn.classList.contains('disabled')) return;
 	if (uiMotion.beginPageChange(() => { openStatsView(); })) return;
 	dismissSettingsForNavigation();
 	window.dismissRepetiererExcelEditorForNavigation?.();
+    window.dismissStudentDossiers?.();
 	uiMotion.cancel(_statsView);
 	resetStatsScrollMotion();
 	disconnectStatsCardObserver();
@@ -2225,6 +2189,13 @@ function openTeacherHelp(topic) {
 				'Protokoll exportieren speichert das Sitzungsprotokoll als PDF und CSV.',
 				'Problem melden sendet einen bereinigten Fehlerbericht mit Kommentar und den letzten Logeinträgen.'
 			]
+		},
+		'drawer-documentation': {
+			title:'Dokumentationen',
+			paragraphs:[
+				'API Dokumentation speichert die Referenz zur lokalen Lese-API, Cloud-Umfrage und zum Mailversand als Markdown-Datei. Sie ist offline in der App enthalten.',
+				'Die Bedienungsanleitung wird später ergänzt und kann derzeit noch nicht heruntergeladen werden.'
+			]
 		}
 	}[topic];
 
@@ -2271,9 +2242,9 @@ function setDrawerView(view) {
 	uiMotion.changeDrawerView(() => {
 	drawerView = view;
 	_drawer.classList.toggle('drawer-submenu', view !== 'main');
-	_drawerTitle.innerText = view === 'data' ? 'Dateiverwaltung' : view === 'protocol' ? 'Protokoll' : 'Navigation';
+	_drawerTitle.innerText = view === 'data' ? 'Dateiverwaltung' : view === 'protocol' ? 'Protokoll' : view === 'documentation' ? 'Dokumentationen' : 'Navigation';
 
-	[_drawerMainView, _drawerDataView, _drawerProtocolView].forEach(drawerViewElement => {
+	[_drawerMainView, _drawerDataView, _drawerProtocolView,_drawerDocumentationView].forEach(drawerViewElement => {
 		drawerViewElement.classList.add('update-hidden');
 	});
 
@@ -2282,6 +2253,9 @@ function setDrawerView(view) {
 		_drawerBackBtn.classList.remove('update-hidden');
 	} else if (view === 'protocol') {
 		_drawerProtocolView.classList.remove('update-hidden');
+		_drawerBackBtn.classList.remove('update-hidden');
+	} else if(view==='documentation'){
+		_drawerDocumentationView.classList.remove('update-hidden');
 		_drawerBackBtn.classList.remove('update-hidden');
 	} else {
 		_drawerMainView.classList.remove('update-hidden');
@@ -2846,6 +2820,8 @@ document.querySelectorAll('#title-bar .ico').forEach(control => {
 module.exports = [scaleName(), updateState(), version(), ipcRenderer.send('get-update-news'), ipcRenderer.send('get-debug-mode'), ipcRenderer.send('get-ui-settings'), ipcRenderer.send('load-saved-file'), ipcRenderer.send('get-pending-excel-status'), ipcRenderer.send('get-undo-status'), ipcRenderer.send('get-active-teaching-session')];
 
 ipcRenderer.on('repetition-saved', (_event, result) => {
+	currentRepetitionToken=null;
+	sessionFinishFlow.saved(result);
 	if (result?.excelWriteSucceeded === false) return;
 	notify.success(result?.type === 'joker' ? 'Der Joker wurde gespeichert.' : 'Die Note wurde gespeichert.', {title:'Repetition'});
 });

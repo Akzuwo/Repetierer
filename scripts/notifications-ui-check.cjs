@@ -7,8 +7,8 @@ module.exports=async({win,evaluate,waitFor,shot,pause})=>{
  assert.equal(await evaluate(`notify.durationSeconds`),6);
  assert.equal(await evaluate(`document.querySelector('.notification-card').dataset.durationSeconds`),'6');
  assert.equal(await evaluate(`document.querySelectorAll('.notification-card b,.notification-card button').length`),0,'Plain text, no close button');
- const geometry=await evaluate(`(()=>{const r=document.querySelector('.notification-card').getBoundingClientRect();return {center:(r.left+r.right)/2,width:r.width,top:r.top}})()`);
- assert.ok(Math.abs(geometry.center-550)<1 && geometry.top>=80 && geometry.width<=520);
+ const geometry=await evaluate(`(()=>{const r=document.querySelector('.notification-card').getBoundingClientRect(),canvas=document.getElementById('glass-canvas').getBoundingClientRect();return {center:(r.left+r.right)/2,viewportCenter:(canvas.left+canvas.right)/2,width:r.width,top:r.top}})()`);
+ assert.ok(Math.abs(geometry.center-geometry.viewportCenter)<1 && geometry.top>=80 && geometry.width<=520,JSON.stringify(geometry));
  await evaluate(`notify.warning('Excel ist geöffnet.',{title:'Speichern ausstehend'});notify.success('Die Note wurde gespeichert.',{title:'Repetition'})`);
  await waitFor(`[...document.querySelectorAll('.notification-card')].every(e=>e.dataset.motion==='idle')`);
  const positions=await evaluate(`[...document.querySelectorAll('.notification-card')].map(e=>{const r=e.getBoundingClientRect();return [r.top,r.bottom]})`);
@@ -52,7 +52,7 @@ module.exports=async({win,evaluate,waitFor,shot,pause})=>{
  await evaluate(`notify.clear();notify.success('Reduzierte Bewegung',{durationSeconds:8})`);
  assert.equal(await evaluate(`document.querySelector('.notification-card').dataset.motion`),'idle');
  await evaluate(`window.notificationContextLoss=notify.glass.renderer.gl.getExtension('WEBGL_lose_context');notificationContextLoss.loseContext()`);
- await waitFor(`document.getElementById('notification-layer').dataset.layerRenderer==='css'`);
+ await waitFor(`document.getElementById('notification-layer').dataset.layerRenderer==='css' && getComputedStyle(document.querySelector('.notification-card')).backgroundColor!=='rgba(0, 0, 0, 0)'`);
  assert.notEqual(await evaluate(`getComputedStyle(document.querySelector('.notification-card')).backgroundColor`),'rgba(0, 0, 0, 0)');
  await shot('notifications-fallback');
  await evaluate(`notificationContextLoss.restoreContext()`);

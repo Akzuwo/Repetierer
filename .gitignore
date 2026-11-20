@@ -143,6 +143,7 @@ importer-samples/
 /issue-handler/
 /scripts/cloudflare-*
 /test/cloudflareE2E.test.js
+/test/cloudflareMail.test.js
 /docs/cloudflare-deployment.md
 /.github/workflows/cloudflare*.yml
 /.github/workflows/cloudflare*.yaml
@@ -158,6 +159,9 @@ importer-samples/
 settings.json
 backup.json
 migrations.json
+local-api-token
+local-api.json
+smtp-mail-usage.json
 unterrichtssessions.json
 *.sqlite
 *.sqlite-*

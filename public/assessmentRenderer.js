@@ -1,3 +1,4 @@
+const {suggestedGrade} = require('../src/assessment/grade');
 const notify = require('./notifications');
 const roundNoticeSignatures = new Set();
 const { ipcRenderer } = require('electron');
@@ -27,21 +28,11 @@ const elements = {
 	assessmentConfigStatus: document.getElementById('assessment-config-status'),
 	assessmentApiStatus: document.getElementById('assessment-api-status'),
 	assessmentConfigImport: document.getElementById('assessment-config-import-btn'),
-	assessmentApiTest: document.getElementById('assessment-api-test-btn'),
 	assessmentConfigRemove: document.getElementById('assessment-config-remove-btn'),
 	brevoStatus: document.getElementById('brevo-status'),
 	brevoImport: document.getElementById('brevo-import-btn'),
-	brevoTest: document.getElementById('brevo-test-btn'),
 	brevoRemove: document.getElementById('brevo-remove-btn'),
-	confirmModal: document.getElementById('assessment-confirm-modal'),
-	confirmText: document.getElementById('assessment-confirm-text'),
-	confirmSend: document.getElementById('assessment-confirm-send-btn'),
-	confirmCancel: document.getElementById('assessment-confirm-cancel-btn'),
-	deleteModal: document.getElementById('assessment-delete-modal'),
-	deleteText: document.getElementById('assessment-delete-text'),
-	deleteSentWarning: document.getElementById('assessment-delete-sent-warning'),
-	deleteConfirm: document.getElementById('assessment-delete-confirm-btn'),
-	deleteCancel: document.getElementById('assessment-delete-cancel-btn')
+
 };
 
 let loadedClasses = [];
@@ -49,8 +40,14 @@ let selectedClass = '';
 let overview = null;
 let roundView = null;
 let teacherIndex = 0;
-let pendingSendMode = 'pending';
 let brevoState = { configured: false };
+let integrationRequest=0;
+ipcRenderer.on('settings-saved',(_event,settings)=>{
+ if(brevoState.mode==='smtp'&&settings.localMailDailyLimit){
+  brevoState.dailyLimit=settings.localMailDailyLimit;
+  elements.brevoStatus.innerText=`Lokaler SMTP-Versand · Tageslimit ${settings.localMailDailyLimit}`;
+ }
+});
 let busy = false,viewRequest=0,renderedTeacherKey=null;
 const teacherDrafts=new Map();
 function captureTeacherDraft(){
@@ -58,8 +55,9 @@ function captureTeacherDraft(){
  const ratings={},comments={};
  elements.body.querySelectorAll('[data-teacher-criterion]').forEach(input=>{ratings[input.dataset.teacherCriterion]={value:Number(input.value),rated:input.dataset.rated==='true'};});
  elements.body.querySelectorAll('[data-teacher-comment]').forEach(input=>{comments[input.dataset.teacherComment]=input.value;});
- teacherDrafts.set(renderedTeacherKey,{ratings,comments,comment:document.getElementById('teacher-comment').value});
+ teacherDrafts.set(renderedTeacherKey,{ratings,comments,grade:document.getElementById('teacher-grade').value,manual:document.getElementById('teacher-grade').dataset.manual==='true',comment:document.getElementById('teacher-comment').value});
 }
+window.captureAssessmentDraft=captureTeacherDraft;
 function teacherKey(student){return JSON.stringify([roundView.filePath||'',selectedClass,roundView.round.id,student.id]);}
 const autoSyncErrors = new Set();
 ipcRenderer.on('assessment:auto-synced', async (_event,payload) => {
@@ -128,40 +126,19 @@ elements.assessmentConfigImport.addEventListener('click', () => integrationActio
 		if (result && result.deleteError) showNotice(result.deleteError, 'warning');
 		if (result && result.formWarning) showNotice(result.formWarning, 'warning');
 }));
-elements.assessmentApiTest.addEventListener('click', async () => {
-	try {
-		const status = await invoke('assessment:api-test');
-		setIntegrationMessage(elements.assessmentApiStatus, status.fallback ? 'API: Erreichbar über akzuwo.ch (Fallback)' : 'API: Erreichbar', 'success');
-	} catch (error) {
-		setIntegrationMessage(elements.assessmentApiStatus, `API: ${error.message}`, 'error');
-	}
-});
 elements.assessmentConfigRemove.addEventListener('click', () => integrationAction('assessment:config-remove', elements.assessmentConfigStatus, loadIntegrationStatuses));
 elements.brevoImport.addEventListener('click', () => integrationAction('assessment:config-import', elements.brevoStatus, result => {
 		loadIntegrationStatuses();
 		if (result && result.deleteError) showNotice(result.deleteError, 'warning');
 		if (result && result.formWarning) showNotice(result.formWarning, 'warning');
 	}));
-elements.brevoTest.addEventListener('click', async () => {
-	const result = await invoke('assessment:brevo-test');
-	setIntegrationMessage(elements.brevoStatus, result.ok ? 'Verbindung erfolgreich' : result.error, result.ok ? 'success' : 'error');
-});
 elements.brevoRemove.addEventListener('click', () => integrationAction('assessment:brevo-remove', elements.brevoStatus, loadIntegrationStatuses));
-
-elements.confirmCancel.addEventListener('click', closeConfirm);
-elements.confirmModal.addEventListener('click', event => { if (event.target === elements.confirmModal) closeConfirm(); });
-elements.confirmSend.addEventListener('click', async () => {
-	closeConfirm();
-	await sendRound(pendingSendMode);
-});
-elements.deleteCancel.addEventListener('click', closeDeleteConfirm);
-elements.deleteModal.addEventListener('click', event => { if (event.target === elements.deleteModal) closeDeleteConfirm(); });
-elements.deleteConfirm.addEventListener('click', deleteRound);
 
 async function openAssessment() {
  if(busy && !elements.view.classList.contains('update-hidden')){closeDrawer();return;}
  if(busy){viewRequest++;setBusy(false);}
 	if (assessmentMotion.beginPageChange(() => { openAssessment(); })) return;
+    window.dismissStudentDossiers?.();
 	window.dismissRepetiererSettingsForNavigation?.();
 	window.dismissRepetiererExcelEditorForNavigation?.();
 	closeDrawer();
@@ -191,6 +168,7 @@ async function openAssessment() {
 function openRepetition() {
  captureTeacherDraft();viewRequest++;setBusy(false);
 	if (assessmentMotion.beginPageChange(() => { openRepetition(); })) return;
+    window.dismissStudentDossiers?.();
 	window.dismissRepetiererSettingsForNavigation?.();
 	window.dismissRepetiererExcelEditorForNavigation?.();
 	closeDrawer();
@@ -334,7 +312,7 @@ function renderRound(background = false) {
 			<span><strong>${escapeHtml(duplicate.email)}</strong><small>${duplicate.count} Antworten</small></span>
 			<select data-select-response>${duplicate.responses.map(response => `<option value="${escapeAttribute(response.externalResponseId)}"${response.externalResponseId === duplicate.selectedResponseId ? ' selected' : ''}>${escapeHtml(formatDateTime(response.timestamp))}</option>`).join('')}</select>
 		</div>`).join('');
-	const invalidHint = !deliveryValidation.valid ? `${deliveryValidation.incomplete.length} Schüler noch nicht versandbereit.` : !brevoState.configured ? 'Brevo SMTP ist noch nicht eingerichtet.' : '';
+	const invalidHint = !deliveryValidation.valid ? `${deliveryValidation.incomplete.length} Schüler noch nicht versandbereit.` : !brevoState.configured ? brevoState.error||'E-Mail-Versand ist noch nicht eingerichtet.' : '';
 	elements.body.innerHTML = `
 		<div class="assessment-metrics">
 			${metric('Selbstbeurteilungen', summary.selfCount, summary.studentCount)}
@@ -343,7 +321,7 @@ function renderRound(background = false) {
 			${metric('Synchronisation', summary.lastSyncStatus === 'failed' ? 'Fehler' : syncLabel, '')}
 		</div>
 		<div class="assessment-toolbar">
-			<button class="btn-1${assessmentConfigured ? '' : ' disabled'}" id="assessment-sync-btn" title="${assessmentConfigured ? '' : 'Mitmachnoten-Konfiguration fehlt'}">Antworten aktualisieren</button>
+			<button class="btn-1${assessmentConfigured ? '' : ' disabled'}" id="assessment-sync-btn" title="${assessmentConfigured ? '' : 'Konfiguration für Mündliche Mitarbeit fehlt'}">Antworten aktualisieren</button>
 			<button class="btn-2${invitation?.url ? '' : ' disabled'}" id="assessment-invitation-btn" ${invitation?.url ? '' : 'disabled'}>Einladungslink kopieren</button>
 			<button class="btn-1" id="assessment-teacher-btn">Beurteilungen öffnen</button>
 			<button class="btn-2${deliveryValidation.valid && brevoState.configured ? '' : ' disabled'}" id="assessment-send-btn" title="${escapeAttribute(invalidHint)}">Klassensatz versenden</button>
@@ -354,7 +332,7 @@ function renderRound(background = false) {
 		${assessmentConfigured && ['closed','pending'].includes(round.cloudStatus) ? `<div class="assessment-reopen"><label>Neue Abgabefrist<input id="assessment-reopen-deadline" type="date" min="${deadlineBounds().min}" max="${deadlineBounds().max}" value="${zurichDate(Date.now()+7*DAY)}"></label><button class="btn-2" id="assessment-reopen-round-btn">${round.cloudStatus==='pending' ? 'Abgabefrist korrigieren und veröffentlichen' : 'Runde wieder öffnen'}</button><p>Der bestehende Umfragelink und bereits gespeicherte Antworten bleiben erhalten.</p></div>` : ''}
 		${assessmentConfigured ? '<p class="assessment-auto-sync-note">Antworten werden automatisch alle 30 Sekunden synchronisiert.</p>' : ''}
 		<details class="assessment-danger-zone"><summary>Weitere Aktionen</summary><button class="btn-danger" id="assessment-delete-round-btn">Runde lokal und online löschen</button></details>
-		${!assessmentConfigured ? `<div class="assessment-warning">${!round.cloudStatus ? 'Diese Runde ist lokal archiviert. Gespeicherte Beurteilungen bleiben bearbeitbar. Für neue Online-Abgaben erstelle eine neue Runde.' : 'Die Online-Umfrage ist noch nicht verbunden. Importiere die Mitmachnoten-Konfiguration in den Einstellungen.'}</div>` : ''}
+		${!assessmentConfigured ? `<div class="assessment-warning">${!round.cloudStatus ? 'Diese Runde ist lokal archiviert. Gespeicherte Beurteilungen bleiben bearbeitbar. Für neue Online-Abgaben erstelle eine neue Runde.' : 'Die Online-Umfrage ist noch nicht verbunden. Importiere die Konfiguration für Mündliche Mitarbeit in den Einstellungen.'}</div>` : ''}
 		${summary.duplicateCount ? `<section class="assessment-duplicates"><h3>Mehrfachantworten</h3><p class="assessment-warning">Standardmäßig wird die neueste Antwort verwendet. Hier kann eine frühere Abgabe gewählt werden.</p>${duplicates}</section>` : ''}
 		${unmatched ? `<section class="assessment-unmatched"><h3>Manuelle Zuordnung erforderlich</h3>${unmatched}</section>` : ''}
 		<section class="assessment-roster"><h3>Klassenübersicht</h3>${studentRows}</section>
@@ -455,15 +433,25 @@ function openTeacher(index) {
 	}).join('');
 	elements.body.innerHTML = `
 		<section class="teacher-assessment">
+            <div id="teacher-participation"></div>
 			<p class="teacher-rating-hint">Bewertung von 1 bis 5: Regler anklicken oder ziehen. Kommentare kannst du bei Bedarf aufklappen.</p>
 			<div class="teacher-grid-heading"><span>Kriterium</span><span>Schüler</span><span>Lehrer</span><span>Differenz</span></div>
 			${criteriaRows}
 			<div class="teacher-comments"><div><h3>Zusätzliche Qualität</h3><p>${escapeHtml(assessment.studentAdditionalQuality || 'Keine Angabe.')}</p></div><div><h3>Sonstige Bemerkungen</h3><p>${escapeHtml(assessment.studentComment || 'Keine Angabe.')}</p></div><label><h3>Kommentar Lehrer</h3><textarea id="teacher-comment" rows="5" maxlength="4000">${escapeHtml(draft?.comment ?? assessment.teacherComment ?? '')}</textarea></label></div>
-			<div class="teacher-actions"><button class="btn-2${teacherIndex === 0 ? ' disabled' : ''}" id="teacher-previous-btn" ${teacherIndex===0 ? 'disabled' : ''}>Vorheriger</button><button class="btn-1" id="teacher-save-btn">Speichern</button><button class="btn-1" id="teacher-next-btn">Speichern & nächster</button></div>
+			<div class="teacher-grade-summary"><label for="teacher-grade">Note</label><input id="teacher-grade" type="text" inputmode="decimal" autocomplete="off" placeholder="1–6"><button type="button" class="btn-2" id="teacher-grade-reset">Vorschlag übernehmen</button><p id="teacher-grade-suggestion" aria-live="polite"></p><p>Alle Kriterien zählen gleich. Negative Kriterien werden umgekehrt gewertet. Der Durchschnitt von 1–5 wird linear auf die Notenskala 1–6 übertragen und auf eine Dezimalstelle gerundet.</p></div>
+            <div class="teacher-actions"><button class="btn-2${teacherIndex === 0 ? ' disabled' : ''}" id="teacher-previous-btn" ${teacherIndex===0 ? 'disabled' : ''}>Vorheriger</button><button class="btn-1" id="teacher-save-btn">Speichern</button><button class="btn-1" id="teacher-next-btn">Speichern & nächster</button></div>
 		</section>`;
  renderedTeacherKey=key;
+ const gradeInput=document.getElementById('teacher-grade');
+ gradeInput.dataset.manual=String(draft ? draft.manual : assessment.teacherGradeManual===true);
+ gradeInput.value=draft?.grade ?? assessment.teacherGrade ?? '';
+ gradeInput.addEventListener('input',()=>{gradeInput.dataset.manual='true';});
+ document.getElementById('teacher-grade-reset').onclick=()=>{gradeInput.dataset.manual='false';updateGradeSuggestion();};
+ const participation=(roundView.participation||[]).find(row=>row.studentId===student.sourceId);
+ document.getElementById('teacher-participation').innerHTML=require('../src/studentDossierView').participationHtml(participation);
+ updateGradeSuggestion();
 	elements.body.querySelectorAll('[data-teacher-criterion]').forEach(input => {
-		const rate = () => {input.dataset.rated = 'true'; updateDifferences();};
+		const rate = () => {input.dataset.rated = 'true'; updateDifferences();updateGradeSuggestion();};
 		input.addEventListener('input', rate);
 		input.addEventListener('change', rate);
 		// A click on the middle value must also count as an intentional rating.
@@ -478,6 +466,12 @@ function openTeacher(index) {
 	document.getElementById('teacher-next-btn').addEventListener('click', () => saveTeacher(true));
 }
 
+function updateGradeSuggestion(){
+ const answers={};elements.body.querySelectorAll('[data-teacher-criterion]').forEach(input=>{answers[input.dataset.teacherCriterion]=input.dataset.rated==='true'?Number(input.value):null;});
+ const grade=suggestedGrade(roundView.round.criteria,answers),input=document.getElementById('teacher-grade');
+ document.getElementById('teacher-grade-suggestion').textContent=grade===null?'Vorschlag nach vollständiger Bewertung.':`Berechneter Vorschlag: ${grade.toFixed(1)}`;
+ if(input.dataset.manual!=='true')input.value=grade===null?'':grade.toFixed(1);
+}
 function formatCriterionValue(criterion, value) {
 	const numeric = Number(value);
 	if (!Number.isInteger(numeric) || numeric < 1 || numeric > 5) return '–';
@@ -510,7 +504,7 @@ async function saveTeacher(moveNext) {
 	elements.body.querySelectorAll('[data-teacher-comment]').forEach(field => { criterionComments[field.dataset.teacherComment] = field.value; });
 	try {
   setBusy(true,'Lehrerbeurteilung wird gespeichert …');
-		const updated = await invoke('assessment:save-teacher', { className: selectedClass, roundId: roundView.round.id, studentId: student.id, answers, criterionComments, comment: document.getElementById('teacher-comment').value });
+		const updated = await invoke('assessment:save-teacher', { className: selectedClass, roundId: roundView.round.id, studentId: student.id, answers, criterionComments, grade: Number(document.getElementById('teacher-grade').value.trim().replace(',','.')), comment: document.getElementById('teacher-comment').value });
   if(request!==viewRequest || className!==selectedClass || roundView?.round.id!==roundId || elements.view.classList.contains('update-hidden'))return;
   teacherDrafts.delete(teacherKey(student));renderedTeacherKey=null;
 		roundView = updated;
@@ -523,43 +517,40 @@ async function saveTeacher(moveNext) {
 	} finally {if(request===viewRequest)setBusy(false);}
 }
 
-function openSendConfirm(mode) {
-	pendingSendMode = mode;
-	const count = mode === 'failed_only' ? roundView.summary.failedCount : roundView.summary.studentCount - roundView.summary.sentCount;
-	elements.confirmText.innerText = `${count} E-Mail${count === 1 ? '' : 's'} werden über Brevo versendet. Bereits erfolgreich versendete Resultate werden nicht erneut verschickt.`;
-	elements.confirmSend.innerText = `${count} E-Mail${count === 1 ? '' : 's'} senden`;
-	assessmentMotion.openDialog(elements.confirmModal);
+const questions=require('./questions');
+let decisionPending=false,deletingRound=false;
+async function openSendConfirm(mode) {
+ if(decisionPending||!roundView)return;
+ decisionPending=true;
+ const id=roundView.round.id, className=selectedClass;
+ const count=mode==='failed_only'?roundView.summary.failedCount:roundView.summary.studentCount-roundView.summary.sentCount;
+ try {
+  const answer=await questions.askQuestion({title:'Resultate per E-Mail senden?',content:`${count} E-Mail${count===1?'':'s'} werden versendet. Erfolgreich versendete Resultate werden nicht erneut geschickt.`,buttons:['Nicht senden',`${count} E-Mail${count===1?'':'s'} senden`],highlight:2,focus:1});
+  if(answer.action==='button2'&&roundView?.round.id===id&&selectedClass===className)await sendRound(mode);
+ }finally{decisionPending=false;}
 }
-
-function closeConfirm() {
-	assessmentMotion.closeDialog(elements.confirmModal);
-}
-
-function openDeleteConfirm() {
-	const sentCount = roundView.summary.sentCount;
-	elements.deleteText.innerText = `Die Beurteilungsrunde „${roundView.round.title}“ und alle lokal gespeicherten Antworten und Bewertungen dieser Runde werden gelöscht.`;
-	elements.deleteSentWarning.innerText = sentCount ? `Achtung: Für ${sentCount} bereits versendete${sentCount === 1 ? 's Resultat' : ' Resultate'} gehen die lokalen Versanddaten verloren.` : '';
-	elements.deleteSentWarning.classList.toggle('update-hidden', sentCount === 0);
-	assessmentMotion.openDialog(elements.deleteModal);
-}
-
-function closeDeleteConfirm() {
-	assessmentMotion.closeDialog(elements.deleteModal);
+async function openDeleteConfirm() {
+ if(decisionPending||!roundView)return;
+ decisionPending=true;
+ const id=roundView.round.id,className=selectedClass,sent=roundView.summary.sentCount;
+ try {
+  const answer=await questions.askQuestion({title:'Beurteilungsrunde löschen?',content:`Die Antworten und Bewertungen von „${roundView.round.title}“ werden gelöscht.${sent?` Auch die lokalen Versanddaten von ${sent} Resultaten gehen verloren.`:''}`,buttons:['Runde behalten','Runde löschen'],highlight:1,focus:1,destructive:2});
+  if(answer.action==='button2'&&roundView?.round.id===id&&selectedClass===className)await deleteRound();
+ }finally{decisionPending=false;}
 }
 
 async function deleteRound() {
-	if (elements.deleteConfirm.classList.contains('disabled')) return;
+	if(deletingRound)return;
 	try {
-		elements.deleteConfirm.classList.add('disabled');
+		deletingRound=true;
 		overview = await invoke('assessment:delete-round', { className: selectedClass, roundId: roundView.round.id });
-		closeDeleteConfirm();
 		roundView = null;
 		renderOverview();
 		showNotice('Beurteilungsrunde gelöscht.', 'success');
 	} catch (error) {
 		showNotice(error.message, 'error');
 	} finally {
-		elements.deleteConfirm.classList.remove('disabled');
+		deletingRound=false;
 	}
 }
 
@@ -578,19 +569,26 @@ async function sendRound(mode) {
 }
 
 async function loadIntegrationStatuses() {
+	const request=++integrationRequest;
 	try {
 		const [assessment, brevo] = await Promise.all([invoke('assessment:config-status'), invoke('assessment:brevo-status')]);
+		const connection=assessment.connection;
+		if(request!==integrationRequest)return;
 		brevoState = brevo;
 		elements.assessmentConfigStatus.innerText = assessment.configured ? 'Umfrage: Eingerichtet' : assessment.invalid ? assessment.error : 'Umfrage: Nicht eingerichtet';
-		elements.assessmentApiStatus.innerText = assessment.configured ? 'API: Noch nicht geprüft' : 'API: Nicht eingerichtet';
-		toggle(elements.assessmentApiTest, assessment.configured);
+		elements.assessmentApiStatus.innerText = !assessment.configured?'API: Nicht eingerichtet':!connection?'API: Wird automatisch geprüft …':connection.error?`API: ${connection.error}`:connection.fallback?'API: Erreichbar über akzuwo.ch (Fallback)':'API: Erreichbar';
 		toggle(elements.assessmentConfigRemove, assessment.configured);
 		elements.assessmentConfigImport.innerText = assessment.configured ? 'Konfiguration ersetzen' : 'Konfiguration importieren';
-		elements.brevoStatus.innerText = brevo.configured ? `Eingerichtet · ${brevo.fromName} <${brevo.fromEmail}>` : brevo.invalid ? brevo.error : 'Nicht eingerichtet';
-		toggle(elements.brevoTest, brevo.configured);
-		toggle(elements.brevoRemove, brevo.configured);
-		elements.brevoImport.innerText = brevo.configured ? 'Konfiguration ersetzen' : 'Konfiguration importieren';
+		elements.brevoStatus.innerText = brevo.configured ? brevo.mode==='cloud'?`Cloudversand · ${brevo.remaining} von 200 Mails heute verfügbar · gemeinsames Limit (UTC)`:`Lokaler SMTP-Versand · Tageslimit ${brevo.dailyLimit||200}` : brevo.invalid ? brevo.error : 'Lokaler SMTP-Versand ist nicht eingerichtet';
+		const localLimit=document.getElementById('smtp-mail-limit-setting');localLimit.disabled=brevo.mode==='cloud'||!!brevo.invalid;
+		const showSmtp=brevo.mode!=='cloud'&&!brevo.invalid;
+		document.getElementById('smtp-mail-limit-row').classList.toggle('update-hidden',!showSmtp);
+		document.getElementById('smtp-settings-actions').classList.toggle('update-hidden',!showSmtp);
+		toggle(elements.brevoRemove, brevo.localConfigured??brevo.configured);
+		elements.brevoRemove.innerText='Lokale SMTP-Daten entfernen';
+		elements.brevoImport.innerText = brevo.localConfigured ? 'Lokale Konfiguration ersetzen' : 'Konfiguration importieren';
 	} catch (error) {
+		if(request!==integrationRequest)return;
 		setIntegrationMessage(elements.brevoStatus, error.message, 'error');
 	}
 }
@@ -646,7 +644,7 @@ function renderError(message) {
 }
 
 function showNotice(message, type = 'info') {
-	return notify[type](message,{title:'Mitmachnote'});
+	return notify[type](message,{title:'Mündliche Mitarbeit'});
 }
 
 function metric(label, value, total) {
@@ -671,3 +669,6 @@ function escapeAttribute(value) { return escapeHtml(value).replace(/`/g, '&#96;'
 function cssEscape(value) { return window.CSS && CSS.escape ? CSS.escape(value) : String(value).replace(/["\\]/g, '\\$&'); }
 
 module.exports = { invoke };
+ipcRenderer.on('assessment:health-changed',()=>void loadIntegrationStatuses());
+// Read the main process's startup result; subsequent health checks push updates.
+void loadIntegrationStatuses();

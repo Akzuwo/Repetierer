@@ -29,7 +29,9 @@ function initScrollEffects() {
    updates.push([element,state,shift,opacity]);
   }
   for(const [element,state,shift,opacity] of updates){state.shift=shift;element.style.translate=shift?`0 ${shift}px`:state.originalTranslate;element.style.opacity=shift?String(opacity):state.originalOpacity;}
-  window.repetiererKristall?.clock.animateFor(90);
+  // Commit the optical layer after the DOM updates in this same frame. A
+  // scheduled spring tick would leave the fixed canvas one frame behind.
+  window.repetiererKristall?.renderer?.draw();
  }
  function refresh(){
   for(const [element,state] of items)if(!element.isConnected){observer.unobserve(element);items.delete(element);}
@@ -44,7 +46,7 @@ function initScrollEffects() {
  const mutations=new MutationObserver(records=>{if(records.some(r=>r.type==='attributes'||[...r.addedNodes,...r.removedNodes].some(n=>n.nodeType===1)))refresh();});
  mutations.observe(document.getElementById('container'),{subtree:true,childList:true,attributes:true,attributeFilter:['class','hidden']});
  document.addEventListener('scroll',event=>{const root=event.target===document?document.scrollingElement:event.target;if(!root||typeof root.scrollTop!=='number')return;const previous=scrolls.get(root);scrolls.set(root,{top:root.scrollTop,direction:root.scrollTop<(previous?.top||0)?-1:1});schedule();},{capture:true,passive:true,signal});
- const finish=()=>{for(const [element,state]of items)restore(element,state);};
+ const finish=()=>{for(const [element,state]of items)restore(element,state);window.repetiererKristall?.renderer?.draw();};
  preference.addEventListener('change',()=>{if(preference.matches)finish();else schedule();},{signal});
  document.addEventListener('visibilitychange',()=>{if(document.hidden)finish();else schedule();},{signal});
  window.addEventListener('resize',refresh,{signal});refresh();

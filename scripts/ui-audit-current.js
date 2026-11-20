@@ -53,8 +53,8 @@ async function main() {
 			replace('#log-list', '');
 			replace('#problem-report-summary', '');
 			replace('#problem-report-details', '');
-			replace('#assessment-confirm-text', 'Vorschau der Versandaktion.');
-			replace('#assessment-delete-text', 'Diese Beurteilungsrunde wird lokal gelöscht.');
+			replace('#question-content', 'Vorschau der Versandaktion.');
+			replace('#question-content', 'Diese Beurteilungsrunde wird lokal gelöscht.');
 			replace('#assessment-delete-sent-warning', '');
 			replace('#assessment-body', 'Bitte wähle eine Klasse.');
 			replace('#session-class-name', 'Klasse 1');
@@ -136,8 +136,8 @@ async function main() {
 		'person-modal', 'absence-modal', 'backup-modal', 'log-modal', 'problem-report-modal',
 		'reload-conflict-modal', 'class-import-modal', 'teacher-help-modal', 'joker-migration-modal',
 		'joker-migration-help-modal', 'probabilities-modal', 'excel-editor-modal', 'update-news-modal',
-		'settings-help-modal', 'session-end-modal', 'participation-modal',
-		'assessment-confirm-modal', 'assessment-delete-modal'
+		'settings-help-modal', 'participation-modal',
+		'question-modal'
 	];
 	for (const id of modals) {
 		await evaluate(`(() => { document.querySelectorAll('.modal').forEach(item => { item.style.display = 'none'; item.classList.remove('modal-open'); }); const modal = document.getElementById(${JSON.stringify(id)}); modal.style.display = 'block'; modal.classList.add('modal-open'); return true; })()`);

@@ -33,12 +33,16 @@ test('ein portables Paket überträgt SMTP und Cloudflare zusammen und behält d
 test('ungültige und gerätegebundene Pakete verändern die bestehende Konfiguration nicht', async () => {
 	const dir=fs.mkdtempSync(path.join(os.tmpdir(),'repetierer-bundle-invalid-')),file=path.join(dir,'invalid.repetierer'),internal=path.join(dir,'internal.env');
 	fs.writeFileSync(internal,assessmentEnv+brevoEnv);const before=fs.readFileSync(internal);
-	for(const bundle of [{format:'repetierer-settings',version:2,values:parseEnv(assessmentEnv+brevoEnv)},{format:'repetierer-settings',version:1,values:parseEnv(assessmentEnv)},{format:'repetierer-settings',version:1,values:{...parseEnv(assessmentEnv+brevoEnv),ASSESSMENT_TEACHER_TOKEN:'encrypted:abc='}}]) {
+	for(const bundle of [{format:'repetierer-settings',version:2,values:parseEnv(assessmentEnv+brevoEnv)},{format:'repetierer-settings',version:1,values:{...parseEnv(assessmentEnv),BREVO_SMTP_HOST:'incomplete'}},{format:'repetierer-settings',version:1,values:{...parseEnv(assessmentEnv+brevoEnv),ASSESSMENT_TEACHER_TOKEN:'encrypted:abc='}}]) {
 		fs.writeFileSync(file,JSON.stringify(bundle));await assert.rejects(importIntegrationEnv(file,internal));assert.deepEqual(fs.readFileSync(internal),before);assert.ok(fs.existsSync(file));
 	}
 });
-test('Paketexport benötigt beide Verbindungen und exportiert keine fremden Schlüssel',()=>{
-	assert.throws(()=>exportIntegrationFile('unused.repetierer',parseEnv(assessmentEnv)),/Fehlende/);
+test('Cloudpaket exportiert nur Cloudzugang und importiert ohne SMTP; fremde Schlüssel bleiben verboten',async()=>{
+	const dir=fs.mkdtempSync(path.join(os.tmpdir(),'repetierer-cloud-bundle-')),file=path.join(dir,'cloud.repetierer');
+	exportIntegrationFile(file,parseEnv(assessmentEnv+brevoEnv),{cloudOnly:true});
+	const result=parsePortableConfig(fs.readFileSync(file));assert.equal(result.BREVO_SMTP_PASSWORD,undefined);
+	const internal=path.join(dir,'internal.env');fs.writeFileSync(internal,brevoEnv);
+	await importIntegrationEnv(file,internal);assert.equal(readBrevoConfig(internal).password,'secret value');
 	assert.throws(()=>parsePortableConfig(JSON.stringify({format:'repetierer-settings',version:1,values:{...parseEnv(assessmentEnv+brevoEnv),COMMAND:'run me'}})),/unbekannte/);
 });
 test('fehlgeschlagene API-Prüfung oder lokaler Schlüsselspeicher bewahren vorhandene Daten',async()=>{

@@ -54,7 +54,7 @@ function history(sheet,row) {
     if(!validGrade(grade)||typeof weight!=='number'||!Number.isFinite(weight)||weight<=0||weight>5)throw new Error('Eine Hausaufgabennote oder ihr Gewicht ist ungültig.');
     let meta={};const raw=sheet.getCell(row,slot.meta).value;
     if(!empty(raw)){try{meta=JSON.parse(raw);if(!meta || typeof meta!=='object' || Array.isArray(meta))throw new Error();}catch{throw new Error('Ein Hausaufgabeneintrag ist beschädigt.');}}
-    return {index:slot.index,columns:{...slot},grade,weight,date:sheet.getCell(row,slot.date).value,id:meta.id,awardExtraJoker:meta.awardExtraJoker===true};
+    return {index:slot.index,columns:{...slot},grade,weight,date:sheet.getCell(row,slot.date).value,id:meta.id,voluntary:typeof meta.voluntary==='boolean'?meta.voluntary:null,awardExtraJoker:meta.awardExtraJoker===true};
   });
 }
 function weightedAverage(sheet,row) {
@@ -82,7 +82,7 @@ function append(sheet,row,entry) {
   let slot=current.slots.find(item=>empty(sheet.getCell(row,item.grade).value));
   if(!slot){if(sheet.columnCount+4>16384)throw new Error('Keine weiteren Excelspalten verfügbar.');addSlot(sheet,current.slots.length+1,sheet.columnCount+1);slot=layout(sheet).slots.at(-1);}
   sheet.getCell(row,slot.grade).value=entry.grade;sheet.getCell(row,slot.date).value=entry.date;sheet.getCell(row,slot.weight).value=entry.weight;
-  sheet.getCell(row,slot.meta).value=JSON.stringify({id:entry.homeworkId||entry.id,awardExtraJoker:!!entry.awardExtraJoker});
+  sheet.getCell(row,slot.meta).value=JSON.stringify({...(typeof entry.voluntary==='boolean'?{voluntary:entry.voluntary}:{}),id:entry.homeworkId||entry.id,awardExtraJoker:!!entry.awardExtraJoker});
   if(entry.awardExtraJoker)sheet.getCell(row,8).value=Number(sheet.getCell(row,8).value||0)+1;
   refreshFormulas(sheet);return true;
 }

@@ -70,6 +70,8 @@ ipcMain.on('class', event => event.reply('ready', false));
 ipcMain.on('get-session-setup', event => event.reply('session-setup-data', { className: 'L23a', persons: students }));
 ipcMain.on('start-teaching-session', event => event.reply(failTeachingStart?'teaching-session-start-failed':'teaching-session-started', failTeachingStart?{reason:'test-retry'}:session));
 ipcMain.on('end-teaching-session', event => event.reply('teaching-session-ended'));
+ipcMain.handle('session:finish-status',()=>({sessionId:session.id,className:session.className,selectionToken:null,hasGrade:false,saving:false}));
+ipcMain.handle('session:finish',event=>{event.sender.send('teaching-session-ended');return {success:true};});
 ipcMain.on('start', event => event.reply('name', ['Anna Müller', 0], students.map(item => item.name), students[0]));
 
 const evaluate = expression => win.webContents.executeJavaScript(expression, true);
@@ -285,7 +287,7 @@ async function main() {
 	await pause(2100);
 	assert.equal(await evaluate(`document.getElementById('name').textContent`), 'Max');
 	await click('end-session-btn');
-	await click('confirm-session-end-btn');
+	await waitFor(`document.getElementById('question-modal').classList.contains('modal-open')`);await pause(450);await click('question-button2');
 	await waitFor(`!document.getElementById('session-empty-view').classList.contains('update-hidden')`);
 	assert.equal(await evaluate(`!!document.getElementById('class-list').closest('#session-empty-view')`), true, 'The single class list returns home after the session');
 	await pause(400);
@@ -450,7 +452,7 @@ async function main() {
 	await waitFor(`getComputedStyle(document.getElementById('ai-modal')).display === 'none' && !document.getElementById('settings-view').classList.contains('update-hidden')`);
 	assert.equal(await evaluate(`!!document.activeElement.closest('#settings-view')`), true, 'Opening settings waits for the chat exit and retains focus inside the new dialog');
 	await shot('settings');
-	await click('close-settings-modal');
+	await click('settings-back-btn');
 	await waitFor(`getComputedStyle(document.getElementById('settings-view')).display === 'none'`);
 	aiState = 'ready';
 	await waitFor(`getComputedStyle(document.getElementById('ai-modal')).display === 'none'`);

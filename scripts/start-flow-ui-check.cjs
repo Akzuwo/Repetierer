@@ -96,7 +96,7 @@ module.exports=async function check({win,evaluate,waitFor,shot,pause,setStartFai
  await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
  await evaluate(`document.getElementById('participation-student-list').scrollTop=99999`);await pause(200);
  assert.equal(await evaluate(`[...document.querySelectorAll('.participation-student')].some(el=>el.getAnimations().length>0)`),false);
- await evaluate(`document.getElementById('end-session-btn').click();document.getElementById('confirm-session-end-btn').click()`);
+ await evaluate(`document.getElementById('end-session-btn').click()`);await waitFor(`document.getElementById('question-modal').classList.contains('modal-open')`);await pause(450);await evaluate(`document.getElementById('question-button2').click()`);
  await waitFor(`!document.getElementById('content').classList.contains('session-active')`);
  console.log('START_FLOW_UI_PASS: open grids, inline attendance, red raster tint, keyboard, absent IDs, repeat scroll both ways, reduced motion');
 };

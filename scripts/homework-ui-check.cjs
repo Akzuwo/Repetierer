@@ -42,8 +42,8 @@ async function main(){
  assert.equal(await evaluate(`document.getElementById('settings-class-picker').checkVisibility()`),true);
  for(const size of [[1100,800],[1440,900]]){
   win.setSize(...size);await pause(300);
-  const dock=await evaluate(`(()=>{const d=document.getElementById('settings-navdock'),r=d.getBoundingClientRect(),b=document.getElementById('save-settings-btn').getBoundingClientRect();return {parent:d.parentElement.id,glass:d.dataset.glass,marker:!!d.querySelector('.nav-selection'),top:r.top,bottom:r.bottom,center:r.x+r.width/2,width:innerWidth,height:innerHeight,saveBottom:b.bottom};})()`);
-  assert.equal(dock.parent,'container');assert.ok(dock.glass && dock.marker);assert.ok(dock.top>dock.height*.8 && dock.bottom<=dock.height && Math.abs(dock.center-dock.width/2)<2);assert.ok(dock.saveBottom<dock.top,'Save actions do not overlap the floating dock');
+  const dock=await evaluate(`(()=>{const d=document.getElementById('settings-navdock'),r=d.getBoundingClientRect();return {parent:d.parentElement.id,glass:d.dataset.glass,marker:!!d.querySelector('.nav-selection'),top:r.top,bottom:r.bottom,center:r.x+r.width/2,width:innerWidth,height:innerHeight};})()`);
+  assert.equal(dock.parent,'container');assert.ok(dock.glass && dock.marker);assert.ok(dock.top>dock.height*.8 && dock.bottom<=dock.height && Math.abs(dock.center-dock.width/2)<2);
   await shot('settings-dock-empty-'+size[0]);
  }
  win.setSize(1100,800);await pause(200);
@@ -81,10 +81,11 @@ async function main(){
  }
  win.setSize(1100,800);await pause(200);
  await shot('homework-repetition-'+grade);
+  await click('#homework-voluntary');await until(`document.getElementById('homework-voluntary').checked`);
   await evaluate(`document.getElementById('homework-grade-input').value=${JSON.stringify(grade)}`);await shot('homework-grade');
   await click('#homework-save-btn');await until(`!!document.getElementById('homework-student-list')`);await settle();
  }
- assert.equal(program.getHomeworkPersons()[0].homework.length,2);assert.equal(program.getHomeworkPersons()[0].joker,2);
+ assert.equal(program.getHomeworkPersons()[0].homework.length,2);assert.equal(program.getHomeworkPersons()[0].homework[0].voluntary,true,'Voluntary choice is stored with the real Excel entry');assert.equal(program.getHomeworkPersons()[0].joker,2);
  await click('#homework-undo-btn');await until(`document.querySelector('#homework-student-list button span').textContent==='1 Vorführung'`);assert.equal(program.getHomeworkPersons()[0].joker,1);
  await click('#homework-redo-btn');await until(`document.querySelector('#homework-student-list button span').textContent==='2 Vorführungen'`);assert.equal(program.getHomeworkPersons()[0].joker,2);
  }
@@ -95,13 +96,13 @@ async function main(){
  await until(`window.getSettingsScopeContext().className==='Klasse B'`);
  for(const id of ['homework-joker-setting','homework-weight-setting']){await evaluate(`document.getElementById('${id}').scrollIntoView({block:'center'});document.getElementById('${id}').focus()`);await pause(150);win.webContents.sendInputEvent({type:'keyDown',keyCode:'Right'});win.webContents.sendInputEvent({type:'keyUp',keyCode:'Right'});}
  await pause(400);await click('#homework-enabled-setting');await until(`document.getElementById('homework-enabled-setting').checked===false`);assert.equal(await evaluate(`document.getElementById('homework-enabled-setting').checked`),false);
- assert.equal(await evaluate(`document.getElementById('settings-class-select').disabled`),true,'Class changes cannot discard a draft');
- await click('#save-settings-btn');await until(`document.getElementById('settings-view').classList.contains('update-hidden')`);await settle();
+ assert.equal(await evaluate(`document.getElementById('settings-class-select').disabled`),false,'Live saves allow switching classes without drafts');
+ await click('#settings-back-btn');await until(`document.getElementById('settings-view').classList.contains('update-hidden')`);await settle();
  assert.equal(storage.getClassSettings(file,'Klasse B').homeworkJokerThreshold,3);assert.equal(storage.getClassSettings(file,'Klasse B').homeworkWeight,1.3);
  assert.equal(storage.getClassSettings(file,'Klasse B').homeworkEnabled,false);assert.equal(storage.getClassSettings(file,'Klasse A').homeworkEnabled,true);
  if(!process.argv.includes('--settings-only'))assert.equal(await evaluate(`document.getElementById('session-homework-tab').classList.contains('update-hidden')`),false,'Editing another class does not change the current session');
  if(process.argv.includes('--settings-only')){console.log('SETTINGS_ONLY_PASS');return;}
- await click('#end-session-btn');await pause(450);await click('#confirm-session-end-btn');await until(`!document.getElementById('session-empty-view').classList.contains('update-hidden')`);await settle();
+ await click('#end-session-btn');await pause(450);await until(`document.getElementById('question-modal').classList.contains('modal-open')`);await pause(450);await click('#question-button2');await until(`!document.getElementById('session-empty-view').classList.contains('update-hidden')`);await settle();
  await click('#class-list button:nth-child(2)');await until(`!document.getElementById('session-attendance-view').classList.contains('update-hidden')`);await settle();await click('#confirm-session-start-btn');await until(`!document.getElementById('participation-view').classList.contains('update-hidden')`);await settle();
  assert.equal(await evaluate(`document.getElementById('session-homework-tab').classList.contains('update-hidden')`),true,'New class applies its own setting');
  const saved=new Excel.Workbook();await saved.xlsx.readFile(file);assert.equal(homework.layout(saved.getWorksheet('Klasse B')).slots.length,6,'All classes were extended once; disabling preserves their columns');

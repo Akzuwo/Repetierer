@@ -161,5 +161,6 @@ function initExcelEditor() {
 	ipcRenderer.on('classes', () => {if (visible()) {dismiss(); window.openRepetiererRepetition?.();} requestId++;});
 	window.openRepetiererExcelEditor = open;
 	window.dismissRepetiererExcelEditorForNavigation = dismiss;
+    window.requestRepetiererExcelEditorNavigation = action => {if(visible()){motion.setDrawerOpen(false);requestAction(action);}else action();};
 }
 module.exports = {initExcelEditor};

@@ -1,0 +1,33 @@
+const assert=require('node:assert/strict');
+module.exports=async({win,evaluate,waitFor,shot,pause})=>{
+ win.showInactive();
+ for(const size of [[1100,800],[1440,900]]){
+ win.setSize(...size);await pause(100);
+ await evaluate(`window.spacingQuestion=window.askQuestion({title:'Session beenden?',content:'In dieser Session wurde noch keine Repetition abgeschlossen.',buttons:['Session fortsetzen','Trotzdem beenden'],highlight:1,destructive:2});undefined`);
+ await waitFor(`document.getElementById('question-modal').classList.contains('modal-open')`);await pause(500);await evaluate('document.fonts.ready.then(()=>true)');
+ const spacing=await evaluate(`(()=>{const card=document.querySelector('#question-modal .modal-content'),title=document.getElementById('question-title'),text=document.getElementById('question-content'),a=document.getElementById('question-button1'),b=document.getElementById('question-button2');const r=card.getBoundingClientRect(),t=title.getBoundingClientRect(),p=text.getBoundingClientRect(),x=a.getBoundingClientRect(),y=b.getBoundingClientRect(),style=getComputedStyle(card);const range=document.createRange();range.selectNodeContents(title);const fontBox=range.getBoundingClientRect(),ctx=document.createElement('canvas').getContext('2d');ctx.font=getComputedStyle(title).font;const metrics=ctx.measureText(title.textContent);return {visibleTitleTop:fontBox.bottom-metrics.fontBoundingBoxDescent-metrics.actualBoundingBoxAscent-r.top,top:t.top-r.top,right:r.right-y.right,bottom:r.bottom-x.bottom,left:t.left-r.left,titleToText:p.top-t.bottom,textToActions:x.top-p.bottom,padding:style.padding,rowGap:style.rowGap,display:style.display,buttonMargin:getComputedStyle(a).margin,titleFont:parseFloat(getComputedStyle(title).fontSize),bodyFont:parseFloat(getComputedStyle(text).fontSize),buttonFont:parseFloat(getComputedStyle(a).fontSize),buttonHeight:x.height,buttonPadding:getComputedStyle(a).padding,buttonRadius:parseFloat(getComputedStyle(a).borderTopLeftRadius),buttonWidths:[x.width,y.width],textBoxTrimSupported:CSS.supports('text-box-trim','trim-start'),textBoxEdgeSupported:CSS.supports('text-box-edge','cap alphabetic'),titleTrim:getComputedStyle(title).textBoxTrim};})()`);
+ if(!process.argv.includes('--measure-only'))assert(Math.abs(spacing.visibleTitleTop-40)<2,'Visible title padding: '+JSON.stringify(spacing));
+ assert(spacing.buttonHeight>=64&&spacing.buttonHeight<=66&&spacing.buttonRadius===12&&spacing.buttonPadding==='18px 12px','Button proportions: '+JSON.stringify(spacing));
+ assert(spacing.buttonHeight/spacing.buttonFont<=3.4&&spacing.buttonHeight/spacing.buttonFont>=2.7&&spacing.titleFont/spacing.buttonFont===1.6&&spacing.bodyFont===spacing.buttonFont,'Reference text/button proportions: '+JSON.stringify(spacing));
+ assert(Math.abs(spacing.titleToText-20)<.6&&Math.abs(spacing.textToActions-32)<.6,'Vertical rhythm: '+JSON.stringify(spacing));
+ assert.equal(await evaluate(`document.documentElement.dataset.renderer==='webgl' && [...document.querySelectorAll('#question-modal button')].every(button=>button.dataset.glass==='pill' && button.classList.contains('crystal-glass') && getComputedStyle(button).backgroundColor==='rgba(0, 0, 0, 0)') && window.repetiererKristall.renderer.gl.getError()===0`),true,'Buttons use shared WebGL lenses');
+ const material=await evaluate(`(()=>{const renderer=window.repetiererKristall.renderer,gl=renderer.gl,canvas=renderer.canvas,box=canvas.getBoundingClientRect();const panel=document.querySelector('#question-modal .modal-content').getBoundingClientRect(),button=document.getElementById('question-button1').getBoundingClientRect();const points=[{x:panel.right-30,y:panel.top+panel.height/2},{x:button.left+26,y:button.top+26}];const sample=p=>{const rgba=new Uint8Array(4);gl.readPixels(Math.round((p.x-box.left)*canvas.width/box.width),canvas.height-1-Math.round((p.y-box.top)*canvas.height/box.height),1,1,gl.RGBA,gl.UNSIGNED_BYTE,rgba);return [...rgba].slice(0,3);};renderer.draw();const glass=points.map(sample),surfaces=[...document.querySelectorAll('#question-modal [data-glass]')],values=surfaces.map(e=>e.getAttribute('data-glass'));let scene;try{surfaces.forEach(e=>e.removeAttribute('data-glass'));renderer.draw();scene=points.map(sample);}finally{surfaces.forEach((e,i)=>e.setAttribute('data-glass',values[i]));renderer.draw();}return {difference:glass.map((color,i)=>Math.max(...color.map((value,j)=>Math.abs(value-scene[i][j])))),textColors:[...document.querySelectorAll('#question-modal button')].map(e=>getComputedStyle(e).color)};})()`);
+ assert(material.difference.every(value=>value<=18),'Glass should inherit the scene: '+JSON.stringify(material));
+ assert(material.textColors.every(value=>value==='rgb(255, 255, 255)'),'Button labels stay white: '+JSON.stringify(material));
+ console.log('QUESTION_SCENE_MATCH',JSON.stringify(material));
+ console.log('QUESTION_SPACING',size[0],JSON.stringify(spacing));await shot('question-spacing-'+size[0]);
+ if(!process.argv.includes('--measure-only'))for(const side of ['top','right','bottom','left'])assert(Math.abs(spacing[side]-40)<.6,`${side}: ${JSON.stringify(spacing)}`);
+ const point=await evaluate(`(()=>{const r=document.getElementById('question-button1').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)}})()`);
+ win.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,...point});win.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,...point});
+ assert.equal((await evaluate('spacingQuestion')).action,'button1');await pause(100);
+ }
+
+ await evaluate(`window.fallbackQuestion=window.askQuestion({title:'Session beenden?',content:'In dieser Session wurde noch keine Repetition abgeschlossen.',buttons:['Session fortsetzen','Trotzdem beenden'],highlight:1,destructive:2});undefined`);
+ await waitFor(`document.getElementById('question-modal').classList.contains('modal-open')`);await pause(500);
+ await evaluate(`window.repetiererKristall.renderer.gl.getExtension('WEBGL_lose_context').loseContext()`);
+ await waitFor(`document.documentElement.dataset.renderer==='css' && getComputedStyle(document.getElementById('question-button1')).backgroundColor!=='rgba(0, 0, 0, 0)'`);await pause(350);
+ await shot('question-buttons-fallback');
+ await evaluate(`document.getElementById('question-button1').click()`);await evaluate('fallbackQuestion');
+ assert.equal(await evaluate(`[...document.querySelectorAll('#question-modal button')].every(e=>getComputedStyle(e).color==='rgb(255, 255, 255)')`),true,'Fallback text remains white');
+ console.log('QUESTION_GLASS_PASS shared lenses, scene-matched card/buttons, white labels, native activation, fixed geometry and CSS fallback');
+};

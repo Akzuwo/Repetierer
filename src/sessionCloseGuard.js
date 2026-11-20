@@ -1,15 +1,16 @@
 const {randomUUID}=require('node:crypto');
 
-function createSessionCloseGuard({app,ipcMain,getActiveSession}) {
+function createSessionCloseGuard({app,ipcMain,getActiveSession,isSaving=()=>false}) {
  const windows=new Set(),pending=new Map();let approved=false;
  function ask(window,event) {
-  if(approved)return;const session=getActiveSession();if(!session)return;
+  if(approved)return;const session=getActiveSession();if(!session&&!isSaving())return;
   event?.preventDefault();
   if(window.isDestroyed())return;
   if(!pending.has(window)) {
-   const request={requestId:randomUUID(),sessionId:session.id};pending.set(window,request);
-   window.webContents.send('session-close-confirmation',{requestId:request.requestId,className:session.className});
+   const request={requestId:randomUUID(),sessionId:session?.id||null};pending.set(window,request);
   }
+  const request=pending.get(window);
+  window.webContents.send('session-close-confirmation',{requestId:request.requestId,className:session?.className||''});
   window.show();window.focus();
  }
  ipcMain.on('session-close-cancel',(event,requestId)=>{
@@ -19,12 +20,12 @@ function createSessionCloseGuard({app,ipcMain,getActiveSession}) {
   for(const [window,request]of pending) {
    if(window.webContents!==event.sender || request.requestId!==requestId)continue;
    const active=getActiveSession();pending.delete(window);
-   if(active && active.id!==request.sessionId){ask(window);return;}
+   if(active||isSaving()){ask(window);return;} // Session and in-flight writes must finish first.
    approved=true;app.quit();return;
   }
  });
  app.on('before-quit',event=>{
-  if(approved || !getActiveSession())return;
+  if(approved || (!getActiveSession()&&!isSaving()))return;
   const window=[...windows].find(window=>!window.isDestroyed());
   if(window)ask(window,event);
  });

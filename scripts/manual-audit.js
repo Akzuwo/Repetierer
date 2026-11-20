@@ -7,7 +7,7 @@ source = source.replace("path.join(__dirname, '..', '.ui-polish-smoke')", "path.
 source = source.replace('60000);', '240000);');
 source = source.replace('async function shot(name) {', 'async function originalShot(name) {');
 source = source.replace("path.join(output, 'home-empty.png')", "path.join(output, auditEntries.find(e=>e.name==='home-empty').file)").replace("path.join(output, 'home-classes.png')", "path.join(output, auditEntries.find(e=>e.name==='home-classes').file)");
-source = source.replace("await click('confirm-session-end-btn');", "await shot('session-end-confirmation'); await click('confirm-session-end-btn');");
+source = source.replace("await click('question-button2');", "await shot('session-end-confirmation'); await click('question-button2');");
 source = source.replace("await shot('session-participation');", `await shot('session-participation');
  await evaluate("document.querySelector('.participation-student').click()"); await shot('participation-score-modal');
  await click('participation-cancel-btn'); await pause(300);

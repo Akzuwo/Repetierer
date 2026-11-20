@@ -71,25 +71,25 @@ function fitName() {
 new ResizeObserver(fitName).observe(page);
 function renderGrade(person) {
  selected=person;page.classList.add('homework-grading');listHeader.classList.add('update-hidden');
- body.innerHTML=`<div class="neum homework-repetition-card"><div class="repetition-header"><h2>Hausaufgaben vorführen</h2></div><div class="button-row repetition-selection-actions"><button type="button" class="btn-2" id="homework-back-btn">Andere Person wählen</button><div class="repetition-tools" id="homework-grade-tools"></div></div><div class="repetition-stage"><h1 id="homework-student-name"></h1></div><form id="homework-grade-form"><div id="homework-grade-field"><label for="homework-grade-input">Note</label><input id="homework-grade-input" inputmode="decimal" type="text" placeholder="z.B. 5.5" required autocomplete="off"></div><button class="btn-2" type="button" id="homework-cancel-btn">Abbrechen</button><button class="btn-1" type="submit" id="homework-save-btn">Speichern</button></form></div>`;
+ body.innerHTML=`<div class="neum homework-repetition-card"><div class="repetition-header"><h2>Hausaufgaben vorführen</h2></div><div class="button-row repetition-selection-actions"><button type="button" class="btn-2" id="homework-back-btn">Andere Person wählen</button><label class="homework-voluntary"><input type="checkbox" id="homework-voluntary"> Freiwillig vorgeführt</label><div class="repetition-tools" id="homework-grade-tools"></div></div><div class="repetition-stage"><h1 id="homework-student-name"></h1></div><form id="homework-grade-form"><div id="homework-grade-field"><label for="homework-grade-input">Note</label><input id="homework-grade-input" inputmode="decimal" type="text" placeholder="z.B. 5.5" required autocomplete="off"></div><button class="btn-2" type="button" id="homework-cancel-btn">Abbrechen</button><button class="btn-1" type="submit" id="homework-save-btn">Speichern</button></form></div>`;
  body.querySelector('#homework-grade-tools').append(historyActions);
  body.querySelector('h1').textContent=person.name;fitName();
  body.querySelector('#homework-back-btn').onclick=()=>{if(!busy)change(()=>{selected=null;renderList();});};
  body.querySelector('#homework-cancel-btn').onclick=()=>body.querySelector('#homework-back-btn').click();
  body.querySelector('form').addEventListener('submit',async event=>{
   event.preventDefault();if(busy)return;
-  const input=body.querySelector('input'),grade=Number(input.value.trim().replace(',','.'));
+  const input=body.querySelector('#homework-grade-input'),grade=Number(input.value.trim().replace(',','.'));
   if(!input.value.trim() || !Number.isFinite(grade)||grade<1||grade>6){notify.error('Bitte eine Note zwischen 1 und 6 eingeben.',{title:'Hausaufgaben'});input.focus();return;}
   busy=true;body.querySelectorAll('button,input').forEach(e=>e.disabled=true);
   try {
-   const result=await ipcRenderer.invoke('homework:save',{sessionId:session.id,personId:person.id,grade});
+   const result=await ipcRenderer.invoke('homework:save',{sessionId:session.id,personId:person.id,grade,voluntary:body.querySelector('#homework-voluntary').checked});
    if(!result.success)throw new Error(result.error||'Die Note konnte nicht gespeichert werden.');
    if(result.entry.excelWriteSucceeded)notify.success(`Die Note wurde gespeichert.${result.entry.awardExtraJoker?' Ein Extra-Joker wurde gutgeschrieben.':''}`,{title:'Hausaufgaben'});
    selected=null;await load(true);
   }catch(error){notify.error(error.message,{title:'Hausaufgaben nicht gespeichert'});}
   finally{busy=false;if(selected)body.querySelectorAll('button,input').forEach(e=>e.disabled=false);}
  });
- motion.revealStudent(body.querySelector('h1'));body.querySelector('input').focus({preventScroll:true});
+ motion.revealStudent(body.querySelector('h1'));body.querySelector('#homework-grade-input').focus({preventScroll:true});
 }
 for(const [kind,channel] of [['undo','undo-status'],['redo','redo-status']]){
  const button=document.getElementById(`homework-${kind}-btn`);button.onclick=()=>{if(!busy)ipcRenderer.send(`${kind}-last-action`);};

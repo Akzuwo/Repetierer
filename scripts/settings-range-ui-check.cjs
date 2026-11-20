@@ -2,13 +2,13 @@ const assert=require('node:assert/strict');
 const {ipcMain}=require('electron');
 module.exports=async function({win,evaluate,waitFor,shot,pause}){
  const ids=['probability-factor-setting','never-selected-boost-factor-setting','wiggers-rule-duration-setting'];
- let saved;
- const onSave=(_event,payload)=>{saved=payload;};ipcMain.on('save-settings',onSave);
+ let saved={};
+ const onSave=(_event,payload)=>{Object.assign(saved,payload);};ipcMain.on('save-settings',onSave);
  win.showInactive();await waitFor(`document.visibilityState==='visible'`);
  await evaluate(`document.getElementById('settings-btn').click()`);
  await waitFor(`!document.getElementById('settings-view').classList.contains('update-hidden') && !document.getElementById('content').dataset.pageMotion`);
  assert.equal(await evaluate(`document.getElementById('settings-navdock').parentElement.id`),'container');
- assert.equal(await evaluate(`document.querySelectorAll('#settings-view input[type=range]').length`),6);
+ assert.equal(await evaluate(`document.querySelectorAll('#settings-view input[type=range]').length`),7);
  assert.equal(await evaluate(`document.querySelectorAll('#settings-view input[type=number]').length`),0);
  await evaluate(`document.getElementById('settings-class-tab').click()`);
  await waitFor(`!document.getElementById('content').dataset.pageMotion`);
@@ -48,7 +48,7 @@ module.exports=async function({win,evaluate,waitFor,shot,pause}){
  await focus(ids[1]);await pause(250);
  assert.ok(await evaluate(`[...document.querySelectorAll('#settings-class-fields .range-control')].every(e=>{const r=e.getBoundingClientRect();return r.width>150&&r.left>=0&&r.right<=innerWidth+1;})`),'All ranges fit a desktop viewport');
  await shot('settings-liquid-ranges-desktop-large');
- win.setSize(1100,800);await pause(150);await evaluate(`document.getElementById('save-settings-btn').click()`);
+ win.setSize(1100,800);await pause(150);await evaluate(`document.getElementById('settings-back-btn').click()`);
  await waitFor(`document.getElementById('settings-view').classList.contains('update-hidden')`);
  assert.equal(saved.notificationDurationSeconds,8);assert.equal(saved.probabilityDecreaseFactor,dragged);assert.equal(saved.neverSelectedBoostFactor,2.4);assert.equal(saved.wiggersRuleDurationMinutes,43);
  win.webContents.send('settings-data',saved,{},{},{filePath:'fixture.xlsx',className:'Demo',classes:['Demo']});
@@ -57,5 +57,5 @@ module.exports=async function({win,evaluate,waitFor,shot,pause}){
  await focus(ids[1]);await win.webContents.debugger.sendCommand('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});await key('Right');
  assert.equal(await output(ids[1]),'2.5×');assert.equal(await evaluate(`repetiererKristall.clock.active.size`),0);
  await evaluate(`document.getElementById('settings-back-btn').click()`);ipcMain.removeListener('save-settings',onSave);
- console.log('SETTINGS_RANGE_UI_PASS: six glass sliders in global/class panels, native drag/keyboard, limits, live values, disabled states, save/reload, desktop layout and reduced motion');
+ console.log('SETTINGS_RANGE_UI_PASS: seven glass sliders in global/class panels, native drag/keyboard, limits, live values, disabled states, live save/reload, desktop layout and reduced motion');
 };

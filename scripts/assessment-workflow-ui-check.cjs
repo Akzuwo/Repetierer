@@ -50,15 +50,17 @@ assert.equal(await evaluate(`!!document.querySelector('[data-copy],.assessment-i
  await click('#teacher-previous-btn');await settle();assert.match(await evaluate(`document.getElementById('assessment-heading').textContent`),/Anna Beispiel/);
  await evaluate(`const first=document.querySelector('[data-teacher-criterion]');first.scrollIntoView({block:'center'});first.focus()`);win.webContents.sendInputEvent({type:'keyDown',keyCode:'End'});win.webContents.sendInputEvent({type:'keyUp',keyCode:'End'});
  await until(`document.querySelector('[data-teacher-criterion]').dataset.rated==='true'`);
- await click('.teacher-criterion-comment summary');await evaluate(`document.querySelector('[data-teacher-comment]').focus()`);await win.webContents.insertText('Entwurf bleibt erhalten');
+ await click('.teacher-criterion-comment summary');await until(`document.querySelector('.teacher-criterion-comment').open`);await evaluate(`document.querySelector('[data-teacher-comment]').focus()`);await win.webContents.insertText('Entwurf bleibt erhalten');await until(`document.querySelector('[data-teacher-comment]').value==='Entwurf bleibt erhalten'`);
  await click('#assessment-back-btn');await settle();await click('[data-teacher-index="0"]');await settle();
  assert.equal(await evaluate(`document.querySelector('[data-teacher-criterion]').value`),'5');assert.equal(await evaluate(`document.querySelector('[data-teacher-comment]').value`),'Entwurf bleibt erhalten','Back/overview navigation preserves drafts');
  const count=await evaluate(`document.querySelectorAll('[data-teacher-criterion]').length`);
  for(let i=1;i<count;i++){await evaluate(`(()=>{const e=document.querySelectorAll('[data-teacher-criterion]')[${i}];e.scrollIntoView({block:'center'});e.focus()})()`);await pause(60);win.webContents.sendInputEvent({type:'keyDown',keyCode:'End'});win.webContents.sendInputEvent({type:'keyUp',keyCode:'End'});}
  await until(`[...document.querySelectorAll('[data-teacher-criterion]')].every(e=>e.dataset.rated==='true')`);
+ assert.match(await evaluate(`document.getElementById('teacher-grade-suggestion').textContent`),/4\.6/,'Negative criteria count in reverse');
+ await evaluate(`document.getElementById('teacher-grade').focus();document.getElementById('teacher-grade').select()`);await win.webContents.insertText('5.2');
  await click('#teacher-save-btn');await settle();await until(`notify.getActive().some(n=>n.text.includes('gespeichert'))`);await click('#assessment-back-btn');await settle();
  const persisted=()=>Object.values(Object.values(JSON.parse(fs.readFileSync(storage.getPaths().assessmentPath,'utf8')).workbooks)[0].classes).find(c=>c.name==='Klasse A').rounds[0];
- assert.equal(Object.values(persisted().assessments).filter(a=>a.teacherAnswers).length,1);
+ assert.equal(Object.values(persisted().assessments).filter(a=>a.teacherAnswers).length,1);assert.equal(Object.values(persisted().assessments).find(a=>a.teacherAnswers).teacherGrade,5.2,'Manual grade survives real IPC/store');
  const response=name=>({responseId:crypto.randomUUID(),roundId:remote.id,timestamp:new Date().toISOString(),name,email:name.startsWith('Anna')?'anna@example.ch':'max@example.ch',answers:Object.fromEntries(remote.criteria.map(c=>[c.id,4]))});
  remote.responses.push(response('Anna Beispiel'));await evaluate(`notify.clear()`);await click('#assessment-sync-btn');await settle();assert.equal(persisted().externalResponses.length,1);
  await click('#assessment-close-round-btn');await until(`!!document.getElementById('assessment-reopen-round-btn')`);await settle();assert.equal(remote.closed,true);

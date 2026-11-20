@@ -3,7 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),{execFileSync,spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..');
 const files=execFileSync('git',['ls-files','--cached','-z'],{cwd:root,encoding:'utf8'}).split('\0').filter(Boolean);
-const privatePath=/(^|\/)(?:cloudflare|issue-handler|node_modules|builds|\.wrangler|\.cloudflare-private|\.cloudflare-test|\.ui-polish-smoke|\.smoke-user-data|\.kristall-check)(\/|$)|^scripts\/cloudflare-|^test\/cloudflareE2E\.test\.js$|^docs\/cloudflare-deployment\.md$|(^|\/)\.env(?:\.|$)|\.(?:env|repetierer|pem|key|pfx|p12|sqlite|db)$/i;
+const privatePath=/(^|\/)(?:cloudflare|issue-handler|node_modules|builds|\.wrangler|\.cloudflare-private|\.cloudflare-test|\.ui-polish-smoke|\.smoke-user-data|\.kristall-check)(\/|$)|^scripts\/cloudflare-|^test\/cloudflare.*\.test\.js$|^docs\/cloudflare-deployment\.md$|(^|\/)\.env(?:\.|$)|\.(?:env|repetierer|pem|key|pfx|p12|sqlite|db)$/i;
 const rules=[
  ['private-key',/-----BEGIN (?:RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----/g],
  ['github-token',/\b(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{40,})\b/g],

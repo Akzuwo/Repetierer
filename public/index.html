@@ -53,10 +53,12 @@
 		</div>
 		<div class="drawer-view" id="drawer-main-view">
 			<div class="drawer-actions">
-				<button class="btn-2" id="repetition-nav-btn" aria-current="page"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7M4 4v5h5"/></svg>Repetition</button>
-				<button class="btn-2" id="assessment-nav-btn"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M9 12l2 2 4-4"/></svg>Mitmachnote</button>
-				<button class="btn-2" id="drawer-data-view-btn" title="Datei laden, Klassen importieren und Excel-Daten synchronisieren."><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>Dateiverwaltung</button>
+				<button class="btn-2" id="repetition-nav-btn" aria-current="page"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m10 8 5 4-5 4Z"/></svg>Session</button>
+				<button class="btn-2" id="assessment-nav-btn"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M9 12l2 2 4-4"/></svg>Mündliche Mitarbeit</button>
+				<button class="btn-2" id="dossiers-nav-btn"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="11" r="2"/><path d="M8 17c0-4 8-4 8 0"/></svg>Schülerakten</button>
+                <button class="btn-2" id="drawer-data-view-btn" title="Datei laden, Klassen importieren und Excel-Daten synchronisieren."><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>Dateiverwaltung</button>
 				<button class="btn-2" id="drawer-protocol-view-btn" title="Backups, Logs und Sitzungsprotokolle ansehen oder exportieren."><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h13M7 10h13M7 16h13M3 4h.01M3 10h.01M3 16h.01"/></svg>Protokoll</button>
+				<button type="button" class="btn-2" id="drawer-documentation-view-btn" title="API-Dokumentation und Bedienungsanleitung herunterladen."><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v16M12 5C9 3 5 3 2 4v15c3-1 7-1 10 2 3-3 7-3 10-2V4c-3-1-7-1-10 1Z"/></svg>Dokumentationen</button>
 				<button class="btn-2 disabled" id="stats-view-btn" title="Zeigt Klassenstatistiken der geladenen Datei."><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11h4v9M10 20V4h4v16M16 20v-7h4v7M3 20h18"/></svg>Statistiken</button>
 			</div>
 		</div>
@@ -73,10 +75,18 @@
 		<div class="drawer-view update-hidden" id="drawer-protocol-view">
 			<div class="drawer-actions">
 				<button class="btn-2" id="backup-btn" title="Zeigt gespeicherte Backup-Einträge dieser Sitzung und Datei.">Backup anzeigen</button>
-				<button class="btn-2" id="log-btn" title="Öffnet technische Meldungen, falls etwas geprüft werden muss.">Log anzeigen</button>
+				<button class="btn-2" id="crash-logs-btn">Crashprotokolle öffnen</button>
+                <button class="btn-2" id="log-btn" title="Öffnet technische Meldungen, falls etwas geprüft werden muss.">Log anzeigen</button>
 				<button class="btn-2" id="export-protocol-btn" title="Exportiert das Sitzungsprotokoll gleichzeitig als PDF und CSV.">Protokoll exportieren</button>
 				<button class="btn-2 update-hidden" id="problem-report-btn" hidden disabled title="Sendet einen Fehlerbericht mit Kommentar und bereinigten Logs.">Problem melden</button>
 			</div>
+		</div>
+		<div class="drawer-view update-hidden" id="drawer-documentation-view">
+			<div class="drawer-actions">
+				<button type="button" class="btn-2" id="documentation-api-btn" title="API-Dokumentation als Markdown-Datei speichern.">API Dokumentation</button>
+				<button type="button" class="btn-2" id="documentation-manual-btn" disabled aria-describedby="documentation-manual-status">Bedienungsanleitung</button>
+			</div>
+			<p id="documentation-manual-status">Die Bedienungsanleitung ist noch nicht verfügbar.</p>
 		</div>
 		</div>
 		<div class="drawer-actions debug-actions update-hidden" id="debug-actions">
@@ -174,7 +184,14 @@
 			<p class="stats-empty update-hidden" id="stats-empty">Noch keine Statistikdaten vorhanden.</p>
 			<div id="stats-list" tabindex="0" aria-label="Klassenstatistik"></div>
 		</section>
-		<div class="assessment-view update-hidden" id="assessment-view">
+		<section class="dossiers-view update-hidden" id="dossiers-view" aria-labelledby="dossiers-heading">
+            <header class="dossiers-header">
+                <div class="dossiers-back-slot"><button type="button" class="page-back-link" id="dossiers-back" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 5-7 7 7 7M3 12h17"/></svg><span>Zurück</span></button></div>
+                <div class="dossiers-heading-row"><h2 id="dossiers-heading">Schülerakten</h2><button type="button" class="btn-2" id="dossiers-export-btn" aria-haspopup="dialog" disabled><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14M5 12h14M5 19h14"/><circle cx="9" cy="5" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="9" cy="19" r="2"/></svg>Optionen</button></div>
+            </header>
+            <div id="dossiers-body" tabindex="0"></div>
+        </section>
+        <div class="assessment-view update-hidden" id="assessment-view">
 			<div class="assessment-header">
 				<div>
 					<h2 id="assessment-heading">Beurteilungsrunden</h2>
@@ -185,7 +202,7 @@
 				</div>
 			</div>
 			<p class="ui-loading-status update-hidden" id="assessment-operation-status" role="status"></p>
-			<div id="assessment-body" class="assessment-body" tabindex="0" aria-label="Mitmachnote – Inhalt"></div>
+			<div id="assessment-body" class="assessment-body" tabindex="0" aria-label="Mündliche Mitarbeit – Inhalt"></div>
 		</div>
     <section id="excel-editor-view" class="update-hidden" aria-labelledby="excel-editor-heading">
         <header class="excel-page-header">
@@ -209,7 +226,6 @@
 				<button class="btn-2 settings-back" id="settings-back-btn">Zurück</button>
 			</div>
 
-<div id="settings-class-picker" class="update-hidden"><label class="setting-field">Klasse<select id="settings-class-select" data-custom-select></select></label></div>
 <div class="settings-scroll-area">
 				<div id="settings-global-fields" role="tabpanel" aria-labelledby="settings-global-tab"><div class="ai-settings-section">
 					<div class="ai-settings-heading"><h3>Lokale KI</h3><button type="button" class="help-button mini-help-button" id="ai-info-btn" title="So funktioniert die lokale KI: Einrichtung, Datenschutz und Bestätigung von Änderungen. Erklärung öffnen." aria-label="Erklärung zur KI-Integration öffnen">?</button></div>
@@ -233,29 +249,31 @@
                     <input id="notification-duration-setting" type="range" min="2" max="8" step="1" value="6" aria-labelledby="notification-duration-setting-label">
                 </label>
 <h3 class="settings-section-heading">Integrationen</h3>
+                <label class="setting-row setting-toggle"><span class="setting-copy">Lokale Lese-API<small>Startet mit Windows und bleibt nach dem Schliessen der App verfügbar. Zugriff nur auf diesem Gerät.</small></span><input class="toggle-input" type="checkbox" id="local-api-setting" role="switch" checked><span class="toggle-switch" aria-hidden="true"></span></label>
+                <div class="setting-action"><span>API-Zugriff<small id="local-api-status" role="status">http://127.0.0.1:17839/v1 · Zugriffsschlüssel im App-Datenordner: local-api-token</small></span><button class="btn-2" id="local-api-copy-btn">Zugriffspfad kopieren</button></div>
                 <div class="integration-package">
-                  <p>Eine Datei für Cloudflare API und SMTP. Beim Import werden beide Verbindungen übernommen.</p>
+                  <p>Cloudzugang als .repetierer-Datei importieren oder exportieren.</p>
                   <div class="button-row"><button class="btn-1" id="integration-package-import-btn">.repetierer importieren</button><button class="btn-2" id="integration-package-export-btn">Paket exportieren</button></div>
                   <small>Das exportierte Paket enthält Zugangsdaten. Teile es nur mit der vorgesehenen Lehrperson.</small>
                   <p id="integration-package-status" role="status"></p>
                 </div>
 				<div class="setting-action assessment-integration-setting">
-					<span>Cloudflare API · Mitmachnote<small id="assessment-config-status">Umfrage: Nicht eingerichtet</small><small id="assessment-api-status">API: Nicht geprüft</small></span>
-					<div class="integration-actions">
-						<button class="btn-2 update-hidden" id="assessment-config-import-btn">Konfiguration importieren</button>
-						<button class="btn-2 update-hidden" id="assessment-api-test-btn">Verbindung testen</button>
-						<button class="btn-danger update-hidden" id="assessment-config-remove-btn">Konfiguration entfernen</button>
-					</div>
+					<span>Cloudflare API · Mündliche Mitarbeit<small id="assessment-config-status">Umfrage: Nicht eingerichtet</small><small id="assessment-api-status" role="status">API: Wird automatisch geprüft …</small><small>Automatische Prüfung beim Appstart und alle 5 Minuten.</small></span>
+					<button class="btn-2 update-hidden" id="assessment-config-import-btn">Konfiguration importieren</button>
 				</div>
 				<div class="setting-action assessment-integration-setting">
-					<span>Brevo SMTP<small id="brevo-status">Nicht eingerichtet</small></span>
-					<div class="integration-actions">
+					<span>E-Mail-Versand<small id="brevo-status">Nicht eingerichtet</small></span>
+					<div class="integration-actions update-hidden" id="smtp-settings-actions">
 						<button class="btn-2 update-hidden" id="brevo-import-btn">Konfiguration importieren</button>
-						<button class="btn-2 update-hidden" id="brevo-test-btn">Verbindung testen</button>
 						<button class="btn-danger update-hidden" id="brevo-remove-btn">Credentials entfernen</button>
 					</div>
-				</div></div>
-<div id="settings-class-fields" role="tabpanel" aria-labelledby="settings-class-tab" class="update-hidden"><p id="settings-class-hint">Bitte zuerst eine Datei laden.</p><fieldset id="settings-class-rules"><h3 class="settings-section-heading">Hausaufgaben vorführen</h3>
+				</div>
+                <label class="setting-field setting-range update-hidden" id="smtp-mail-limit-row"><span class="setting-range-heading"><span id="smtp-mail-limit-label">Tageslimit für eigenen lokalen SMTP-Versand</span><output id="smtp-mail-limit-value" for="smtp-mail-limit-setting">200</output></span><input id="smtp-mail-limit-setting" type="range" min="1" max="1000" value="200" step="1" aria-labelledby="smtp-mail-limit-label"><small>Das gemeinsame Cloudlimit beträgt fest 200 Mails pro Tag und lässt sich hier nicht ändern.</small></label>
+                <div class="settings-config-actions"><button type="button" class="btn-danger update-hidden" id="assessment-config-remove-btn">Konfiguration entfernen</button></div>
+                </div>
+<div id="settings-class-fields" role="tabpanel" aria-labelledby="settings-class-tab" class="update-hidden">
+<div id="settings-class-picker"><label class="setting-field">Klasse<select id="settings-class-select" data-custom-select></select></label></div>
+<p id="settings-class-hint">Bitte zuerst eine Datei laden.</p><fieldset id="settings-class-rules"><h3 class="settings-section-heading">Hausaufgaben vorführen</h3>
         <label class="setting-row setting-toggle"><span class="setting-copy">Freiwillige Hausaufgaben vorführen<small>Als zusätzlichen Bereich im Session-Dock anzeigen.</small></span><input class="toggle-input" type="checkbox" role="switch" id="homework-enabled-setting" checked><span class="toggle-switch" aria-hidden="true"></span></label>
         <label class="setting-field setting-range"><span class="setting-range-heading"><span id="homework-joker-setting-label">Ein Extra-Joker nach jeweils</span><output id="homework-joker-setting-value" for="homework-joker-setting" aria-hidden="true">2 Vorführungen</output></span><input type="range" id="homework-joker-setting" min="1" max="20" step="1" value="2" aria-labelledby="homework-joker-setting-label"></label>
         <label class="setting-field setting-range"><span class="setting-range-heading"><span id="homework-weight-setting-label">Gewicht gegenüber einer Repetition</span><output id="homework-weight-setting-value" for="homework-weight-setting" aria-hidden="true">1.2×</output></span><input type="range" id="homework-weight-setting" min="0.1" max="5" step="0.1" value="1.2" aria-labelledby="homework-weight-setting-label"></label>
@@ -301,10 +319,6 @@
 				</label>
 
                 </fieldset></div>
-			</div>
-			<div class="settings-page-actions">
-				<button class="btn-2" id="close-settings-modal">Verwerfen</button>
-				<button class="btn-1" id="save-settings-btn">Speichern</button>
 			</div>
 		</div>
 	</section>
@@ -518,6 +532,8 @@
 				<h2>Anleitung</h2>
 			</div>
 			<div class="settings-guide settings-scroll-area">
+				<h3>Einstellungen direkt übernehmen</h3>
+				<p>Änderungen werden sofort gespeichert und angewendet. Globale Optionen gelten für die App, Klassenregeln nur für die ausgewählte Klasse. Mit „Zurück“ verlässt du die Einstellungen.</p>
 				<h3>Design</h3>
 				<p>Mitternacht ist das neue Standarddesign in Schwarz, Blau und Weiß. Das bisherige grüne Design bleibt als „Klassisch“ verfügbar.</p>
 				<h3>Extra Joker ab 3 Noten</h3>
@@ -543,43 +559,12 @@
 		</div>
 	</div>
 
-	<div id="session-close-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="session-close-heading">
-  <div class="modal-content session-end-confirm-content">
-   <h2 id="session-close-heading">App schliessen?</h2>
-   <p id="session-close-text"></p>
-   <p>Bereits gespeicherte Einträge bleiben erhalten. Die Session kann beim nächsten Start fortgesetzt werden.</p>
-   <div class="modal-buttons"><button type="button" class="btn-2" id="session-close-cancel-btn">Zurück zur App</button><button type="button" class="btn-danger" id="session-close-confirm-btn">App schliessen</button></div>
-  </div>
- </div>
-
-	<div id="session-end-modal" class="modal">
-		<div class="modal-content session-end-confirm-content">
-			<h2>Session beenden?</h2>
-			<p>Alle Einträge bleiben gespeichert. Danach gelangst du zur Klassenauswahl.</p>
-			<div class="modal-buttons">
-				<button class="btn-2" id="cancel-session-end-btn">Abbrechen</button>
-				<button class="btn-danger" id="confirm-session-end-btn">Session beenden</button>
-			</div>
-		</div>
-	</div>
-
 	<div id="participation-modal" class="modal">
 		<div class="modal-content participation-modal-content">
 			<h2>Mitarbeit erfassen</h2>
 			<p class="participation-modal-person" id="participation-student-name">Schüler</p>
 			<div class="participation-score-list" id="participation-score-list"></div>
 			<div class="modal-buttons"><button class="btn-2 participation-cancel" id="participation-cancel-btn">Abbrechen</button></div>
-		</div>
-	</div>
-
-	<div id="assessment-confirm-modal" class="modal">
-		<div class="modal-content conflict-content">
-			<h2>Klassensatz versenden</h2>
-			<p id="assessment-confirm-text"></p>
-			<div class="modal-buttons">
-				<button class="btn-1" id="assessment-confirm-send-btn">E-Mails senden</button>
-				<button class="btn-2" id="assessment-confirm-cancel-btn">Abbrechen</button>
-			</div>
 		</div>
 	</div>
 
@@ -593,9 +578,6 @@
 			<div class="modal-buttons"><button type="button" class="btn-2" id="ai-info-close-btn">Verstanden</button><button type="button" class="btn-1 update-hidden" id="ai-info-confirm-btn">Einrichten und herunterladen</button></div>
 		</div>
 	</div>
-	<div id="ai-remove-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="ai-remove-heading" aria-hidden="true">
-		<div class="modal-content conflict-content"><h2 id="ai-remove-heading">KI-Integration entfernen?</h2><p>Repetierer verwendet die lokale KI danach nicht mehr. Offene Änderungsbestätigungen werden verworfen. Deine Klassen und Bewertungen sowie Ollama und vorhandene Modelle bleiben erhalten.</p><div class="modal-buttons"><button type="button" class="btn-2" id="ai-remove-cancel-btn">Abbrechen</button><button type="button" class="btn-danger" id="ai-remove-confirm-btn">Integration entfernen</button></div></div>
-	</div>
 	<div id="ai-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="ai-heading" aria-hidden="true">
 		<div class="modal-content ai-content">
 			<div class="ai-header"><h2 id="ai-heading">KI-Assistent</h2><button class="btn-2 update-hidden" id="ai-close-btn">Schliessen</button></div>
@@ -605,19 +587,6 @@
 			<div class="ai-messages" id="ai-messages" role="log" aria-label="Chatverlauf" aria-live="polite" aria-relevant="additions text"><div class="ai-empty" id="ai-empty"><div class="ai-empty-intro"><canvas class="thinking-orb ai-welcome-orb" id="ai-welcome-orb" aria-hidden="true"></canvas><div><h3>Fragen zum Unterricht</h3><p>Stelle eine Frage zur Klasse oder zur aktuellen Session.</p></div></div></div></div>
 			<div class="ai-activity update-hidden" id="ai-activity" role="status"><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span><div><strong id="ai-activity-label">Antwort wird erstellt …</strong><span>Der Assistent verarbeitet deine Anfrage lokal.</span></div></div>
 			<form class="ai-composer" id="ai-form"><label class="sr-only" for="ai-input">Nachricht an den KI-Assistenten</label><div class="ai-input-row"><textarea id="ai-input" rows="1" maxlength="2000" placeholder="Frage zur Klasse oder Session …" autocomplete="off"></textarea><button class="btn-1" id="ai-send-btn" type="submit" aria-label="Nachricht senden"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 11 7-7 7 7M12 4v16"/></svg></button></div></form>
-		</div>
-	</div>
-
-	<div id="assessment-delete-modal" class="modal">
-		<div class="modal-content conflict-content">
-			<h2>Beurteilungsrunde löschen</h2>
-			<p id="assessment-delete-text"></p>
-			<p class="ui-alert ui-alert-warning assessment-warning update-hidden" id="assessment-delete-sent-warning"></p>
-			<p>Die Runde und ihre Antworten werden lokal und auf dem Umfrageserver gelöscht. Bereits versendete E-Mails bleiben bei den Empfängern.</p>
-			<div class="modal-buttons">
-				<button class="btn-danger" id="assessment-delete-confirm-btn">Runde löschen</button>
-				<button class="btn-2" id="assessment-delete-cancel-btn">Abbrechen</button>
-			</div>
 		</div>
 	</div>
 
@@ -638,6 +607,7 @@
 </body>
 
 <script>
+    require('./crashReporter.js');
 	require('./debugMode.js').install();
 	require('./customSelect.js').initCustomSelects();
 	require('./kristall/integration.js').initKristall();
@@ -648,6 +618,7 @@
 	require('./homeworkPage.js');
 	require('./settingsScope.js');
 	require('./assessmentRenderer.js');
+    require('./studentDossiers.js');
 	require('./aiRenderer.js');
 </script>
 
