@@ -45,7 +45,7 @@ function publishRelease(root = path.resolve(__dirname, '..'), env = process.env,
   }
   // A failed upload leaves a new release as a draft; reruns can replace the same assets.
   gh(['release', 'upload', tag, ...assets, '--repo', repository, '--clobber']);
-  gh(['release', 'edit', tag, '--repo', repository, '--notes-file', notes, '--draft=false']);
+  gh(['release', 'edit', tag, '--repo', repository, '--notes-file', notes, '--draft=false', '--latest']);
   console.log(`Release ${tag} mit Installer, Blockmap, latest.yml und Buildnotes.json veröffentlicht.`);
 }
 

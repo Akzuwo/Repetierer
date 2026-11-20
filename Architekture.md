@@ -104,7 +104,7 @@ Versioniert werden App, appseitiger API-Client, Dokumentation und lokale App-Pr�
 
 ## Version und Buildidentität
 
-`package.json` hält `version` (Semver, aktuell 7.0.0) unabhängig von `buildNumber` (28) und `buildDate` (09112026). `src/buildInfo.js` liest diese gespeicherten Werte ohne neues Startdatum und erzeugt die Anzeige `28.09112026`. `get-version` liefert Version und Buildinformationen getrennt; beide sind auch ausserhalb des Debug-Modus im Drawer sichtbar. Der Release-Plan übergibt Buildnummer und Datum per `extraMetadata` an beide Builder-Schritte und verwendet sie im Installer-Dateinamen. Das Datum wird einmal beim Bauen in Europe/Zurich ermittelt. `build-local.ps1` zählt von der höheren lokalen/Paketnummer weiter und speichert den Zähler erst nach Erfolg. Eine Prüfung des Argumentplans erstellt keinen Installer. `test/debugTools.test.js` prüft diese Regeln sowie die Update-Zustände und Testmail-Vorlage.
+`package.json` hält `version` (Semver) unabhängig von `buildNumber` und `buildDate`. `src/buildInfo.js` liest diese gespeicherten Werte ohne neues Startdatum und erzeugt beispielsweise die Anzeige `29.20112026`. `get-version` liefert Version und Buildinformationen getrennt; beide sind auch ausserhalb des Debug-Modus im Drawer sichtbar. Der Release-Plan übergibt Buildnummer und Datum per `extraMetadata` an beide Builder-Schritte und verwendet sie im Installer-Dateinamen. Das Datum wird einmal beim Bauen in Europe/Zurich ermittelt. `build-local.ps1` zählt von der höheren lokalen/Paketnummer weiter und speichert den Zähler erst nach Erfolg. Eine Prüfung des Argumentplans erstellt keinen Installer. `test/debugTools.test.js` prüft diese Regeln sowie die Update-Zustände und Testmail-Vorlage.
 
 
 ## Hausaufgaben und lokale Klassenregeln
@@ -161,6 +161,8 @@ Die Rundenübersicht öffnet Schüler über native Buttons. Lehrerentwürfe werd
 Die Online-Umfrage ist ein separat veröffentlichter Dienst. Der frühere Serverstand vom 13. Oktober unterstützte das Wiederöffnen noch nicht. Nach ausdrücklicher Freigabe wurde der getestete Stand am 13. November für beide bestehenden Umfragepfade veröffentlicht; synthetische Live-Runden bestätigten Schliessen, Wiederöffnen, verspätete Abgabe und Erhalt vorheriger Antworten. Die Prüfrunden wurden entfernt; private Betreiberdateien bleiben unversioniert.
 
 ## GitHub-Release-Notizen
+
+Die Windows-App lädt `latest.yml` über GitHubs `releases/latest/download/`-Endpunkt. Der generische Provider in `app.js` liest das Manifest direkt und prüft die Version und den Installer mit Electron Updater. Der vorhandene GitHub-Publish-Provider erzeugt weiterhin Installer, Blockmap und Manifest für bestehende Installationen. Die Pipeline markiert das stabile Release nach dem Upload mit `--latest` als aktuell. Der Download startet weiterhin erst nach Zustimmung.
 
 Der Release-Workflow erzeugt `release_notes.md` ausschliesslich aus dem Eintrag der aktuellen Paketversion in `Buildnotes.json` (Grossschreibung des Dateinamens beachten). Titel und Änderungen werden als Markdownüberschrift und Liste ausgegeben. Bei Tag-Releases muss der Tag zur Paketversion passen. Fehlende oder ungültige Einträge stoppen den Job vor dem Build; `release-notes.txt` und manuelle Texteingaben sind keine Ersatzquelle. Die Anzeige der bisherigen App-Neuigkeiten aus `release-notes.txt` bleibt unabhängig davon unverändert.
 

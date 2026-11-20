@@ -44,6 +44,7 @@ test('missing tag is created at the workflow SHA before a draft is created, uplo
   assert.ok(f.calls[4].includes('--verify-tag')); assert.ok(f.calls[4].includes('--draft'));
   assert.ok(f.calls[5].includes(path.join(f.root, 'builds', 'latest.yml')));
   assert.ok(f.calls[6].includes('--draft=false')); assert.ok(f.calls[6].includes('--notes-file'));
+  assert.ok(f.calls[6].includes('--latest'));
 });
 
 test('reruns reuse existing tags and releases without deleting earlier build assets', t => {

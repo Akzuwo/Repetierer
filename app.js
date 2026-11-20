@@ -36,10 +36,9 @@ let updateCheckStarted = false;
 let updateListenersRegistered = false;
 let availableUpdateInfo;
 const updateFeed = {
-	provider: 'github',
-	owner: 'Akzuwo',
-	repo: 'Repetierer',
-	releaseType: 'release'
+	provider: 'generic',
+	url: 'https://github.com/Akzuwo/Repetierer/releases/latest/download/',
+	useMultipleRangeRequest: false
 };
 
 if (process.platform === 'win32') {
@@ -147,7 +146,7 @@ ipcMain.on('startup-splash-finished', () => {
 	createMainWindow();
 });
 
-function checkForUpdatesWithConsent() {
+async function checkForUpdatesWithConsent() {
 	if (updateCheckStarted) return;
 	updateCheckStarted = true;
 
@@ -156,20 +155,21 @@ function checkForUpdatesWithConsent() {
 		return;
 	}
 
-	autoUpdater = getAutoUpdater();
-	autoUpdater.autoDownload = false;
-	autoUpdater.autoInstallOnAppQuit = false;
-	autoUpdater.setFeedURL(updateFeed);
-	registerUpdaterListeners();
-
 	sendUpdateStatus('checking');
-	autoUpdater.checkForUpdates().catch(error => {
+	try {
+		autoUpdater = getAutoUpdater();
+		autoUpdater.autoDownload = false;
+		autoUpdater.autoInstallOnAppQuit = false;
+		autoUpdater.setFeedURL(updateFeed);
+		registerUpdaterListeners();
+		await autoUpdater.checkForUpdates();
+	} catch (error) {
 		console.error('Update check failed:', error);
 		sendUpdateStatus('error', {
 			message: 'Update-Prüfung fehlgeschlagen.',
 			error: getErrorMessage(error)
 		});
-	});
+	}
 }
 
 function getAutoUpdater() {

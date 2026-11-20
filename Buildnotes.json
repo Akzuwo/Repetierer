@@ -10,6 +10,13 @@
       "Abwesenheiten werden nach jedem Tag automatisch zurückgesetzt"
     ]
   },
+  "7.0.1": {
+    "title": "Windows-Updater",
+    "changes": [
+      "Repetierer liest die Update-Datei direkt aus dem aktuellen stabilen GitHub-Release.",
+      "Stabile Releases werden nach dem Upload der Update-Dateien ausdrücklich als aktuell markiert."
+    ]
+  },
   "7.0.0": {
     "title": "Grosses Update mit neuem Design und neuen Features",
     "changes": [
